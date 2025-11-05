@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServiceIA - Socket.IO + OpenAI</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 800px;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .chat-container {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.bot {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .message-label {
+            font-size: 0.75em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+        }
+
+        .message.agent-action {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 3px solid #ffc107;
+            font-style: italic;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .message.agent-selection {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 3px solid #17a2b8;
+            font-size: 0.9em;
+        }
+
+        .message.agent-message {
+            background: #e7f3ff;
+            color: #004085;
+            border-left: 3px solid #0056b3;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+
+        .message.agent-message pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.85em;
+        }
+
+        .message.agent-message code {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .message.terminal-output {
+            background: #1e1e1e;
+            border-left: 3px solid #4ec9b0;
+            margin: 10px 0;
+        }
+
+        .message.terminal-output .message-label {
+            background: #252526;
+            color: #4ec9b0;
+            padding: 8px 12px;
+            border-radius: 5px 5px 0 0;
+            font-weight: 600;
+        }
+
+        .terminal-content {
+            scrollbar-width: thin;
+            scrollbar-color: #4ec9b0 #1e1e1e;
+        }
+
+        .terminal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-content::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .terminal-content::-webkit-scrollbar-thumb {
+            background: #4ec9b0;
+            border-radius: 4px;
+        }
+
+        .terminal-content::-webkit-scrollbar-thumb:hover {
+            background: #5ed9c9;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 ServiceIA</h1>
+        <p class="subtitle">Comunicação via Socket.IO com OpenAI</p>
+        
+        <div id="status" class="status disconnected">
+            Desconectado
+        </div>
+
+        <div class="chat-container" id="chat">
+            <div class="message bot">
+                <div class="message-label">Sistema</div>
+                <div>Conecte-se ao servidor para começar a conversar!</div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="Digite sua mensagem (ex: Hello)..."
+                autocomplete="off"
+            >
+            <button id="sendButton" onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:3000');
+        const chatContainer = document.getElementById('chat');
+        const statusDiv = document.getElementById('status');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+
+        // Eventos de conexão
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Conectado';
+            statusDiv.className = 'status connected';
+            addMessage('Sistema', 'Conectado ao servidor!', 'bot');
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Desconectado';
+            statusDiv.className = 'status disconnected';
+            addMessage('Sistema', 'Desconectado do servidor', 'bot');
+        });
+
+        // Recebe informação sobre qual agente foi selecionado
+        socket.on('agent_selected', (data) => {
+            addAgentSelection(data.agentName, data.description);
+        });
+
+        // Recebe resposta do servidor
+        socket.on('response', (data) => {
+            removeLoading();
+            removeAgentActions();
+            const senderLabel = data.agentName ? `IA (${data.agentName})` : 'IA';
+            addMessage(senderLabel, data.message, 'bot');
+        });
+
+        // Recebe erros
+        socket.on('error', (data) => {
+            removeLoading();
+            removeAgentActions();
+            addMessage('Erro', data.message, 'bot');
+        });
+
+        // Recebe ações do agente em tempo real
+        socket.on('agent_action', (data) => {
+            addAgentAction(data.action);
+        });
+
+        // Recebe confirmação de conclusão de ação
+        socket.on('agent_action_complete', (data) => {
+            updateAgentAction(data.action, data.success, data.result);
+        });
+
+        // Logs de debug removidos - apenas logs no servidor
+
+        // Recebe mensagens trocadas pelos agentes
+        socket.on('agent_message', (data) => {
+            addAgentMessage(data);
+        });
+
+        // Recebe saída do terminal em tempo real
+        socket.on('terminal_output', (data) => {
+            addTerminalOutput(data);
+        });
+
+        function addMessage(sender, message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `
+                <div class="message-label">${sender}</div>
+                <div>${message}</div>
+            `;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function addLoading() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading';
+            loadingDiv.className = 'loading';
+            loadingDiv.textContent = 'Processando...';
+            chatContainer.appendChild(loadingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function removeLoading() {
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.remove();
+            }
+        }
+
+        function addAgentAction(actionText) {
+            // Remove ações anteriores se existirem
+            removeAgentActions();
+            
+            const actionDiv = document.createElement('div');
+            actionDiv.className = 'message agent-action';
+            actionDiv.id = 'agent-action';
+            actionDiv.innerHTML = `
+                <div class="message-label">🤖 Agente</div>
+                <div>${actionText}</div>
+            `;
+            chatContainer.appendChild(actionDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function updateAgentAction(actionText, success, resultPreview) {
+            const actionDiv = document.getElementById('agent-action');
+            if (actionDiv) {
+                const icon = success ? '✅' : '❌';
+                let content = `${icon} ${actionText}`;
+                if (resultPreview) {
+                    content += `<br><small style="opacity: 0.7;">Resultado: ${escapeHtml(resultPreview)}</small>`;
+                }
+                actionDiv.innerHTML = `
+                    <div class="message-label">🤖 Agente</div>
+                    <div>${content}</div>
+                `;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                // Remove após 3 segundos
+                setTimeout(() => {
+                    if (actionDiv && actionDiv.parentNode) {
+                        actionDiv.remove();
+                    }
+                }, 3000);
+            }
+        }
+
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Container para o terminal
+        let terminalContainer = null;
+
+        function addTerminalOutput(data) {
+            // Se for início de um novo comando, limpa o terminal anterior
+            if (data.type === 'start') {
+                if (terminalContainer && terminalContainer.parentNode) {
+                    terminalContainer.remove();
+                }
+                terminalContainer = null;
+            }
+
+            // Cria container do terminal se não existir
+            if (!terminalContainer) {
+                terminalContainer = document.createElement('div');
+                terminalContainer.className = 'message terminal-output';
+                terminalContainer.id = 'terminal-output';
+                terminalContainer.innerHTML = `
+                    <div class="message-label">💻 Terminal</div>
+                    <div class="terminal-content" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9em; white-space: pre-wrap; max-height: 500px; overflow-y: auto; line-height: 1.5;"></div>
+                `;
+                chatContainer.appendChild(terminalContainer);
+            }
+
+            const terminalContent = terminalContainer.querySelector('.terminal-content');
+            
+            if (!terminalContent) return;
+
+            // Processa o conteúdo baseado no tipo
+            let content = '';
+            let color = '#d4d4d4'; // Cor padrão (cinza claro)
+
+            switch (data.type) {
+                case 'start':
+                    color = '#4ec9b0'; // Verde água
+                    content = escapeHtml(data.content);
+                    break;
+                case 'stdout':
+                    color = '#d4d4d4'; // Cinza claro (saída normal)
+                    content = escapeHtml(data.content);
+                    break;
+                case 'stderr':
+                    color = '#f48771'; // Laranja (erros/avisos)
+                    content = escapeHtml(data.content);
+                    break;
+                case 'success':
+                    color = '#4ec9b0'; // Verde água
+                    content = escapeHtml(data.content);
+                    break;
+                case 'error':
+                    color = '#f48771'; // Laranja/vermelho
+                    content = escapeHtml(data.content);
+                    break;
+                default:
+                    content = escapeHtml(data.content);
+            }
+
+            // Adiciona o conteúdo com a cor apropriada
+            const span = document.createElement('span');
+            span.style.color = color;
+            span.textContent = content;
+            terminalContent.appendChild(span);
+
+            // Auto-scroll para o final
+            terminalContent.scrollTop = terminalContent.scrollHeight;
+
+            // Se o comando terminou, marca mas mantém visível
+            if (data.isComplete) {
+                // Adiciona uma linha separadora visual
+                const separator = document.createElement('div');
+                separator.style.marginTop = '10px';
+                separator.style.paddingTop = '10px';
+                separator.style.borderTop = '1px solid #4ec9b0';
+                separator.style.opacity = '0.3';
+                terminalContent.appendChild(separator);
+            }
+        }
+
+        function addAgentMessage(data) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message agent-message';
+            
+            let icon = '💬';
+            let title = 'Mensagem do Agente';
+            let content = '';
+            
+            if (data.type === 'user') {
+                icon = '👤';
+                title = 'Mensagem do Usuário (enviada ao agente)';
+                content = `<div style="font-weight: 600; margin-bottom: 5px;">📝 Mensagem:</div>
+                    <div style="background: rgba(102, 126, 234, 0.1); padding: 8px; border-radius: 5px; margin-bottom: 5px;">${escapeHtml(data.message)}</div>`;
+            } else if (data.type === 'assistant') {
+                icon = '🤖';
+                title = 'Resposta do Agente';
+                content = `<div style="font-weight: 600; margin-bottom: 5px;">💬 Resposta:</div>
+                    <div style="background: rgba(102, 126, 234, 0.1); padding: 8px; border-radius: 5px; margin-bottom: 5px; white-space: pre-wrap;">${escapeHtml(data.message)}</div>`;
+            } else if (data.type === 'function_calls') {
+                icon = '🔧';
+                title = 'Funções que o Agente quer Executar';
+                content = `<div style="font-weight: 600; margin-bottom: 5px;">Funções solicitadas:</div>`;
+                data.toolCalls.forEach((tc, index) => {
+                    content += `<div style="background: rgba(255, 193, 7, 0.1); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
+                        <strong>${index + 1}. ${tc.functionName}</strong><br>
+                        <small>Argumentos:</small><pre style="font-size: 0.85em; margin: 5px 0; overflow-x: auto;">${escapeHtml(JSON.stringify(tc.arguments, null, 2))}</pre>
+                    </div>`;
+                });
+            } else if (data.type === 'function_result') {
+                icon = '✅';
+                title = `Resultado da Função: ${data.functionName}`;
+                content = `<div style="font-weight: 600; margin-bottom: 5px;">Função executada: <code>${data.functionName}</code> (${data.executionTime}ms)</div>
+                    <div style="font-weight: 600; margin-bottom: 5px;">Argumentos:</div>
+                    <pre style="font-size: 0.85em; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px; overflow-x: auto;">${escapeHtml(JSON.stringify(data.arguments, null, 2))}</pre>
+                    <div style="font-weight: 600; margin-bottom: 5px;">Resultado:</div>
+                    <div style="background: ${data.success ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)'}; padding: 8px; border-radius: 5px; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">${escapeHtml(data.result)}</div>`;
+            } else if (data.type === 'function_outputs') {
+                icon = '📤';
+                title = 'Resultados Enviados de Volta ao Agente';
+                content = `<div style="font-weight: 600; margin-bottom: 5px;">${data.outputsCount} resultado(s) enviado(s):</div>`;
+                data.outputs.forEach((output, index) => {
+                    content += `<div style="background: rgba(102, 126, 234, 0.1); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
+                        <strong>${index + 1}. Tool Call ID: ${output.toolCallId}</strong><br>
+                        <small>Tamanho: ${output.outputLength} caracteres</small><br>
+                        <div style="margin-top: 5px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-size: 0.9em;">${escapeHtml(output.output)}</div>
+                    </div>`;
+                });
+            }
+            
+            let detailsHtml = '';
+            if (data.details && Object.keys(data.details).length > 0) {
+                detailsHtml = '<details style="margin-top: 5px;"><summary style="cursor: pointer; font-size: 0.85em; opacity: 0.7;">Detalhes técnicos</summary><pre style="font-size: 0.75em; margin-top: 5px; padding: 5px; background: rgba(0,0,0,0.1); border-radius: 3px; overflow-x: auto;">' + 
+                    escapeHtml(JSON.stringify(data.details, null, 2)) + '</pre></details>';
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-label">${icon} ${title}</div>
+                <div>${content}${detailsHtml}</div>
+            `;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function removeAgentActions() {
+            const actionDiv = document.getElementById('agent-action');
+            if (actionDiv) {
+                actionDiv.remove();
+            }
+        }
+
+        function addAgentSelection(agentName, description) {
+            const selectionDiv = document.createElement('div');
+            selectionDiv.className = 'message agent-selection';
+            selectionDiv.innerHTML = `
+                <div class="message-label">🤖 Usando Agente</div>
+                <div><strong>${agentName}</strong>: ${description}</div>
+            `;
+            chatContainer.appendChild(selectionDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Remove após 3 segundos
+            setTimeout(() => {
+                if (selectionDiv && selectionDiv.parentNode) {
+                    selectionDiv.remove();
+                }
+            }, 3000);
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage('Você', message, 'user');
+            addLoading();
+            messageInput.value = '';
+            sendButton.disabled = true;
+
+            socket.emit('message', { message: message });
+
+            setTimeout(() => {
+                sendButton.disabled = false;
+                messageInput.focus();
+            }, 100);
+        }
+
+        // Envia mensagem ao pressionar Enter
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Foca no input quando a página carrega
+        window.onload = () => {
+            messageInput.focus();
+        };
+    </script>
+</body>
+</html>
+
