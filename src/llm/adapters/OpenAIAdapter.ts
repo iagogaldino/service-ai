@@ -7,6 +7,8 @@ import { Socket } from 'socket.io';
 import { AgentConfig } from '../../agents/config';
 import { LLMAdapter, LLMThread, LLMMessage, LLMRun, TokenUsage } from './LLMAdapter';
 import { executeTool } from '../../agents/agentManager';
+import { emitToMonitors } from '../../services/monitoringService';
+import { formatActionMessage } from '../../utils/functionDescriptions';
 
 export class OpenAIAdapter implements LLMAdapter {
   readonly provider = 'openai';
@@ -195,6 +197,73 @@ export class OpenAIAdapter implements LLMAdapter {
     let totalCompletionTokens = 0;
     let totalTokens = 0;
 
+    const seenAssistantMessageIds = new Set<string>();
+
+    const emitEvent = (event: string, data: any) => {
+      if (!socket) return;
+      socket.emit(event, data);
+      emitToMonitors(socket.id, event, data);
+    };
+
+    const emitAssistantMessage = (message: {
+      type: 'assistant';
+      message: string;
+      messageId: string;
+      details: { threadId: string; role: string; createdAt?: number };
+    }) => {
+      emitEvent('agent_message', message);
+    };
+
+    const fetchAndEmitNewAssistantMessages = async (): Promise<any[] | null> => {
+      if (!socket) {
+        return null;
+      }
+
+      const messages = await this.openai.beta.threads.messages.list(threadId, {
+        order: 'desc',
+        limit: 50,
+      });
+
+      for (const msg of [...messages.data].reverse()) {
+        if (msg.role !== 'assistant') {
+          continue;
+        }
+        if (seenAssistantMessageIds.has(msg.id)) {
+          continue;
+        }
+        const textContent = msg.content.find((c: any) => c.type === 'text') as any;
+        if (!textContent?.text?.value) {
+          continue;
+        }
+
+        seenAssistantMessageIds.add(msg.id);
+        emitAssistantMessage({
+          type: 'assistant',
+          message: textContent.text.value,
+          messageId: msg.id,
+          details: {
+            threadId,
+            role: 'assistant',
+            createdAt: msg.created_at
+          }
+        });
+      }
+
+      return messages.data;
+    };
+
+    if (socket) {
+      const existingMessages = await this.openai.beta.threads.messages.list(threadId, {
+        order: 'desc',
+        limit: 50
+      });
+      existingMessages.data.forEach((msg: any) => {
+        if (msg.role === 'assistant') {
+          seenAssistantMessageIds.add(msg.id);
+        }
+      });
+    }
+
     while (iterationCount < MAX_ITERATIONS) {
       iterationCount++;
       const run = await this.openai.beta.threads.runs.retrieve(threadId, runId);
@@ -205,20 +274,30 @@ export class OpenAIAdapter implements LLMAdapter {
         totalTokens += run.usage.total_tokens || 0;
       }
 
+      if (socket) {
+        await fetchAndEmitNewAssistantMessages();
+      }
+
       if (run.status === 'completed') {
+        let latestMessages: any[] | null = null;
+        if (socket) {
+          latestMessages = await fetchAndEmitNewAssistantMessages();
+        }
         // A API da OpenAI retorna mensagens em ordem decrescente (mais recentes primeiro)
         // Quando um run completa, a mensagem do assistente é adicionada à thread
         // Então a primeira mensagem do assistente na lista é a resposta mais recente
-        const messages = await this.openai.beta.threads.messages.list(threadId, { limit: 20 });
+        const messages =
+          latestMessages ??
+          (await this.openai.beta.threads.messages.list(threadId, { limit: 20 })).data;
         
         // Procura a primeira mensagem do assistente (role === 'assistant') na lista
         // Como a lista está em ordem decrescente, a primeira mensagem do assistente é a mais recente
-        const assistantMessage = messages.data.find(msg => msg.role === 'assistant');
+        const assistantMessage = messages.find((msg: any) => msg.role === 'assistant');
         
         if (assistantMessage) {
           // Procura conteúdo de texto na mensagem
-          const textContent = assistantMessage.content.find((c: any) => c.type === 'text');
-          if (textContent && 'text' in textContent) {
+          const textContent = assistantMessage.content.find((c: any) => c.type === 'text') as any;
+          if (textContent?.text?.value) {
             return {
               message: textContent.text.value,
               tokenUsage: {
@@ -231,10 +310,10 @@ export class OpenAIAdapter implements LLMAdapter {
         }
         
         // Fallback: se não encontrou mensagem do assistente, tenta pegar a primeira mensagem
-        const firstMessage = messages.data[0];
+        const firstMessage = messages[0];
         if (firstMessage) {
-          const textContent = firstMessage.content.find((c: any) => c.type === 'text');
-          if (textContent && 'text' in textContent) {
+          const textContent = firstMessage.content.find((c: any) => c.type === 'text') as any;
+          if (textContent?.text?.value) {
             return {
               message: textContent.text.value,
               tokenUsage: {
@@ -262,12 +341,81 @@ export class OpenAIAdapter implements LLMAdapter {
 
       if (run.status === 'requires_action') {
         const toolCalls = run.required_action?.submit_tool_outputs?.tool_calls || [];
+
+        const toolCallsInfo = toolCalls
+          .map((toolCall) => {
+            if (toolCall.type !== 'function') return null;
+            let parsedArgs: any = {};
+            try {
+              parsedArgs = JSON.parse(toolCall.function.arguments || '{}');
+            } catch (error) {
+              parsedArgs = { raw: toolCall.function.arguments };
+            }
+            return {
+              toolCallId: toolCall.id,
+              functionName: toolCall.function.name,
+              arguments: parsedArgs,
+              rawArguments: toolCall.function.arguments,
+            };
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null);
+
+        if (toolCallsInfo.length > 0) {
+          emitEvent('agent_message', {
+            type: 'function_calls',
+            toolCalls: toolCallsInfo,
+            details: {
+              runId,
+              toolCallsCount: toolCalls.length,
+            },
+          });
+        }
+
         const toolOutputs = await Promise.all(
           toolCalls.map(async (toolCall) => {
             if (toolCall.type !== 'function') return null;
+
             const functionName = toolCall.function.name;
-            const args = JSON.parse(toolCall.function.arguments);
-            const result = await executeTool(functionName, args, socket);
+            let args: any = {};
+
+            try {
+              args = JSON.parse(toolCall.function.arguments || '{}');
+            } catch (error) {
+              args = { raw: toolCall.function.arguments };
+            }
+
+            const actionMessage = formatActionMessage(functionName, args);
+            emitEvent('agent_action', {
+              action: actionMessage,
+              functionName,
+              args,
+            });
+
+            const startTime = Date.now();
+            const rawResult = await executeTool(functionName, args, socket);
+            const result =
+              typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult, null, 2);
+            const executionTime = Date.now() - startTime;
+            const success = !result.startsWith('Erro:');
+
+            emitEvent('agent_message', {
+              type: 'function_result',
+              functionName,
+              arguments: args,
+              result,
+              executionTime,
+              details: {
+                toolCallId: toolCall.id,
+                success,
+              },
+            });
+
+            emitEvent('agent_action_complete', {
+              action: actionMessage,
+              success,
+              result: result.substring(0, 500),
+            });
+
             return {
               tool_call_id: toolCall.id,
               output: result,
@@ -276,6 +424,25 @@ export class OpenAIAdapter implements LLMAdapter {
         );
 
         const validOutputs = toolOutputs.filter((o): o is NonNullable<typeof o> => o !== null);
+
+        emitEvent('agent_action', {
+          action: '⚙️ Processando resultados...',
+          functionName: 'processing',
+        });
+
+        emitEvent('agent_message', {
+          type: 'function_outputs',
+          outputs: validOutputs.map((output) => ({
+            toolCallId: output.tool_call_id,
+            output: output.output.substring(0, 1000) + (output.output.length > 1000 ? '...' : ''),
+            outputLength: output.output.length,
+          })),
+          details: {
+            runId,
+            outputsCount: validOutputs.length,
+          },
+        });
+
         await this.openai.beta.threads.runs.submitToolOutputs(threadId, runId, {
           tool_outputs: validOutputs,
         });

@@ -6,6 +6,7 @@ import { Socket } from 'socket.io';
 import { AgentConfig } from '../../agents/config';
 import { LLMAdapter, LLMThread, LLMMessage, LLMRun, TokenUsage } from './LLMAdapter';
 import { executeTool } from '../../agents/agentManager';
+import { emitToMonitors } from '../../services/monitoringService';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -191,16 +192,88 @@ export class StackSpotAdapter implements LLMAdapter {
   ): Promise<{ message: string; tokenUsage: TokenUsage }> {
     let iterationCount = 0;
     const MAX_ITERATIONS = 60; // Aumentado para 60 para dar tempo ao follow-up run
+    const seenAssistantMessageIds = new Set<string>();
+
+    const emitAssistantMessage = (message: {
+      type: 'assistant';
+      message: string;
+      messageId: string;
+      details: { threadId: string; role: string; createdAt?: number };
+    }) => {
+      if (!socket) return;
+      socket.emit('agent_message', message);
+      emitToMonitors(socket.id, 'agent_message', message);
+    };
+
+    const fetchAndEmitNewAssistantMessages = async (): Promise<any[] | null> => {
+      if (!socket) {
+        return null;
+      }
+
+      const messages = await this.stackspot.beta.threads.messages.list(threadId, {
+        order: 'desc',
+      });
+
+      for (const msg of [...messages.data].reverse()) {
+        if (msg.role !== 'assistant') {
+          continue;
+        }
+        if (seenAssistantMessageIds.has(msg.id)) {
+          continue;
+        }
+
+        const textValue = msg.content?.[0]?.text?.value;
+        if (!textValue) {
+          continue;
+        }
+
+        seenAssistantMessageIds.add(msg.id);
+        emitAssistantMessage({
+          type: 'assistant',
+          message: textValue,
+          messageId: msg.id,
+          details: {
+            threadId,
+            role: 'assistant',
+            createdAt: msg.created_at,
+          },
+        });
+      }
+
+      return messages.data;
+    };
+
+    if (socket) {
+      const existingMessages = await this.stackspot.beta.threads.messages.list(threadId, {
+        order: 'desc',
+      });
+      existingMessages.data.forEach((msg: any) => {
+        if (msg.role === 'assistant') {
+          seenAssistantMessageIds.add(msg.id);
+        }
+      });
+    }
 
     while (iterationCount < MAX_ITERATIONS) {
       iterationCount++;
       const run = await this.stackspot.beta.threads.runs.retrieve(threadId, runId);
 
+      if (socket) {
+        await fetchAndEmitNewAssistantMessages();
+      }
+
       if (run.status === 'completed') {
-        const messages = await this.stackspot.beta.threads.messages.list(threadId, {
-          order: 'asc',
-        });
-        const lastMessage = messages.data[messages.data.length - 1];
+        let latestMessages: any[] | null = null;
+        if (socket) {
+          latestMessages = await fetchAndEmitNewAssistantMessages();
+        }
+        const messagesData =
+          latestMessages
+            ? [...latestMessages].reverse()
+            : (await this.stackspot.beta.threads.messages.list(threadId, {
+                order: 'asc',
+              })).data;
+        const lastMessage = messagesData[messagesData.length - 1];
         
         // Extrai tokens do metadata se disponível
         const tokens = (lastMessage.metadata as any)?.tokens || {};
