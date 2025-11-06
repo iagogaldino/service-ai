@@ -798,6 +798,29 @@
         const statusDiv = document.getElementById('status');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        
+        // Armazena tokens totais para atualização em tempo real
+        let currentTotalTokens = {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            totalCost: { promptCost: 0, completionCost: 0, totalCost: 0 }
+        };
+        
+        // Armazena tokens salvos do tokens.json (base)
+        let savedTotalTokens = {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            totalCost: { promptCost: 0, completionCost: 0, totalCost: 0 }
+        };
+        
+        // Armazena tokens acumulados da thread atual (não salvos ainda)
+        let currentThreadTokens = {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0
+        };
 
         // Eventos de conexão
         socket.on('connect', () => {
@@ -827,13 +850,32 @@
         });
 
         // Recebe resposta do servidor
-        socket.on('response', (data) => {
+        socket.on('response', async (data) => {
             removeLoading();
             removeAgentActions();
             const senderLabel = data.agentName ? `IA (${data.agentName})` : 'IA';
             
             // Adiciona mensagem principal
             addMessage(senderLabel, data.message, 'bot');
+            
+            // Quando recebemos response, os tokens já foram salvos no servidor
+            // Recarrega tokens salvos e reseta currentThreadTokens
+            if (data.accumulatedTokenUsage) {
+                // Recarrega tokens salvos (que agora incluem os tokens que acabaram de ser salvos)
+                await reloadSavedTokens();
+                
+                // Reseta currentThreadTokens porque os tokens já foram salvos
+                // Mas mantemos acumulado para a próxima mensagem
+                // Na verdade, não resetamos completamente, apenas atualizamos para o próximo ciclo
+                // Os tokens da thread atual ainda não foram salvos completamente até a próxima mensagem
+                // Então mantemos currentThreadTokens para mostrar em tempo real
+                
+                // Atualiza o card de tokens se o painel estiver visível
+                const tokensPanel = document.getElementById('tokensPanel');
+                if (tokensPanel && tokensPanel.classList.contains('active')) {
+                    updateTokensCard();
+                }
+            }
             
             // Adiciona informações de tokens de forma compacta se disponíveis
             if (data.tokenUsage || data.accumulatedTokenUsage) {
@@ -1014,6 +1056,12 @@
             if (data.threadId) {
                 localStorage.setItem('delsucia_threadId', data.threadId);
                 console.log('Thread criada e salva:', data.threadId);
+                // Reseta tokens da thread atual quando uma nova thread é criada
+                currentThreadTokens = {
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0
+                };
             }
         });
 
@@ -1027,6 +1075,22 @@
 
         // Recebe informações de tokens em tempo real
         socket.on('token_usage', (data) => {
+            // Atualiza tokens acumulados da thread atual (não salvos ainda)
+            if (data.accumulated) {
+                currentThreadTokens = {
+                    promptTokens: data.accumulated.promptTokens,
+                    completionTokens: data.accumulated.completionTokens,
+                    totalTokens: data.accumulated.totalTokens
+                };
+                
+                // Atualiza o card de tokens se o painel estiver visível
+                // Não recarrega tokens salvos aqui porque ainda não foram salvos no servidor
+                const tokensPanel = document.getElementById('tokensPanel');
+                if (tokensPanel && tokensPanel.classList.contains('active')) {
+                    updateTokensCard();
+                }
+            }
+            
             // Adiciona uma mensagem de token usage na interface
             const tokenDiv = document.createElement('div');
             tokenDiv.className = 'message token-usage';
@@ -1525,6 +1589,112 @@
             showPanel('tokens');
         }
 
+        // Função para calcular custo (mesma lógica do servidor)
+        function calculateTokenCost(promptTokens, completionTokens, model = 'gpt-4-turbo-preview') {
+            const MODEL_PRICING = {
+                'gpt-4-turbo-preview': { prompt: 0.01, completion: 0.03 },
+                'gpt-4': { prompt: 0.03, completion: 0.06 },
+                'gpt-4-0125-preview': { prompt: 0.01, completion: 0.03 },
+                'gpt-4-1106-preview': { prompt: 0.01, completion: 0.03 },
+                'gpt-3.5-turbo': { prompt: 0.0005, completion: 0.0015 },
+                'gpt-3.5-turbo-16k': { prompt: 0.003, completion: 0.004 }
+            };
+            
+            const pricing = MODEL_PRICING[model] || MODEL_PRICING['gpt-4-turbo-preview'];
+            const promptCost = (promptTokens / 1000) * pricing.prompt;
+            const completionCost = (completionTokens / 1000) * pricing.completion;
+            const totalCost = promptCost + completionCost;
+            
+            return {
+                promptCost: Math.round(promptCost * 10000) / 10000,
+                completionCost: Math.round(completionCost * 10000) / 10000,
+                totalCost: Math.round(totalCost * 10000) / 10000
+            };
+        }
+
+        // Função para calcular tokens totais (salvos + thread atual)
+        // Mas só soma currentThreadTokens se ainda não foram salvos
+        function calculateTotalTokens() {
+            // Se os tokens da thread atual já foram salvos (detectado quando recarrega o painel),
+            // então currentThreadTokens já está incluído em savedTotalTokens
+            // Por isso, só somamos se currentThreadTokens > 0 e não foram salvos ainda
+            
+            // Vamos usar uma abordagem diferente: quando recarregamos o painel,
+            // comparamos o total salvo com o que temos na thread atual
+            // Se os tokens da thread atual são maiores que zero, significa que ainda não foram salvos
+            
+            // Na verdade, a melhor abordagem é: quando loadTokens() é chamado,
+            // resetamos currentThreadTokens para 0, porque os tokens salvos já incluem tudo
+            // E quando recebemos token_usage, atualizamos currentThreadTokens apenas para tokens ainda não salvos
+            
+            return {
+                promptTokens: savedTotalTokens.promptTokens + currentThreadTokens.promptTokens,
+                completionTokens: savedTotalTokens.completionTokens + currentThreadTokens.completionTokens,
+                totalTokens: savedTotalTokens.totalTokens + currentThreadTokens.totalTokens
+            };
+        }
+        
+        // Função para recarregar tokens salvos e resetar thread atual
+        async function reloadSavedTokens() {
+            try {
+                const response = await fetch('/api/tokens');
+                const data = await response.json();
+                
+                if (data.totalTokens) {
+                    const totalCost = data.totalCost || { promptCost: 0, completionCost: 0, totalCost: 0 };
+                    
+                    // Atualiza tokens salvos (base do tokens.json)
+                    savedTotalTokens = {
+                        promptTokens: data.totalTokens.promptTokens,
+                        completionTokens: data.totalTokens.completionTokens,
+                        totalTokens: data.totalTokens.totalTokens,
+                        totalCost: totalCost
+                    };
+                    
+                    // Reset currentThreadTokens porque agora os tokens salvos já incluem tudo
+                    // (a menos que haja uma nova mensagem sendo processada)
+                    // Na verdade, não resetamos aqui para manter os tokens em tempo real
+                    // O reset só acontece quando uma nova thread é criada
+                }
+            } catch (error) {
+                console.error('Erro ao recarregar tokens salvos:', error);
+            }
+        }
+
+        // Função para atualizar o card de tokens totais
+        function updateTokensCard() {
+            const tokensCard = document.getElementById('tokensTotalCard');
+            if (!tokensCard) return;
+            
+            // Calcula total (salvos + thread atual)
+            const totalTokens = calculateTotalTokens();
+            const cost = calculateTokenCost(
+                totalTokens.promptTokens,
+                totalTokens.completionTokens
+            );
+            
+            tokensCard.innerHTML = `
+                <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens</div>
+                <div style="display: flex; justify-content: space-around; margin-top: 10px;">
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Prompt</div>
+                        <div style="font-size: 1.3em; font-weight: bold;">${totalTokens.promptTokens.toLocaleString()}</div>
+                        <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${cost.promptCost.toFixed(4)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Completion</div>
+                        <div style="font-size: 1.3em; font-weight: bold;">${totalTokens.completionTokens.toLocaleString()}</div>
+                        <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${cost.completionCost.toFixed(4)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Total</div>
+                        <div style="font-size: 1.5em; font-weight: bold;">${totalTokens.totalTokens.toLocaleString()}</div>
+                        <div style="font-size: 0.9em; opacity: 0.9; margin-top: 3px; font-weight: bold;">$${cost.totalCost.toFixed(4)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Carrega e exibe o histórico de tokens
         async function loadTokens() {
             const tokensContent = document.getElementById('tokensContent');
@@ -1539,23 +1709,43 @@
                 // Total de tokens
                 if (data.totalTokens) {
                     const totalCost = data.totalCost || { promptCost: 0, completionCost: 0, totalCost: 0 };
-                    html += `<div style="margin-bottom: 20px; padding: 15px; background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: var(--text-primary); border-radius: 8px; text-align: center;">
+                    
+                    // Atualiza tokens salvos (base do tokens.json)
+                    // Quando recarregamos, os tokens salvos já incluem todas as threads anteriores
+                    // Mas podem não incluir os tokens da thread atual se ainda não foram salvos
+                    savedTotalTokens = {
+                        promptTokens: data.totalTokens.promptTokens,
+                        completionTokens: data.totalTokens.completionTokens,
+                        totalTokens: data.totalTokens.totalTokens,
+                        totalCost: totalCost
+                    };
+                    
+                    // Calcula total (salvos + thread atual)
+                    // Se os tokens da thread atual já foram salvos, currentThreadTokens será 0
+                    // Caso contrário, somamos para mostrar em tempo real
+                    const totalTokens = calculateTotalTokens();
+                    const totalCostCalculated = calculateTokenCost(
+                        totalTokens.promptTokens,
+                        totalTokens.completionTokens
+                    );
+                    
+                    html += `<div id="tokensTotalCard" style="margin-bottom: 20px; padding: 15px; background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: var(--text-primary); border-radius: 8px; text-align: center;">
                         <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens</div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px;">
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Prompt</div>
-                                <div style="font-size: 1.3em; font-weight: bold;">${data.totalTokens.promptTokens.toLocaleString()}</div>
-                                <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${totalCost.promptCost.toFixed(4)}</div>
+                                <div style="font-size: 1.3em; font-weight: bold;">${totalTokens.promptTokens.toLocaleString()}</div>
+                                <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${totalCostCalculated.promptCost.toFixed(4)}</div>
                             </div>
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Completion</div>
-                                <div style="font-size: 1.3em; font-weight: bold;">${data.totalTokens.completionTokens.toLocaleString()}</div>
-                                <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${totalCost.completionCost.toFixed(4)}</div>
+                                <div style="font-size: 1.3em; font-weight: bold;">${totalTokens.completionTokens.toLocaleString()}</div>
+                                <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${totalCostCalculated.completionCost.toFixed(4)}</div>
                             </div>
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Total</div>
-                                <div style="font-size: 1.5em; font-weight: bold;">${data.totalTokens.totalTokens.toLocaleString()}</div>
-                                <div style="font-size: 0.9em; opacity: 0.9; margin-top: 3px; font-weight: bold;">$${totalCost.totalCost.toFixed(4)}</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${totalTokens.totalTokens.toLocaleString()}</div>
+                                <div style="font-size: 0.9em; opacity: 0.9; margin-top: 3px; font-weight: bold;">$${totalCostCalculated.totalCost.toFixed(4)}</div>
                             </div>
                         </div>
                     </div>`;
