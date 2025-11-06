@@ -853,6 +853,9 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         
+        // Rastreia se há um processo de terminal em execução
+        let terminalProcessRunning = false;
+        
         // Armazena tokens totais para atualização em tempo real
         let currentTotalTokens = {
             promptTokens: 0,
@@ -1288,6 +1291,11 @@
                     terminalContainer.remove();
                 }
                 terminalContainer = null;
+                // Marca que há um processo de terminal rodando
+                terminalProcessRunning = true;
+                // Desabilita o botão de enviar
+                sendButton.disabled = true;
+                sendButton.innerHTML = '⏳ Terminal em execução...';
             }
 
             // Cria container do terminal se não existir
@@ -1353,6 +1361,14 @@
                 separator.style.borderTop = '1px solid #4ec9b0';
                 separator.style.opacity = '0.3';
                 terminalContent.appendChild(separator);
+                
+                // Marca que o processo de terminal terminou
+                terminalProcessRunning = false;
+                // Reabilita o botão de enviar (se não estiver em loading)
+                if (!sendButton.innerHTML.includes('button-loading')) {
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = 'Enviar';
+                }
             }
         }
 
@@ -1477,9 +1493,12 @@
                 sendButton.disabled = true;
                 sendButton.innerHTML = '<span class="button-loading"></span>';
             } else {
-                sendButton.disabled = false;
-                sendButton.innerHTML = 'Enviar';
-                messageInput.focus();
+                // Só reabilita o botão se não houver processo de terminal rodando
+                if (!terminalProcessRunning) {
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = 'Enviar';
+                    messageInput.focus();
+                }
             }
         }
 
