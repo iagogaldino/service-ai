@@ -1,4 +1,4 @@
-# ServiceIA
+# DelsucIA
 
 Projeto Node.js com TypeScript que integra Socket.IO com a **Assistants API da OpenAI** para comunicação em tempo real com agentes inteligentes.
 
@@ -83,7 +83,7 @@ O agente possui três ferramentas principais para trabalhar com arquivos:
 
 ## 🤖 Sistema de Agentes
 
-O ServiceIA utiliza um sistema hierárquico de agentes organizados em grupos com orquestradores.
+O DelsucIA utiliza um sistema hierárquico de agentes organizados em grupos com orquestradores.
 
 ### 📊 Estrutura Hierárquica
 
@@ -453,7 +453,7 @@ socket.on('response', (data) => {
 ## 📁 Estrutura do Projeto
 
 ```
-ServiceIA/
+DelsucIA/
 ├── src/
 │   ├── agents/
 │   │   ├── agents.json       # Configuração dos agentes
@@ -490,7 +490,7 @@ A aplicação utiliza `config.json` para armazenar configurações. Configure at
 
 ### Assistente
 O assistente é criado automaticamente na primeira execução com:
-- **Nome**: ServiceIA Assistant
+- **Nome**: DelsucIA Assistant
 - **Modelo**: GPT-4 Turbo Preview
 - **Instruções**: Assistente especializado em analisar e navegar por projetos de código
 - **Tools**: Funções para listar diretórios, ler arquivos e procurar arquivos

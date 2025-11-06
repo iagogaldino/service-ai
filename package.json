@@ -1,5 +1,5 @@
 {
-  "name": "service-ia",
+  "name": "delsuc-ia",
   "version": "1.0.0",
   "description": "Serviço Node.js com TypeScript, Socket.IO e integração OpenAI",
   "main": "dist/server.js",

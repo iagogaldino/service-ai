@@ -3,201 +3,540 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ServiceIA - Socket.IO + OpenAI</title>
+    <title>DelsucIA - Socket.IO + OpenAI</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #252525;
+            --bg-card: #1e1e1e;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #3b82f6;
+            --border-color: #2a2a2a;
+            --shadow: rgba(0, 0, 0, 0.5);
         }
 
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 14px; /* Reduzido de 16px padrão */
+            background: var(--bg-primary);
+            margin: 0;
+            padding: 0;
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header / Navbar */
+        .navbar {
+            background: var(--bg-card);
+            border-bottom: 2px solid var(--border-color);
+            padding: 15px 25px; /* Reduzido */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            min-height: 50px; /* Reduzido */
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.5em; /* Reduzido de 1.8em */
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            display: flex;
+            flex: 1;
+            border-top: 2px solid var(--border-color);
+            border-bottom: 2px solid var(--border-color);
+            min-height: 0;
+            overflow: hidden;
+            height: 0; /* Permite que flex: 1 funcione corretamente */
+        }
+
+        /* Menu Sidebar */
+        .menu-sidebar {
+            width: 220px; /* Reduzido de 250px */
+            background: var(--bg-card);
+            border-right: 2px solid var(--border-color);
+            padding: 15px; /* Reduzido de 20px */
+            overflow-y: auto;
+            flex-shrink: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-card);
+        }
+
+        .menu-sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .menu-sidebar::-webkit-scrollbar-track {
+            background: var(--bg-card);
+            border-radius: 4px;
+        }
+
+        .menu-sidebar::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        .menu-sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
+        }
+
+        .menu-sidebar .menu-button {
             width: 100%;
-            max-width: 800px;
-            padding: 30px;
+            padding: 10px 14px; /* Reduzido */
+            margin-bottom: 8px; /* Reduzido */
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; /* Reduzido */
+            color: var(--text-primary);
+            font-size: 0.85em; /* Reduzido de 0.95em */
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px; /* Reduzido */
+        }
+
+        .menu-sidebar .menu-button:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            transform: translateX(5px);
+        }
+
+        .menu-sidebar .menu-button.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* Chat Area */
+        .chat-area {
+            width: 360px; /* Reduzido de 400px */
+            background: var(--bg-card);
+            border-right: 2px solid var(--border-color);
+            padding: 15px; /* Reduzido de 20px */
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .chat-area-header {
+            margin-bottom: 12px; /* Reduzido */
+            padding-bottom: 12px; /* Reduzido */
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .chat-area-header h2 {
+            margin: 0 0 8px 0; /* Reduzido */
+            font-size: 1.1em; /* Reduzido de 1.2em */
+            color: var(--text-primary);
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            background: var(--bg-card);
+            padding: 15px; /* Reduzido de 20px */
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-card);
+            min-height: 0;
+            position: relative;
+        }
+
+        .content-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .content-area::-webkit-scrollbar-track {
+            background: var(--bg-card);
+            border-radius: 4px;
+        }
+
+        .content-area::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        .content-area::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
+        }
+
+
+        .content-panel {
+            display: none;
+            width: 100%;
+        }
+
+        .content-panel.active {
+            display: block;
+            width: 100%;
+        }
+
+        /* Monitor Panel Styles */
+        #monitorConnectionsList {
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-secondary);
+        }
+
+        #monitorConnectionsList::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #monitorConnectionsList::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        #monitorConnectionsList::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        #monitorConnectionsList::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
+        }
+
+        #monitorEventsContainer {
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-secondary);
+        }
+
+        #monitorEventsContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #monitorEventsContainer::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        #monitorEventsContainer::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        #monitorEventsContainer::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--bg-card);
+            border-top: 2px solid var(--border-color);
+            padding: 12px 25px; /* Reduzido */
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.8em; /* Reduzido de 0.9em */
+            flex-shrink: 0;
+            min-height: 45px; /* Reduzido */
         }
 
         h1 {
-            color: #333;
+            color: var(--text-primary);
             text-align: center;
-            margin-bottom: 10px;
-            font-size: 2em;
+            margin-bottom: 8px; /* Reduzido */
+            font-size: 1.8em; /* Reduzido de 2.2em */
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .subtitle {
             text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 0.9em;
+            color: var(--text-secondary);
+            margin-bottom: 20px; /* Reduzido */
+            font-size: 0.85em; /* Reduzido de 0.9em */
+            font-weight: 400;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .header-actions button,
+        .header-actions a {
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-actions button:hover:not(:disabled),
+        .header-actions a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
         .status {
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 10px 16px; /* Reduzido */
+            border-radius: 10px; /* Reduzido */
+            margin-bottom: 15px; /* Reduzido */
             text-align: center;
             font-weight: 500;
+            font-size: 0.8em; /* Reduzido de 0.9em */
+            transition: all 0.3s;
+            border: 1px solid transparent;
         }
 
         .status.connected {
-            background: #d4edda;
-            color: #155724;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.3);
         }
 
         .status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+            border-color: rgba(239, 68, 68, 0.3);
         }
 
         .chat-container {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            height: 400px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px; /* Reduzido de 16px */
+            flex: 1;
+            min-height: 0;
             overflow-y: auto;
-            padding: 20px;
-            margin-bottom: 20px;
-            background: #f9f9f9;
+            padding: 15px; /* Reduzido de 20px */
+            margin-bottom: 15px; /* Reduzido */
+            background: var(--bg-secondary);
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-secondary);
+            max-height: 100%;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
         }
 
         .message {
-            margin-bottom: 15px;
-            padding: 12px;
-            border-radius: 10px;
-            max-width: 80%;
+            margin-bottom: 12px; /* Reduzido */
+            padding: 10px 14px; /* Reduzido */
+            border-radius: 10px; /* Reduzido */
+            max-width: 85%; /* Aumentado para compensar fonte menor */
             word-wrap: break-word;
+            animation: messageSlide 0.3s ease-out;
+            backdrop-filter: blur(10px);
+            font-size: 0.9em; /* Reduzido */
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .message.user {
-            background: #667eea;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             color: white;
             margin-left: auto;
             text-align: right;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
         .message.bot {
-            background: #e0e0e0;
-            color: #333;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
 
         .message-label {
-            font-size: 0.75em;
-            opacity: 0.7;
-            margin-bottom: 5px;
+            font-size: 0.7em; /* Reduzido de 0.75em */
+            opacity: 0.8;
+            margin-bottom: 6px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .input-container {
             display: flex;
-            gap: 10px;
+            gap: 10px; /* Reduzido */
+            flex-shrink: 0;
         }
 
         input[type="text"] {
             flex: 1;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1em;
+            padding: 10px 14px; /* Reduzido */
+            border: 1px solid var(--border-color);
+            border-radius: 10px; /* Reduzido */
+            font-size: 0.9em; /* Reduzido de 1em */
             outline: none;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+
+        input[type="text"]::placeholder {
+            color: var(--text-secondary);
         }
 
         input[type="text"]:focus {
-            border-color: #667eea;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
         button {
-            padding: 12px 30px;
-            background: #667eea;
+            padding: 10px 20px; /* Reduzido */
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 1em;
+            border-radius: 10px; /* Reduzido */
+            font-size: 0.9em; /* Reduzido de 1em */
+            font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
         button:hover:not(:disabled) {
-            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
         }
 
         button:disabled {
-            background: #ccc;
+            background: var(--bg-tertiary);
             cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
         }
 
         .loading {
             text-align: center;
-            color: #666;
+            color: var(--text-secondary);
             font-style: italic;
             padding: 10px;
         }
 
         .message.agent-action {
-            background: #fff3cd;
-            color: #856404;
-            border-left: 3px solid #ffc107;
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border-left: 3px solid var(--warning);
             font-style: italic;
             animation: pulse 1.5s ease-in-out infinite;
+            border: 1px solid rgba(245, 158, 11, 0.3);
         }
 
         .message.agent-selection {
-            background: #d1ecf1;
-            color: #0c5460;
-            border-left: 3px solid #17a2b8;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--info);
+            border-left: 3px solid var(--info);
             font-size: 0.9em;
+            border: 1px solid rgba(59, 130, 246, 0.3);
         }
 
         .message.agent-message {
-            background: #e7f3ff;
-            color: #004085;
-            border-left: 3px solid #0056b3;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--text-primary);
+            border-left: 3px solid var(--accent-primary);
             font-size: 0.9em;
             margin: 10px 0;
+            border: 1px solid rgba(99, 102, 241, 0.3);
         }
 
         .message.agent-message pre {
             white-space: pre-wrap;
             word-wrap: break-word;
             font-size: 0.85em;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 8px;
         }
 
         .message.agent-message code {
-            background: rgba(0, 0, 0, 0.1);
-            padding: 2px 5px;
-            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 3px 6px;
+            border-radius: 4px;
             font-family: 'Courier New', monospace;
+            font-size: 0.9em;
         }
 
         .message.terminal-output {
-            background: #1e1e1e;
+            background: #0a0a0a;
             border-left: 3px solid #4ec9b0;
             margin: 10px 0;
+            border: 1px solid rgba(78, 201, 176, 0.3);
         }
 
         .message.terminal-output .message-label {
-            background: #252526;
+            background: rgba(78, 201, 176, 0.1);
             color: #4ec9b0;
             padding: 8px 12px;
-            border-radius: 5px 5px 0 0;
+            border-radius: 8px 8px 0 0;
             font-weight: 600;
         }
 
         .terminal-content {
             scrollbar-width: thin;
-            scrollbar-color: #4ec9b0 #1e1e1e;
+            scrollbar-color: #4ec9b0 #0a0a0a;
         }
 
         .terminal-content::-webkit-scrollbar {
@@ -205,7 +544,7 @@
         }
 
         .terminal-content::-webkit-scrollbar-track {
-            background: #1e1e1e;
+            background: #0a0a0a;
         }
 
         .terminal-content::-webkit-scrollbar-thumb {
@@ -225,108 +564,228 @@
                 opacity: 0.7;
             }
         }
+
+        /* Panel Styles */
+        .panel-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Config Panel */
+        .config-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 0.95em;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            font-family: inherit;
+        }
+
+        .config-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .config-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9em;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                border-radius: 16px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .header-actions {
+                flex-direction: column;
+            }
+
+            .header-actions button,
+            .header-actions a {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .message {
+                max-width: 90%;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h1 style="margin: 0;">🤖 ServiceIA</h1>
-            <div style="display: flex; gap: 10px;">
-                <button onclick="toggleAgentsList()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#218838';" onmouseout="this.style.background='#28a745';">📋 Agentes</button>
-                <button onclick="toggleTokensList()" style="background: #ffc107; color: #333; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#e0a800';" onmouseout="this.style.background='#ffc107';">💰 Tokens</button>
-                <button onclick="toggleLogsList()" style="background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#138496';" onmouseout="this.style.background='#17a2b8';">📝 Logs</button>
-                <button onclick="toggleConfigPanel()" style="background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#5a6268';" onmouseout="this.style.background='#6c757d';">⚙️ Config</button>
-                <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor</a>
-            </div>
-        </div>
-        <p class="subtitle">Comunicação via Socket.IO com OpenAI</p>
-        
-        <div id="status" class="status disconnected">
-            Desconectado
-        </div>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <h1>🤖 DelsucIA</h1>
+    </nav>
 
-        <!-- Lista de Agentes (oculta por padrão) -->
-        <div id="agentsList" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 2px solid #e0e0e0; max-height: 400px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 style="margin: 0; font-size: 1.3em; color: #333;">📋 Agentes Disponíveis</h2>
-                <button onclick="toggleAgentsList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
-            </div>
-            <div id="agentsContent">Carregando agentes...</div>
-        </div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Menu Sidebar -->
+        <aside class="menu-sidebar">
+            <button class="menu-button active" onclick="showPanel('agents'); this.classList.add('active');">
+                📋 Agentes
+            </button>
+            <button class="menu-button" onclick="showPanel('tokens'); this.classList.add('active');">
+                💰 Tokens
+            </button>
+            <button class="menu-button" onclick="showPanel('logs'); this.classList.add('active');">
+                📝 Logs
+            </button>
+            <button class="menu-button" onclick="showPanel('config'); this.classList.add('active');">
+                ⚙️ Config
+            </button>
+            <button class="menu-button" onclick="showPanel('monitor'); this.classList.add('active');">
+                🔍 Monitor
+            </button>
+        </aside>
 
-        <!-- Histórico de Tokens (oculto por padrão) -->
-        <div id="tokensList" style="display: none; margin-bottom: 20px; padding: 15px; background: #fff3cd; border-radius: 10px; border: 2px solid #ffc107; max-height: 500px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 style="margin: 0; font-size: 1.3em; color: #333;">💰 Histórico de Tokens</h2>
-                <button onclick="toggleTokensList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
-            </div>
-            <div id="tokensContent">Carregando tokens...</div>
-        </div>
-
-        <!-- Histórico de Logs (oculto por padrão) -->
-        <div id="logsList" style="display: none; margin-bottom: 20px; padding: 15px; background: #d1ecf1; border-radius: 10px; border: 2px solid #17a2b8; max-height: 600px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 style="margin: 0; font-size: 1.3em; color: #333;">📝 Histórico de Logs</h2>
-                <button onclick="toggleLogsList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
-            </div>
-            <div id="logsContent">Carregando logs...</div>
-        </div>
-
-        <!-- Painel de Configuração (oculto por padrão) -->
-        <div id="configPanel" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 2px solid #6c757d;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 style="margin: 0; font-size: 1.3em; color: #333;">⚙️ Configuração</h2>
-                <button onclick="toggleConfigPanel()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
-            </div>
-            <div id="configContent">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">OpenAI API Key</label>
-                    <input 
-                        type="password" 
-                        id="apiKeyInput" 
-                        placeholder="sk-..." 
-                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;"
-                    >
-                    <div id="apiKeyStatus" style="margin-top: 5px; font-size: 0.85em;"></div>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Porta (opcional)</label>
-                    <input 
-                        type="number" 
-                        id="portInput" 
-                        placeholder="3000" 
-                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;"
-                    >
-                </div>
-                <button 
-                    onclick="saveConfig()" 
-                    style="width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold;"
-                    onmouseover="this.style.background='#218838';"
-                    onmouseout="this.style.background='#28a745';"
-                >
-                    💾 Salvar Configuração
-                </button>
-                <div id="configMessage" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
-            </div>
+        <!-- Chat Area -->
+        <section class="chat-area">
+            <div class="chat-area-header">
+                <h2>💬 Chat</h2>
+                <div id="status" class="status disconnected">Desconectado</div>
         </div>
 
         <div class="chat-container" id="chat">
-            <div class="message bot">
-                <div class="message-label">Sistema</div>
-                <div>Conecte-se ao servidor para começar a conversar!</div>
-            </div>
         </div>
 
         <div class="input-container">
             <input 
                 type="text" 
                 id="messageInput" 
-                placeholder="Digite sua mensagem (ex: Hello)..."
+                    placeholder="Digite sua mensagem..."
                 autocomplete="off"
             >
             <button id="sendButton" onclick="sendMessage()">Enviar</button>
         </div>
+        </section>
+
+        <!-- Content Area -->
+        <section class="content-area">
+            <!-- Agentes Panel -->
+            <div id="agentsPanel" class="content-panel active">
+                <div class="panel-header">
+                    <h2>📋 Agentes Disponíveis</h2>
+                </div>
+                <div id="agentsContent" style="color: var(--text-secondary);">Carregando agentes...</div>
     </div>
+
+            <!-- Tokens Panel -->
+            <div id="tokensPanel" class="content-panel">
+                <div class="panel-header">
+                    <h2>💰 Histórico de Tokens</h2>
+                </div>
+                <div id="tokensContent" style="color: var(--text-secondary);">Carregando tokens...</div>
+            </div>
+
+            <!-- Logs Panel -->
+            <div id="logsPanel" class="content-panel">
+                <div class="panel-header">
+                    <h2>📝 Histórico de Logs</h2>
+                </div>
+                <div id="logsContent" style="color: var(--text-secondary);">Carregando logs...</div>
+            </div>
+
+            <!-- Config Panel -->
+            <div id="configPanel" class="content-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Configuração</h2>
+                </div>
+                <div id="configContent">
+                    <div style="margin-bottom: 15px;">
+                        <label class="config-label">OpenAI API Key</label>
+                        <input 
+                            type="password" 
+                            id="apiKeyInput" 
+                            placeholder="sk-..." 
+                            class="config-input"
+                        >
+                        <div id="apiKeyStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label class="config-label">Porta (opcional)</label>
+                        <input 
+                            type="number" 
+                            id="portInput" 
+                            placeholder="3000" 
+                            class="config-input"
+                        >
+                    </div>
+                    <button 
+                        onclick="saveConfig()" 
+                        style="width: 100%; margin-top: 10px;"
+                    >
+                        💾 Salvar Configuração
+                    </button>
+                    <div id="configMessage" style="margin-top: 12px; padding: 12px; border-radius: 10px; display: none; font-size: 0.9em;"></div>
+                </div>
+            </div>
+
+            <!-- Monitor Panel -->
+            <div id="monitorPanel" class="content-panel">
+                <div class="panel-header">
+                    <h2>🔍 Monitor de Conexões</h2>
+                </div>
+                <div id="monitorContent" style="display: flex; flex-direction: column; min-height: 0;">
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-shrink: 0;">
+                        <button onclick="refreshMonitorConnections()" style="padding: 10px 20px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            🔄 Atualizar Conexões
+                        </button>
+                        <button id="stopMonitorBtn" onclick="stopMonitorMonitoring()" style="padding: 10px 20px; background: rgba(239, 68, 68, 0.2); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; cursor: pointer; font-weight: 600; display: none;">
+                            Parar Monitoramento
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 350px 1fr; gap: 15px; flex: 1; min-height: 0; overflow: hidden;">
+                        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; min-height: 0;">
+                            <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                                <h3 style="margin: 0 0 5px 0; color: var(--text-primary); font-size: 1.1em;">Conexões Ativas</h3>
+                                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85em;">Clique em uma conexão para monitorar</p>
+                            </div>
+                            <div id="monitorConnectionsList" style="flex: 1; overflow-y: auto; min-height: 0; color: var(--text-secondary);">
+                                Carregando conexões...
+                            </div>
+                        </div>
+                        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; overflow: hidden; display: flex; flex-direction: column; min-height: 0;">
+                            <div id="monitorTitle" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); flex-shrink: 0;">
+                                Selecione uma conexão para monitorar
+                            </div>
+                            <div id="monitorEventsContainer" style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;">
+                                <div style="text-align: center; color: var(--text-secondary); padding: 40px;">
+                                    👈 Clique em uma conexão à esquerda para ver os eventos em tempo real
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Desenvolvido por iago_galdino@hotmail.com
+    </footer>
 
     <script>
         const socket = io('http://localhost:3000');
@@ -339,13 +798,15 @@
         socket.on('connect', () => {
             statusDiv.textContent = 'Conectado';
             statusDiv.className = 'status connected';
-            addMessage('Sistema', 'Conectado ao servidor!', 'bot');
+            // myMonitorSocketId será atualizado no escopo do monitor
+            if (typeof window.updateMonitorSocketId === 'function') {
+                window.updateMonitorSocketId(socket.id);
+            }
         });
 
         socket.on('disconnect', () => {
             statusDiv.textContent = 'Desconectado';
             statusDiv.className = 'status disconnected';
-            addMessage('Sistema', 'Desconectado do servidor', 'bot');
         });
 
         // Recebe informação sobre qual agente foi selecionado
@@ -366,8 +827,9 @@
             if (data.tokenUsage || data.accumulatedTokenUsage) {
                 const tokenDiv = document.createElement('div');
                 tokenDiv.className = 'message';
-                tokenDiv.style.background = 'rgba(40, 167, 69, 0.05)';
-                tokenDiv.style.border = '1px solid rgba(40, 167, 69, 0.2)';
+                tokenDiv.style.background = 'rgba(16, 185, 129, 0.15)';
+                tokenDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                tokenDiv.style.color = 'var(--success)';
                 tokenDiv.style.marginTop = '5px';
                 tokenDiv.style.padding = '6px 10px';
                 tokenDiv.style.fontSize = '0.75em';
@@ -380,7 +842,7 @@
                 }
                 
                 if (data.accumulatedTokenUsage) {
-                    tokenContent += `<span style="margin-left: 10px; font-weight: 600; color: #28a745;">Total: ${data.accumulatedTokenUsage.totalTokens}</span>`;
+                    tokenContent += `<span style="margin-left: 10px; font-weight: 600; color: var(--success);">Total: ${data.accumulatedTokenUsage.totalTokens}</span>`;
                 }
                 
                 tokenContent += '</div>';
@@ -395,24 +857,23 @@
         socket.on('config_required', (data) => {
             const configMessage = document.createElement('div');
             configMessage.className = 'message';
-            configMessage.style.background = '#fff3cd';
-            configMessage.style.border = '2px solid #ffc107';
+            configMessage.style.background = 'rgba(245, 158, 11, 0.15)';
+            configMessage.style.border = '2px solid rgba(245, 158, 11, 0.3)';
+            configMessage.style.color = 'var(--warning)';
             configMessage.style.borderRadius = '10px';
             configMessage.style.padding = '15px';
             configMessage.style.marginBottom = '15px';
             configMessage.innerHTML = `
-                <div class="message-label" style="color: #856404; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
-                <div style="color: #856404; margin-bottom: 10px;">
+                <div class="message-label" style="color: var(--warning); font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
+                <div style="color: var(--text-secondary); margin-bottom: 10px;">
                     ${escapeHtml(data.details)}
                 </div>
-                <div style="color: #856404; margin-bottom: 15px; font-weight: 500;">
+                <div style="color: var(--text-secondary); margin-bottom: 15px; font-weight: 500;">
                     ${escapeHtml(data.action)}
                 </div>
                 <button 
                     onclick="toggleConfigPanel()" 
-                    style="background: #ffc107; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.95em;"
-                    onmouseover="this.style.background='#e0a800';"
-                    onmouseout="this.style.background='#ffc107';"
+                    style="background: linear-gradient(135deg, var(--warning), #f97316); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95em;"
                 >
                     ⚙️ Configurar API Key
                 </button>
@@ -425,14 +886,15 @@
         socket.on('config_saved', (data) => {
             const successMessage = document.createElement('div');
             successMessage.className = 'message';
-            successMessage.style.background = '#d4edda';
-            successMessage.style.border = '2px solid #28a745';
+            successMessage.style.background = 'rgba(16, 185, 129, 0.15)';
+            successMessage.style.border = '2px solid rgba(16, 185, 129, 0.3)';
+            successMessage.style.color = 'var(--success)';
             successMessage.style.borderRadius = '10px';
             successMessage.style.padding = '15px';
             successMessage.style.marginBottom = '15px';
             successMessage.innerHTML = `
-                <div class="message-label" style="color: #155724; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
-                <div style="color: #155724;">
+                <div class="message-label" style="color: var(--success); font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
+                <div style="color: var(--text-secondary);">
                     ${escapeHtml(data.details)}
                 </div>
             `;
@@ -444,28 +906,27 @@
         socket.on('api_key_invalid', (data) => {
             const invalidKeyMessage = document.createElement('div');
             invalidKeyMessage.className = 'message';
-            invalidKeyMessage.style.background = '#f8d7da';
-            invalidKeyMessage.style.border = '2px solid #dc3545';
+            invalidKeyMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+            invalidKeyMessage.style.border = '2px solid rgba(239, 68, 68, 0.3)';
+            invalidKeyMessage.style.color = 'var(--error)';
             invalidKeyMessage.style.borderRadius = '10px';
             invalidKeyMessage.style.padding = '15px';
             invalidKeyMessage.style.marginBottom = '15px';
             invalidKeyMessage.innerHTML = `
-                <div class="message-label" style="color: #721c24; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
-                <div style="color: #721c24; margin-bottom: 10px;">
+                <div class="message-label" style="color: var(--error); font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
+                <div style="color: var(--text-secondary); margin-bottom: 10px;">
                     ${escapeHtml(data.details)}
                 </div>
-                <div style="color: #721c24; margin-bottom: 15px; font-weight: 500;">
+                <div style="color: var(--text-secondary); margin-bottom: 15px; font-weight: 500;">
                     ${escapeHtml(data.action)}
                 </div>
-                <div style="color: #856404; font-size: 0.85em; margin-bottom: 10px; padding: 8px; background: rgba(255, 193, 7, 0.1); border-radius: 5px;">
+                <div style="color: var(--warning); font-size: 0.85em; margin-bottom: 10px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 5px;">
                     <strong>Detalhes do erro:</strong><br>
                     ${escapeHtml(data.errorMessage)}
                 </div>
                 <button 
                     onclick="toggleConfigPanel()" 
-                    style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.95em;"
-                    onmouseover="this.style.background='#c82333';"
-                    onmouseout="this.style.background='#dc3545';"
+                    style="background: linear-gradient(135deg, var(--error), #dc2626); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95em;"
                 >
                     ⚙️ Corrigir API Key
                 </button>
@@ -502,8 +963,9 @@
             // Adiciona uma mensagem de token usage na interface
             const tokenDiv = document.createElement('div');
             tokenDiv.className = 'message token-usage';
-            tokenDiv.style.background = 'rgba(102, 126, 234, 0.05)';
-            tokenDiv.style.border = '1px solid rgba(102, 126, 234, 0.2)';
+            tokenDiv.style.background = 'rgba(245, 158, 11, 0.15)';
+            tokenDiv.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+            tokenDiv.style.color = 'var(--warning)';
             tokenDiv.style.fontSize = '0.75em';
             tokenDiv.style.padding = '6px 10px';
             tokenDiv.style.marginBottom = '5px';
@@ -699,7 +1161,7 @@
                 // Adiciona informações de tokens se disponíveis (compacto)
                 let tokenInfo = '';
                 if (data.tokenUsage) {
-                    tokenInfo = `<div style="margin-top: 5px; padding: 4px 6px; background: rgba(40, 167, 69, 0.08); border-radius: 3px; font-size: 0.7em; color: #666;">
+                    tokenInfo = `<div style="margin-top: 5px; padding: 4px 6px; background: rgba(16, 185, 129, 0.15); border-radius: 3px; font-size: 0.7em; color: var(--text-secondary);">
                         💰 ${data.tokenUsage.totalTokens} tokens
                     </div>`;
                 }
@@ -722,7 +1184,7 @@
                 title = `Resultado da Função: ${data.functionName}`;
                 content = `<div style="font-weight: 600; margin-bottom: 5px;">Função executada: <code>${data.functionName}</code> (${data.executionTime}ms)</div>
                     <div style="font-weight: 600; margin-bottom: 5px;">Argumentos:</div>
-                    <pre style="font-size: 0.85em; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px; overflow-x: auto;">${escapeHtml(JSON.stringify(data.arguments, null, 2))}</pre>
+                    <pre style="font-size: 0.85em; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 5px; margin-bottom: 5px; overflow-x: auto; color: var(--text-primary);">${escapeHtml(JSON.stringify(data.arguments, null, 2))}</pre>
                     <div style="font-weight: 600; margin-bottom: 5px;">Resultado:</div>
                     <div style="background: ${data.success ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)'}; padding: 8px; border-radius: 5px; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">${escapeHtml(data.result)}</div>`;
             } else if (data.type === 'function_outputs') {
@@ -801,20 +1263,74 @@
             }
         });
 
-        // Foca no input quando a página carrega
-        window.onload = () => {
-            messageInput.focus();
-        };
 
-        // Função para alternar visibilidade da lista de agentes
-        function toggleAgentsList() {
-            const agentsList = document.getElementById('agentsList');
-            if (agentsList.style.display === 'none') {
-                agentsList.style.display = 'block';
-                loadAgents();
-            } else {
-                agentsList.style.display = 'none';
+        // Função para mostrar painel específico
+        function showPanel(panelName) {
+            // Para o intervalo de atualização do monitor se estiver ativo
+            if (monitorRefreshInterval) {
+                clearInterval(monitorRefreshInterval);
+                monitorRefreshInterval = null;
             }
+            
+            // Remove active de todos os painéis
+            document.querySelectorAll('.content-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // Remove active de todos os botões do menu
+            document.querySelectorAll('.menu-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // Ativa o painel selecionado
+            const panel = document.getElementById(panelName + 'Panel');
+            if (panel) {
+                panel.classList.add('active');
+            }
+            
+            // Ativa o botão correspondente
+            const buttons = document.querySelectorAll('.menu-button');
+            buttons.forEach((button, index) => {
+                const panelNames = ['agents', 'tokens', 'logs', 'config', 'monitor'];
+                if (panelNames[index] === panelName) {
+                    button.classList.add('active');
+                }
+            });
+            
+            // Carrega conteúdo se necessário
+            switch(panelName) {
+                case 'agents':
+                    loadAgents();
+                    break;
+                case 'tokens':
+                    loadTokens();
+                    break;
+                case 'logs':
+                    loadLogs();
+                    break;
+                case 'config':
+                    loadConfig();
+                    break;
+                case 'monitor':
+                    loadMonitorConnections();
+                    // Atualiza conexões a cada 5 segundos quando o painel está ativo
+                    monitorRefreshInterval = setInterval(() => {
+                        const panel = document.getElementById('monitorPanel');
+                        if (panel && panel.classList.contains('active')) {
+                            loadMonitorConnections();
+                        } else {
+                            // Para o intervalo se o painel não estiver mais ativo
+                            clearInterval(monitorRefreshInterval);
+                            monitorRefreshInterval = null;
+                        }
+                    }, 5000);
+                    break;
+            }
+        }
+
+        // Função para alternar visibilidade da lista de agentes (mantida para compatibilidade)
+        function toggleAgentsList() {
+            showPanel('agents');
         }
 
         // Carrega e exibe a lista de agentes
@@ -832,15 +1348,15 @@
                 if (data.mainSelector) {
                     let toolsHtml = '';
                     if (data.mainSelector.tools && data.mainSelector.tools.length > 0) {
-                        toolsHtml = `<div style="margin-top: 8px; padding: 6px; background: rgba(255,255,255,0.2); border-radius: 5px; font-size: 0.85em;">
+                        toolsHtml = `<div style="margin-top: 8px; padding: 6px; background: rgba(99, 102, 241, 0.15); border-radius: 5px; font-size: 0.85em;">
                             <strong>🔧 Ferramentas (${data.mainSelector.tools.length}):</strong><br>
                             <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
-                                ${data.mainSelector.tools.map(tool => `<span style="background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">${escapeHtml(tool)}</span>`).join('')}
+                                ${data.mainSelector.tools.map(tool => `<span style="background: rgba(99, 102, 241, 0.25); padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">${escapeHtml(tool)}</span>`).join('')}
                             </div>
                         </div>`;
                     }
                     
-                    html += `<div style="margin-bottom: 15px; padding: 10px; background: #667eea; color: white; border-radius: 8px;">
+                    html += `<div style="margin-bottom: 15px; padding: 10px; background: rgba(99, 102, 241, 0.2); border: 1px solid var(--accent-primary); color: var(--text-primary); border-radius: 8px;">
                         <strong>🎯 Main Selector</strong><br>
                         <div style="margin-top: 5px; font-size: 0.9em;">
                             <strong>${escapeHtml(data.mainSelector.name)}</strong><br>
@@ -855,12 +1371,12 @@
                     html += '<div style="margin-bottom: 15px;"><strong style="font-size: 1.1em;">📦 Grupos</strong></div>';
                     
                     data.groups.forEach(group => {
-                        html += `<div style="margin-bottom: 15px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #28a745;">
-                            <div style="font-weight: 600; margin-bottom: 8px; color: #28a745;">${escapeHtml(group.name)}</div>
+                        html += `<div style="margin-bottom: 15px; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; border-left: 4px solid var(--success);">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--success);">${escapeHtml(group.name)}</div>
                             
-                            <div style="margin-left: 15px; margin-bottom: 8px; padding: 8px; background: rgba(102, 126, 234, 0.1); border-radius: 5px;">
+                            <div style="margin-left: 15px; margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.1); border-radius: 5px;">
                                 <strong>🎯 Orquestrador:</strong> ${escapeHtml(group.orchestrator.name)}<br>
-                                <small style="color: #666;">${escapeHtml(group.orchestrator.description)}</small>`;
+                                <small style="color: var(--text-secondary);">${escapeHtml(group.orchestrator.description)}</small>`;
                         
                         if (group.orchestrator.tools && group.orchestrator.tools.length > 0) {
                             html += `<div style="margin-top: 6px; font-size: 0.85em;">
@@ -886,9 +1402,9 @@
                                 </div>`;
                             }
                             
-                            html += `<div style="margin-top: 5px; padding: 6px; background: rgba(0,0,0,0.05); border-radius: 3px; font-size: 0.9em;">
-                                <strong>${escapeHtml(agent.name)}</strong><br>
-                                <small style="color: #666;">${escapeHtml(agent.description)}</small>
+                            html += `<div style="margin-top: 5px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 3px; font-size: 0.9em;">
+                                <strong style="color: var(--text-primary);">${escapeHtml(agent.name)}</strong><br>
+                                <small style="color: var(--text-secondary);">${escapeHtml(agent.description)}</small>
                                 ${agentToolsHtml}
                             </div>`;
                         });
@@ -901,15 +1417,15 @@
                 if (data.fallbackAgent) {
                     let fallbackToolsHtml = '';
                     if (data.fallbackAgent.tools && data.fallbackAgent.tools.length > 0) {
-                        fallbackToolsHtml = `<div style="margin-top: 8px; padding: 6px; background: rgba(0,0,0,0.1); border-radius: 5px; font-size: 0.85em;">
+                        fallbackToolsHtml = `<div style="margin-top: 8px; padding: 6px; background: rgba(251, 191, 36, 0.15); border-radius: 5px; font-size: 0.85em;">
                             <strong>🔧 Ferramentas (${data.fallbackAgent.tools.length}):</strong><br>
                             <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
-                                ${data.fallbackAgent.tools.map(tool => `<span style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">${escapeHtml(tool)}</span>`).join('')}
+                                ${data.fallbackAgent.tools.map(tool => `<span style="background: rgba(251, 191, 36, 0.25); padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">${escapeHtml(tool)}</span>`).join('')}
                             </div>
                         </div>`;
                     }
                     
-                    html += `<div style="margin-top: 15px; padding: 10px; background: #ffc107; color: #333; border-radius: 8px;">
+                    html += `<div style="margin-top: 15px; padding: 10px; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); color: var(--text-primary); border-radius: 8px;">
                         <strong>🔄 Fallback Agent</strong><br>
                         <div style="margin-top: 5px; font-size: 0.9em;">
                             <strong>${escapeHtml(data.fallbackAgent.name)}</strong><br>
@@ -919,27 +1435,21 @@
                     </div>`;
                 }
                 
-                html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px; text-align: center; font-size: 0.85em; color: #666;">
+                html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 5px; text-align: center; font-size: 0.85em; color: var(--text-secondary);">
                     Total: <strong>${data.total}</strong> agente(s) configurado(s)
                 </div>`;
                 
                 agentsContent.innerHTML = html;
             } catch (error) {
-                agentsContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
+                agentsContent.innerHTML = `<div style="color: var(--error); padding: 10px; background: rgba(239, 68, 68, 0.15); border-radius: 5px;">
                     Erro ao carregar agentes: ${error.message}
                 </div>`;
             }
         }
 
-        // Função para alternar visibilidade do histórico de tokens
+        // Função para alternar visibilidade do histórico de tokens (mantida para compatibilidade)
         function toggleTokensList() {
-            const tokensList = document.getElementById('tokensList');
-            if (tokensList.style.display === 'none') {
-                tokensList.style.display = 'block';
-                loadTokens();
-            } else {
-                tokensList.style.display = 'none';
-            }
+            showPanel('tokens');
         }
 
         // Carrega e exibe o histórico de tokens
@@ -956,7 +1466,7 @@
                 // Total de tokens
                 if (data.totalTokens) {
                     const totalCost = data.totalCost || { promptCost: 0, completionCost: 0, totalCost: 0 };
-                    html += `<div style="margin-bottom: 20px; padding: 15px; background: #28a745; color: white; border-radius: 8px; text-align: center;">
+                    html += `<div style="margin-bottom: 20px; padding: 15px; background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: var(--text-primary); border-radius: 8px; text-align: center;">
                         <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens</div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px;">
                             <div>
@@ -989,51 +1499,51 @@
                         const date = new Date(entry.timestamp);
                         const dateStr = date.toLocaleString('pt-BR');
                         
-                        html += `<div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #ffc107;">
+                        html += `<div style="margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; border-left: 4px solid var(--warning);">
                             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                                 <div>
-                                    <strong style="color: #333;">${escapeHtml(entry.agentName)}</strong>
-                                    <div style="font-size: 0.85em; color: #666; margin-top: 3px;">${escapeHtml(entry.message)}</div>
+                                    <strong style="color: var(--text-primary);">${escapeHtml(entry.agentName)}</strong>
+                                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 3px;">${escapeHtml(entry.message)}</div>
                                 </div>
-                                <div style="font-size: 0.75em; color: #999; text-align: right;">
+                                <div style="font-size: 0.75em; color: var(--text-secondary); text-align: right;">
                                     ${dateStr}
                                 </div>
                             </div>
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                                <div style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px;">
-                                    <div style="font-size: 0.8em; color: #666; margin-bottom: 4px;">Esta Interação</div>
-                                    <div style="font-size: 0.85em;">
-                                        <span style="color: #007bff;">Prompt:</span> ${entry.tokenUsage.promptTokens.toLocaleString()}<br>
-                                        <span style="color: #28a745;">Completion:</span> ${entry.tokenUsage.completionTokens.toLocaleString()}<br>
-                                        <span style="color: #333; font-weight: bold;">Total:</span> ${entry.tokenUsage.totalTokens.toLocaleString()}
-                                        ${entry.cost ? `<br><span style="color: #ffc107; font-weight: bold; margin-top: 3px; display: block;">💰 Custo: $${entry.cost.totalCost.toFixed(4)}</span>` : ''}
+                                <div style="padding: 8px; background: rgba(0,0,0,0.2); border-radius: 5px;">
+                                    <div style="font-size: 0.8em; color: var(--text-secondary); margin-bottom: 4px;">Esta Interação</div>
+                                    <div style="font-size: 0.85em; color: var(--text-primary);">
+                                        <span style="color: var(--info);">Prompt:</span> ${entry.tokenUsage.promptTokens.toLocaleString()}<br>
+                                        <span style="color: var(--success);">Completion:</span> ${entry.tokenUsage.completionTokens.toLocaleString()}<br>
+                                        <span style="color: var(--text-primary); font-weight: bold;">Total:</span> ${entry.tokenUsage.totalTokens.toLocaleString()}
+                                        ${entry.cost ? `<br><span style="color: var(--warning); font-weight: bold; margin-top: 3px; display: block;">💰 Custo: $${entry.cost.totalCost.toFixed(4)}</span>` : ''}
                                     </div>
                                 </div>
-                                <div style="padding: 8px; background: rgba(40, 167, 69, 0.1); border-radius: 5px;">
-                                    <div style="font-size: 0.8em; color: #666; margin-bottom: 4px;">Acumulado</div>
-                                    <div style="font-size: 0.85em;">
-                                        <span style="color: #007bff;">Prompt:</span> ${entry.accumulatedTokenUsage.promptTokens.toLocaleString()}<br>
-                                        <span style="color: #28a745;">Completion:</span> ${entry.accumulatedTokenUsage.completionTokens.toLocaleString()}<br>
-                                        <span style="color: #333; font-weight: bold;">Total:</span> ${entry.accumulatedTokenUsage.totalTokens.toLocaleString()}
-                                        ${entry.accumulatedCost ? `<br><span style="color: #ffc107; font-weight: bold; margin-top: 3px; display: block;">💰 Custo: $${entry.accumulatedCost.totalCost.toFixed(4)}</span>` : ''}
+                                <div style="padding: 8px; background: rgba(16, 185, 129, 0.15); border-radius: 5px;">
+                                    <div style="font-size: 0.8em; color: var(--text-secondary); margin-bottom: 4px;">Acumulado</div>
+                                    <div style="font-size: 0.85em; color: var(--text-primary);">
+                                        <span style="color: var(--info);">Prompt:</span> ${entry.accumulatedTokenUsage.promptTokens.toLocaleString()}<br>
+                                        <span style="color: var(--success);">Completion:</span> ${entry.accumulatedTokenUsage.completionTokens.toLocaleString()}<br>
+                                        <span style="color: var(--text-primary); font-weight: bold;">Total:</span> ${entry.accumulatedTokenUsage.totalTokens.toLocaleString()}
+                                        ${entry.accumulatedCost ? `<br><span style="color: var(--warning); font-weight: bold; margin-top: 3px; display: block;">💰 Custo: $${entry.accumulatedCost.totalCost.toFixed(4)}</span>` : ''}
                                     </div>
                                 </div>
                             </div>
                             
-                            <div style="font-size: 0.7em; color: #999; margin-top: 6px;">
+                            <div style="font-size: 0.7em; color: var(--text-secondary); margin-top: 6px;">
                                 Thread: ${entry.threadId.substring(0, 20)}...
                             </div>
                         </div>`;
                     });
                     
                     if (data.entries.length > 20) {
-                        html += `<div style="text-align: center; padding: 10px; color: #666; font-size: 0.9em;">
+                        html += `<div style="text-align: center; padding: 10px; color: var(--text-secondary); font-size: 0.9em;">
                             Mostrando últimas 20 de ${data.entries.length} interações
                         </div>`;
                     }
                 } else {
-                    html += `<div style="padding: 20px; text-align: center; color: #666;">
+                    html += `<div style="padding: 20px; text-align: center; color: var(--text-secondary);">
                         <div style="font-size: 2em; margin-bottom: 10px;">📊</div>
                         <div>Nenhuma interação registrada ainda.</div>
                     </div>`;
@@ -1042,28 +1552,22 @@
                 // Última atualização
                 if (data.lastUpdated) {
                     const lastUpdate = new Date(data.lastUpdated);
-                    html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px; text-align: center; font-size: 0.85em; color: #666;">
+                    html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 5px; text-align: center; font-size: 0.85em; color: var(--text-secondary);">
                         Última atualização: ${lastUpdate.toLocaleString('pt-BR')}
                     </div>`;
                 }
                 
                 tokensContent.innerHTML = html;
             } catch (error) {
-                tokensContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
+                tokensContent.innerHTML = `<div style="color: var(--error); padding: 10px; background: rgba(239, 68, 68, 0.15); border-radius: 5px;">
                     Erro ao carregar tokens: ${error.message}
                 </div>`;
             }
         }
 
-        // Função para alternar visibilidade do histórico de logs
+        // Função para alternar visibilidade do histórico de logs (mantida para compatibilidade)
         function toggleLogsList() {
-            const logsList = document.getElementById('logsList');
-            if (logsList.style.display === 'none') {
-                logsList.style.display = 'block';
-                loadLogs();
-            } else {
-                logsList.style.display = 'none';
-            }
+            showPanel('logs');
         }
 
         // Função para obter cor baseada no tipo de log
@@ -1117,7 +1621,7 @@
                 
                 // Estatísticas
                 if (data.statistics) {
-                    html += `<div style="margin-bottom: 20px; padding: 15px; background: #17a2b8; color: white; border-radius: 8px;">
+                    html += `<div style="margin-bottom: 20px; padding: 15px; background: rgba(59, 130, 246, 0.2); border: 1px solid var(--info); color: var(--text-primary); border-radius: 8px;">
                         <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">📊 Estatísticas</div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
                             <div style="text-align: center;">
@@ -1148,7 +1652,7 @@
                 if (data.entries && data.entries.length > 0) {
                     html += `<div style="margin-bottom: 10px;">
                         <strong style="font-size: 1.1em;">📜 Logs (${data.entries.length} entrada${data.entries.length > 1 ? 's' : ''})</strong>
-                        <div style="margin-top: 5px; font-size: 0.85em; color: #666;">
+                        <div style="margin-top: 5px; font-size: 0.85em; color: var(--text-secondary);">
                             Mostrando últimas 50 entradas (mais recentes primeiro)
                         </div>
                     </div>`;
@@ -1162,32 +1666,32 @@
                         const typeColor = getLogTypeColor(log.type);
                         const typeIcon = getLogTypeIcon(log.type);
                         
-                        html += `<div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid ${typeColor};">
+                        html += `<div style="margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; border-left: 4px solid ${typeColor};">
                             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                                 <div style="flex: 1;">
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
                                         <span style="font-size: 1.2em;">${typeIcon}</span>
                                         <strong style="color: ${typeColor}; text-transform: uppercase; font-size: 0.9em;">${escapeHtml(log.type)}</strong>
-                                        ${log.agentName ? `<span style="font-size: 0.85em; color: #666;">🤖 ${escapeHtml(log.agentName)}</span>` : ''}
+                                        ${log.agentName ? `<span style="font-size: 0.85em; color: var(--text-secondary);">🤖 ${escapeHtml(log.agentName)}</span>` : ''}
                                     </div>
-                                    ${log.message ? `<div style="font-size: 0.85em; color: #333; margin-top: 5px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 3px;">💬 ${escapeHtml(log.message)}</div>` : ''}
-                                    ${log.response ? `<div style="font-size: 0.85em; color: #28a745; margin-top: 5px; padding: 5px; background: rgba(40,167,69,0.1); border-radius: 3px;">✅ ${escapeHtml(log.response.substring(0, 200))}${log.response.length > 200 ? '...' : ''}</div>` : ''}
-                                    ${log.error ? `<div style="font-size: 0.85em; color: #dc3545; margin-top: 5px; padding: 5px; background: rgba(220,53,69,0.1); border-radius: 3px;">❌ ${escapeHtml(log.error)}</div>` : ''}
-                                    ${log.toolName ? `<div style="font-size: 0.85em; color: #333; margin-top: 5px;">
+                                    ${log.message ? `<div style="font-size: 0.85em; color: var(--text-primary); margin-top: 5px; padding: 5px; background: rgba(0,0,0,0.2); border-radius: 3px;">💬 ${escapeHtml(log.message)}</div>` : ''}
+                                    ${log.response ? `<div style="font-size: 0.85em; color: var(--success); margin-top: 5px; padding: 5px; background: rgba(16,185,129,0.15); border-radius: 3px;">✅ ${escapeHtml(log.response.substring(0, 200))}${log.response.length > 200 ? '...' : ''}</div>` : ''}
+                                    ${log.error ? `<div style="font-size: 0.85em; color: var(--error); margin-top: 5px; padding: 5px; background: rgba(239,68,68,0.15); border-radius: 3px;">❌ ${escapeHtml(log.error)}</div>` : ''}
+                                    ${log.toolName ? `<div style="font-size: 0.85em; color: var(--text-primary); margin-top: 5px;">
                                         <strong>🔧 ${escapeHtml(log.toolName)}</strong>
-                                        ${log.toolExecutionTime ? `<span style="color: #666;"> (${log.toolExecutionTime}ms)</span>` : ''}
+                                        ${log.toolExecutionTime ? `<span style="color: var(--text-secondary);"> (${log.toolExecutionTime}ms)</span>` : ''}
                                     </div>` : ''}
-                                    ${log.tokenUsage ? `<div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                                    ${log.tokenUsage ? `<div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">
                                         💰 Tokens: ${log.tokenUsage.totalTokens.toLocaleString()} (prompt: ${log.tokenUsage.promptTokens.toLocaleString()}, completion: ${log.tokenUsage.completionTokens.toLocaleString()})
-                                        ${log.tokenCost ? `<br><span style="color: #ffc107; font-weight: bold;">💰 Custo: $${log.tokenCost.totalCost.toFixed(4)}</span>` : ''}
+                                        ${log.tokenCost ? `<br><span style="color: var(--warning); font-weight: bold;">💰 Custo: $${log.tokenCost.totalCost.toFixed(4)}</span>` : ''}
                                     </div>` : ''}
                                 </div>
-                                <div style="font-size: 0.75em; color: #999; text-align: right; min-width: 150px;">
+                                <div style="font-size: 0.75em; color: var(--text-secondary); text-align: right; min-width: 150px;">
                                     ${dateStr}
                                 </div>
                             </div>
                             
-                            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 0.7em; color: #999; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 0.7em; color: var(--text-secondary); flex-wrap: wrap;">
                                 ${log.socketId ? `<span>Socket: ${log.socketId.substring(0, 12)}...</span>` : ''}
                                 ${log.threadId ? `<span>Thread: ${log.threadId.substring(0, 12)}...</span>` : ''}
                                 ${log.runId ? `<span>Run: ${log.runId.substring(0, 12)}...</span>` : ''}
@@ -1195,20 +1699,20 @@
                             
                             ${log.metadata && Object.keys(log.metadata).length > 0 ? `
                                 <details style="margin-top: 8px;">
-                                    <summary style="font-size: 0.8em; color: #666; cursor: pointer;">📋 Mais detalhes</summary>
-                                    <pre style="margin-top: 5px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 3px; font-size: 0.75em; overflow-x: auto;">${escapeHtml(JSON.stringify(log.metadata, null, 2))}</pre>
+                                    <summary style="font-size: 0.8em; color: var(--text-secondary); cursor: pointer;">📋 Mais detalhes</summary>
+                                    <pre style="margin-top: 5px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 3px; font-size: 0.75em; overflow-x: auto; color: var(--text-primary);">${escapeHtml(JSON.stringify(log.metadata, null, 2))}</pre>
                                 </details>
                             ` : ''}
                         </div>`;
                     });
                     
                     if (data.entries.length > 50) {
-                        html += `<div style="text-align: center; padding: 10px; color: #666; font-size: 0.9em;">
+                        html += `<div style="text-align: center; padding: 10px; color: var(--text-secondary); font-size: 0.9em;">
                             Mostrando últimas 50 de ${data.entries.length} entradas
                         </div>`;
                     }
                 } else {
-                    html += `<div style="padding: 20px; text-align: center; color: #666;">
+                    html += `<div style="padding: 20px; text-align: center; color: var(--text-secondary);">
                         <div style="font-size: 2em; margin-bottom: 10px;">📊</div>
                         <div>Nenhum log registrado ainda.</div>
                     </div>`;
@@ -1217,29 +1721,371 @@
                 // Última atualização
                 if (data.lastUpdated) {
                     const lastUpdate = new Date(data.lastUpdated);
-                    html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px; text-align: center; font-size: 0.85em; color: #666;">
+                    html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 5px; text-align: center; font-size: 0.85em; color: var(--text-secondary);">
                         Última atualização: ${lastUpdate.toLocaleString('pt-BR')}
                     </div>`;
                 }
                 
                 logsContent.innerHTML = html;
             } catch (error) {
-                logsContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
+                logsContent.innerHTML = `<div style="color: var(--error); padding: 10px; background: rgba(239, 68, 68, 0.15); border-radius: 5px;">
                     Erro ao carregar logs: ${error.message}
                 </div>`;
             }
         }
 
-        // Função para alternar visibilidade do painel de configuração
+        // Função para alternar visibilidade do painel de configuração (mantida para compatibilidade)
         function toggleConfigPanel() {
-            const configPanel = document.getElementById('configPanel');
-            if (configPanel.style.display === 'none') {
-                configPanel.style.display = 'block';
-                loadConfig();
-            } else {
-                configPanel.style.display = 'none';
+            showPanel('config');
+        }
+
+        // ============================================
+        // FUNÇÕES DO MONITOR
+        // ============================================
+        let currentMonitoringSocketId = null;
+        let monitorConnections = [];
+        let monitorEvents = [];
+        let myMonitorSocketId = null;
+        
+        // Função global para atualizar o ID do socket do monitor
+        window.updateMonitorSocketId = (socketId) => {
+            myMonitorSocketId = socketId;
+            console.log('Monitor Socket ID atualizado:', socketId);
+        };
+
+        // Carrega lista de conexões para monitoramento
+        let monitorRefreshInterval = null;
+        
+        async function loadMonitorConnections() {
+            const list = document.getElementById('monitorConnectionsList');
+            if (!list) {
+                console.error('Elemento monitorConnectionsList não encontrado');
+                return;
+            }
+            
+            list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">🔄 Carregando conexões...</div>';
+            
+            try {
+                const response = await fetch('/api/connections');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Conexões recebidas da API:', data);
+                monitorConnections = data.connections || [];
+                console.log('Total de conexões:', monitorConnections.length);
+                console.log('My Monitor Socket ID:', myMonitorSocketId);
+                
+                if (monitorConnections.length === 0) {
+                    list.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">Nenhuma conexão ativa no momento</div>';
+                    return;
+                }
+                
+                renderMonitorConnections();
+            } catch (error) {
+                console.error('Erro ao carregar conexões:', error);
+                if (list) {
+                    list.innerHTML = `<div style="color: var(--error); padding: 15px; background: rgba(239, 68, 68, 0.15); border-radius: 8px; border-left: 4px solid var(--error);">
+                        <strong>❌ Erro ao carregar conexões</strong><br>
+                        <small>${error.message}</small><br>
+                        <small style="margin-top: 10px; display: block;">Verifique se o servidor está rodando e tente novamente.</small>
+                    </div>`;
+                }
             }
         }
+
+        // Renderiza lista de conexões
+        function renderMonitorConnections() {
+            const list = document.getElementById('monitorConnectionsList');
+            if (!list) {
+                console.error('Elemento monitorConnectionsList não encontrado');
+                return;
+            }
+            
+            console.log('Renderizando conexões. Total:', monitorConnections.length);
+            console.log('My Monitor Socket ID:', myMonitorSocketId);
+            
+            // Mostra todas as conexões, incluindo a própria (útil para debug)
+            // Mas marca a própria conexão de forma diferente
+            if (monitorConnections.length === 0) {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Nenhuma conexão ativa no momento</div>';
+                return;
+            }
+
+            list.innerHTML = monitorConnections.map(conn => {
+                const connectedAt = new Date(conn.connectedAt);
+                const lastActivity = new Date(conn.lastActivity);
+                const isActive = conn.socketId === currentMonitoringSocketId;
+                const isOwnConnection = conn.socketId === myMonitorSocketId;
+                
+                return `
+                    <div onclick="selectMonitorConnection('${conn.socketId}')" style="background: ${isActive ? 'rgba(99, 102, 241, 0.2)' : 'var(--bg-tertiary)'}; border: 1px solid ${isActive ? 'var(--accent-primary)' : isOwnConnection ? 'rgba(251, 191, 36, 0.5)' : 'var(--border-color)'}; border-radius: 10px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; position: relative;">
+                        ${isOwnConnection ? '<div style="position: absolute; top: 8px; right: 8px; padding: 2px 6px; background: rgba(251, 191, 36, 0.2); color: #fbbf24; border-radius: 4px; font-size: 0.7em; font-weight: 600;">VOCÊ</div>' : ''}
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; color: ${isOwnConnection ? '#fbbf24' : 'var(--accent-primary)'}; font-size: 0.9em;">${conn.socketId.substring(0, 20)}...</span>
+                            <span style="padding: 4px 8px; background: rgba(16, 185, 129, 0.2); color: var(--success); border-radius: 5px; font-size: 0.75em; font-weight: 600;">Online</span>
+                        </div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary);">
+                            <div><strong>Thread:</strong> ${conn.threadId ? conn.threadId.substring(0, 20) + '...' : 'N/A'}</div>
+                            <div><strong>Mensagens:</strong> ${conn.messageCount || 0}</div>
+                            <div><strong>Conectado:</strong> ${formatMonitorTime(connectedAt)}</div>
+                            <div><strong>Última atividade:</strong> ${formatMonitorTime(lastActivity)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Formata tempo relativo
+        function formatMonitorTime(date) {
+            const now = new Date();
+            const diff = Math.floor((now - date) / 1000);
+            
+            if (diff < 60) return `${diff}s atrás`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
+            return date.toLocaleString('pt-BR');
+        }
+
+        // Seleciona uma conexão para monitorar
+        function selectMonitorConnection(socketId) {
+            if (currentMonitoringSocketId === socketId) return;
+            
+            currentMonitoringSocketId = socketId;
+            monitorEvents = [];
+            
+            // Inicia monitoramento
+            socket.emit('start_monitoring', { targetSocketId: socketId });
+            
+            // Atualiza UI
+            const monitorTitle = document.getElementById('monitorTitle');
+            const stopBtn = document.getElementById('stopMonitorBtn');
+            const eventsContainer = document.getElementById('monitorEventsContainer');
+            
+            if (monitorTitle) {
+                monitorTitle.innerHTML = `<strong style="color: var(--accent-primary);">Monitorando:</strong> ${socketId.substring(0, 30)}...`;
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'block';
+            }
+            if (eventsContainer) {
+                eventsContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">Aguardando eventos...</div>';
+            }
+            
+            renderMonitorConnections();
+        }
+
+        // Para monitoramento
+        function stopMonitorMonitoring() {
+            if (currentMonitoringSocketId) {
+                socket.emit('stop_monitoring');
+                currentMonitoringSocketId = null;
+                monitorEvents = [];
+                
+                const monitorTitle = document.getElementById('monitorTitle');
+                const stopBtn = document.getElementById('stopMonitorBtn');
+                const eventsContainer = document.getElementById('monitorEventsContainer');
+                
+                if (monitorTitle) {
+                    monitorTitle.innerHTML = 'Selecione uma conexão para monitorar';
+                }
+                if (stopBtn) {
+                    stopBtn.style.display = 'none';
+                }
+                if (eventsContainer) {
+                    eventsContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">👈 Clique em uma conexão à esquerda para ver os eventos em tempo real</div>';
+                }
+                
+                renderMonitorConnections();
+            }
+        }
+
+        // Atualiza lista de conexões
+        function refreshMonitorConnections() {
+            loadMonitorConnections();
+        }
+
+        // Renderiza eventos do monitor
+        function renderMonitorEvents() {
+            const container = document.getElementById('monitorEventsContainer');
+            if (!container) return;
+
+            if (monitorEvents.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">Nenhum evento ainda. Aguardando atividade...<br><small>Envie uma mensagem na conexão monitorada para ver os eventos</small></div>';
+                return;
+            }
+
+            container.innerHTML = monitorEvents.map(event => {
+                try {
+                    let eventClass = getMonitorEventClass(event.event);
+                    
+                    if (event.event === 'agent_message' && event.data && event.data.type) {
+                        if (event.data.type === 'user') {
+                            eventClass = 'user';
+                        } else if (event.data.type === 'assistant') {
+                            eventClass = 'assistant';
+                        }
+                    }
+                    
+                    const eventIcon = getMonitorEventIcon(event.event);
+                    const eventData = formatMonitorEventData(event);
+                    const borderColor = getMonitorBorderColor(eventClass);
+                    
+                    return `
+                        <div style="background: var(--bg-tertiary); border-left: 4px solid ${borderColor}; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-weight: 600; color: ${borderColor}; font-size: 0.9em;">${eventIcon} ${event.event}</span>
+                                <span style="font-size: 0.75em; color: var(--text-secondary);">${new Date(event.timestamp).toLocaleTimeString('pt-BR')}</span>
+                            </div>
+                            <div style="color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word;">${eventData}</div>
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('Erro ao renderizar evento:', error, event);
+                    return `<div style="background: rgba(239, 68, 68, 0.15); border-left: 4px solid var(--error); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-weight: 600; color: var(--error); font-size: 0.9em;">❌ Erro</span>
+                            <span style="font-size: 0.75em; color: var(--text-secondary);">${new Date(event.timestamp).toLocaleTimeString('pt-BR')}</span>
+                        </div>
+                        <div style="color: var(--text-primary);">Erro ao renderizar evento: ${error.message}</div>
+                    </div>`;
+                }
+            }).join('');
+            
+            // Scroll para o final
+            setTimeout(() => {
+                container.scrollTop = container.scrollHeight;
+            }, 100);
+        }
+
+        // Obtém classe CSS baseada no tipo de evento
+        function getMonitorEventClass(eventType) {
+            if (!eventType) return 'info';
+            if (eventType.includes('action')) return 'action';
+            if (eventType.includes('error')) return 'error';
+            if (eventType.includes('connection') || eventType.includes('monitoring')) return 'info';
+            if (eventType === 'response') return 'assistant';
+            if (eventType === 'agent_selected') return 'info';
+            return 'info';
+        }
+
+        // Obtém ícone baseado no tipo de evento
+        function getMonitorEventIcon(eventType) {
+            if (eventType.includes('message')) return '💬';
+            if (eventType.includes('action')) return '⚙️';
+            if (eventType.includes('response')) return '✅';
+            if (eventType.includes('agent_selected')) return '🤖';
+            if (eventType.includes('error')) return '❌';
+            return '📋';
+        }
+
+        // Obtém cor da borda baseada na classe
+        function getMonitorBorderColor(eventClass) {
+            const colors = {
+                'user': 'var(--accent-primary)',
+                'assistant': 'var(--success)',
+                'action': 'var(--warning)',
+                'error': 'var(--error)',
+                'info': 'var(--info)'
+            };
+            return colors[eventClass] || 'var(--accent-primary)';
+        }
+
+        // Formata dados do evento para exibição
+        function formatMonitorEventData(event) {
+            const data = event.data;
+            
+            if (event.event === 'agent_message') {
+                if (data.type === 'user') {
+                    return `<strong style="color: var(--accent-primary);">Mensagem do Usuário:</strong><br><div style="margin-top: 5px;">${escapeHtml(data.message)}</div>`;
+                } else if (data.type === 'assistant') {
+                    return `<strong style="color: var(--success);">Resposta do Assistente:</strong><br><div style="margin-top: 5px; white-space: pre-wrap;">${escapeHtml(data.message)}</div>`;
+                } else if (data.type === 'function_calls') {
+                    return `<strong>Funções Solicitadas:</strong><pre style="margin-top: 5px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 0.85em;">${escapeHtml(JSON.stringify(data.toolCalls, null, 2))}</pre>`;
+                } else if (data.type === 'function_result') {
+                    const resultPreview = data.result.length > 2000 ? data.result.substring(0, 2000) + '\n\n... (resultado truncado, muito longo)' : data.result;
+                    return `<strong>Resultado da Função:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">${escapeHtml(data.functionName)}</code><br>
+                            <strong>Execução:</strong> ${data.executionTime}ms<br>
+                            <strong>Resultado:</strong><pre style="margin-top: 5px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; max-height: 500px; overflow-y: auto; font-size: 0.85em;">${escapeHtml(resultPreview)}</pre>`;
+                } else if (data.type === 'function_outputs') {
+                    return `<strong>Outputs Enviados:</strong> ${data.outputsCount}<pre style="margin-top: 5px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; max-height: 500px; overflow-y: auto; font-size: 0.85em;">${escapeHtml(JSON.stringify(data.outputs, null, 2))}</pre>`;
+                }
+            } else if (event.event === 'agent_action') {
+                return `<strong>Ação:</strong><br><div style="margin-top: 5px;">${escapeHtml(data.action)}</div><br>
+                        <strong>Função:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">${escapeHtml(data.functionName)}</code>`;
+            } else if (event.event === 'agent_action_complete') {
+                return `<strong>Ação Concluída:</strong><br><div style="margin-top: 5px;">${escapeHtml(data.action)}</div><br>
+                        <strong>Status:</strong> ${data.success ? '✅ Sucesso' : '❌ Erro'}<br>
+                        <strong>Preview:</strong><pre style="margin-top: 5px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto; font-size: 0.85em;">${escapeHtml(data.result)}</pre>`;
+            } else if (event.event === 'agent_selected') {
+                return `<strong>Agente Selecionado:</strong> ${escapeHtml(data.agentName)}<br>
+                        <strong>Descrição:</strong><br><div style="margin-top: 5px;">${escapeHtml(data.description)}</div>`;
+            } else if (event.event === 'response') {
+                return `<strong>Resposta Final:</strong><br><div style="margin-top: 5px; white-space: pre-wrap;">${escapeHtml(data.message)}</div>`;
+            } else if (event.event === 'connection' || event.event === 'connection_info') {
+                const connectedAt = data.connectedAt ? new Date(data.connectedAt).toLocaleString('pt-BR') : 'N/A';
+                const lastActivity = data.lastActivity ? new Date(data.lastActivity).toLocaleString('pt-BR') : 'N/A';
+                return `<strong>Informações da Conexão:</strong><br>
+                        <strong>Socket ID:</strong> <span style="word-break: break-all;">${data.socketId || 'N/A'}</span><br>
+                        <strong>Thread ID:</strong> <span style="word-break: break-all;">${data.threadId || 'N/A'}</span><br>
+                        <strong>Conectado em:</strong> ${connectedAt}<br>
+                        <strong>Última atividade:</strong> ${lastActivity}<br>
+                        <strong>Mensagens:</strong> ${data.messageCount || 0}<br>
+                        ${data.userAgent ? `<strong>User Agent:</strong><br><span style="word-break: break-all;">${escapeHtml(data.userAgent)}</span><br>` : ''}
+                        ${data.ipAddress ? `<strong>IP:</strong> ${data.ipAddress}` : ''}`;
+            } else if (event.event === 'disconnect') {
+                return `<strong>Conexão Desconectada:</strong> ${data.socketId}`;
+            } else if (event.event === 'monitoring_started') {
+                return `<strong>Monitoramento Iniciado:</strong><br>
+                        <strong>Monitorando:</strong><br><span style="word-break: break-all;">${data.targetSocketId}</span>`;
+            }
+            
+            return `<pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; max-height: 500px; overflow-y: auto; font-size: 0.85em;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+        }
+
+        // Eventos do Socket.IO para monitoramento
+        socket.on('monitoring_started', (data) => {
+            console.log('Monitoramento iniciado:', data);
+            monitorEvents.push({
+                event: 'monitoring_started',
+                data: data,
+                timestamp: new Date().toISOString()
+            });
+            renderMonitorEvents();
+        });
+
+        socket.on('monitored_event', (data) => {
+            console.log('Evento recebido:', data.event, 'para target:', data.targetSocketId, 'monitorando:', currentMonitoringSocketId);
+            if (data.targetSocketId === currentMonitoringSocketId) {
+                console.log('Evento aceito e adicionado:', data.event);
+                monitorEvents.push(data);
+                if (monitorEvents.length > 500) {
+                    monitorEvents.shift(); // Mantém apenas os últimos 500 eventos
+                }
+                renderMonitorEvents();
+            }
+        });
+
+        socket.on('monitoring_stopped', () => {
+            console.log('Monitoramento parado');
+        });
+
+        socket.on('monitoring_error', (data) => {
+            console.error('Erro no monitoramento:', data);
+            const eventsContainer = document.getElementById('monitorEventsContainer');
+            if (eventsContainer) {
+                eventsContainer.innerHTML = `<div style="background: rgba(239, 68, 68, 0.15); border-left: 4px solid var(--error); border-radius: 8px; padding: 15px; color: var(--error);">
+                    <strong>Erro:</strong> ${data.message}
+                </div>`;
+            }
+        });
+
+        // Carrega conteúdo inicial ao carregar a página
+        window.onload = () => {
+            messageInput.focus();
+            loadAgents(); // Carrega agentes por padrão
+            // myMonitorSocketId será atualizado no evento 'connect'
+        };
 
         // Carrega configuração atual
         async function loadConfig() {
@@ -1254,15 +2100,15 @@
                 if (data.hasApiKey) {
                     apiKeyInput.value = '';
                     apiKeyInput.placeholder = data.apiKeyPreview || 'sk-...';
-                    apiKeyStatus.innerHTML = `<span style="color: #28a745;">✅ API Key configurada: ${data.apiKeyPreview}</span>`;
+                    apiKeyStatus.innerHTML = `<span style="color: var(--success);">✅ API Key configurada: ${data.apiKeyPreview}</span>`;
                     if (data.lastUpdated) {
                         const date = new Date(data.lastUpdated);
-                        apiKeyStatus.innerHTML += `<br><span style="color: #666; font-size: 0.85em;">Atualizada em: ${date.toLocaleString('pt-BR')}</span>`;
+                        apiKeyStatus.innerHTML += `<br><span style="color: var(--text-secondary); font-size: 0.85em;">Atualizada em: ${date.toLocaleString('pt-BR')}</span>`;
                     }
                 } else {
                     apiKeyInput.value = '';
                     apiKeyInput.placeholder = 'sk-...';
-                    apiKeyStatus.innerHTML = `<span style="color: #dc3545;">⚠️ API Key não configurada</span>`;
+                    apiKeyStatus.innerHTML = `<span style="color: var(--error);">⚠️ API Key não configurada</span>`;
                 }
                 
                 portInput.value = data.port || '3000';
@@ -1282,27 +2128,27 @@
             
             if (!apiKey) {
                 configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
-                configMessage.style.color = '#dc3545';
-                configMessage.style.border = '1px solid #dc3545';
+                configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                configMessage.style.color = 'var(--error)';
+                configMessage.style.border = '1px solid var(--error)';
                 configMessage.textContent = '❌ Por favor, insira uma API Key';
                 return;
             }
             
             if (!apiKey.startsWith('sk-')) {
                 configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
-                configMessage.style.color = '#dc3545';
-                configMessage.style.border = '1px solid #dc3545';
+                configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                configMessage.style.color = 'var(--error)';
+                configMessage.style.border = '1px solid var(--error)';
                 configMessage.textContent = '❌ API Key inválida. Deve começar com "sk-"';
                 return;
             }
             
             try {
                 configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(23, 162, 184, 0.1)';
-                configMessage.style.color = '#17a2b8';
-                configMessage.style.border = '1px solid #17a2b8';
+                configMessage.style.background = 'rgba(59, 130, 246, 0.15)';
+                configMessage.style.color = 'var(--info)';
+                configMessage.style.border = '1px solid var(--info)';
                 configMessage.textContent = '⏳ Salvando configuração...';
                 
                 const response = await fetch('/api/config', {
@@ -1319,9 +2165,9 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    configMessage.style.background = 'rgba(40, 167, 69, 0.1)';
-                    configMessage.style.color = '#28a745';
-                    configMessage.style.border = '1px solid #28a745';
+                    configMessage.style.background = 'rgba(16, 185, 129, 0.15)';
+                    configMessage.style.color = 'var(--success)';
+                    configMessage.style.border = '1px solid var(--success)';
                     configMessage.textContent = `✅ ${data.message}`;
                     
                     // Limpa o campo de API key por segurança
@@ -1340,9 +2186,9 @@
                 }
             } catch (error) {
                 configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
-                configMessage.style.color = '#dc3545';
-                configMessage.style.border = '1px solid #dc3545';
+                configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                configMessage.style.color = 'var(--error)';
+                configMessage.style.border = '1px solid var(--error)';
                 configMessage.textContent = `❌ Erro ao salvar configuração: ${error.message}`;
             }
         }

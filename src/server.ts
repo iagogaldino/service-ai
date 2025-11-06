@@ -1070,7 +1070,7 @@ app.post('/api/config', async (req, res) => {
               socket.emit('config_saved', {
                 type: 'config_saved',
                 message: '✅ API Key configurada com sucesso!',
-                details: 'Agora você pode usar o ServiceIA normalmente.',
+                details: 'Agora você pode usar o DelsucIA normalmente.',
                 timestamp: new Date().toISOString()
               });
               
@@ -1143,7 +1143,7 @@ io.on('connection', async (socket: Socket) => {
       socket.emit('config_required', {
         type: 'config_required',
         message: '⚠️ API Key não configurada',
-        details: 'Para usar o ServiceIA, você precisa configurar sua OpenAI API Key.',
+        details: 'Para usar o DelsucIA, você precisa configurar sua OpenAI API Key.',
         action: 'Clique no botão "⚙️ Config" no topo da página para configurar.',
         timestamp: new Date().toISOString()
       });
@@ -1278,7 +1278,7 @@ io.on('connection', async (socket: Socket) => {
         socket.emit('config_required', {
           type: 'config_required',
           message: '⚠️ API Key não configurada',
-          details: 'Para usar o ServiceIA, você precisa configurar sua OpenAI API Key.',
+          details: 'Para usar o DelsucIA, você precisa configurar sua OpenAI API Key.',
           action: 'Clique no botão "⚙️ Config" no topo da página para configurar.',
           timestamp: new Date().toISOString()
         });
