@@ -19,7 +19,8 @@ import { AgentManager, executeTool } from './agents/agentManager';
 import { loadEnvironmentVariables, validateRequiredEnvVars, getEnvAsNumber, logEnvironmentInfo } from './config/env';
 import { formatActionMessage } from './utils/functionDescriptions';
 import { isRunningUnderNodemon, getShutdownConfig, gracefulShutdown as performGracefulShutdown } from './utils/serverHelpers';
-import { initializeAgents } from './agents/config';
+import { initializeAgents, getAgentsConfig } from './agents/config';
+import { getGroupsInfo, getMainSelector, getFallbackAgent } from './agents/agentLoader';
 
 // ============================================================================
 // CONFIGURAÇÃO DE AMBIENTE
@@ -447,6 +448,98 @@ app.get('/api/connections/:socketId', (req, res) => {
     userAgent: connection.userAgent,
     ipAddress: connection.ipAddress
   });
+});
+
+/**
+ * API: Lista todos os agentes disponíveis
+ */
+app.get('/api/agents', async (req, res) => {
+  try {
+    const agents = getAgentsConfig();
+    const groups = getGroupsInfo(agents);
+    const mainSelector = getMainSelector(agents);
+    const fallbackAgent = getFallbackAgent(agents);
+    
+    // Formata agentes para resposta
+    const formattedAgents = agents.map(agent => {
+      const agentAny = agent as any;
+      return {
+        name: agent.name,
+        description: agent.description,
+        model: agent.model,
+        priority: agentAny.priority ?? 999,
+        role: agentAny.role || 'agent',
+        groupId: agentAny.groupId || null,
+        groupName: agentAny.groupName || null,
+        toolsCount: agent.tools.length,
+        tools: agent.tools.map((tool: any) => {
+          if (tool.type === 'function' && tool.function) {
+            return tool.function.name;
+          }
+          return 'unknown';
+        }).filter(Boolean)
+      };
+    });
+    
+    // Organiza grupos
+    const formattedGroups = Array.from(groups.values()).map(group => ({
+      id: group.groupId,
+      name: group.groupName,
+      orchestrator: {
+        name: group.orchestrator.name,
+        description: group.orchestrator.description,
+        toolsCount: group.orchestrator.tools.length,
+        tools: group.orchestrator.tools.map((tool: any) => {
+          if (tool.type === 'function' && tool.function) {
+            return tool.function.name;
+          }
+          return 'unknown';
+        }).filter(Boolean)
+      },
+      agents: group.agents.map(agent => ({
+        name: agent.name,
+        description: agent.description,
+        toolsCount: agent.tools.length,
+        tools: agent.tools.map((tool: any) => {
+          if (tool.type === 'function' && tool.function) {
+            return tool.function.name;
+          }
+          return 'unknown';
+        }).filter(Boolean)
+      }))
+    }));
+    
+    res.json({
+      total: agents.length,
+      mainSelector: mainSelector ? {
+        name: mainSelector.name,
+        description: mainSelector.description,
+        toolsCount: mainSelector.tools.length,
+        tools: mainSelector.tools.map((tool: any) => {
+          if (tool.type === 'function' && tool.function) {
+            return tool.function.name;
+          }
+          return 'unknown';
+        }).filter(Boolean)
+      } : null,
+      fallbackAgent: fallbackAgent ? {
+        name: fallbackAgent.name,
+        description: fallbackAgent.description,
+        toolsCount: fallbackAgent.tools.length,
+        tools: fallbackAgent.tools.map((tool: any) => {
+          if (tool.type === 'function' && tool.function) {
+            return tool.function.name;
+          }
+          return 'unknown';
+        }).filter(Boolean)
+      } : null,
+      groups: formattedGroups,
+      agents: formattedAgents
+    });
+  } catch (error: any) {
+    console.error('Erro ao obter agentes:', error);
+    res.status(500).json({ error: 'Erro ao obter lista de agentes' });
+  }
 });
 
 // ============================================================================

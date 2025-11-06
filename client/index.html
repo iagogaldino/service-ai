@@ -231,12 +231,24 @@
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h1 style="margin: 0;">🤖 ServiceIA</h1>
-            <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor de Conexões</a>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="toggleAgentsList()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#218838';" onmouseout="this.style.background='#28a745';">📋 Agentes</button>
+                <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor</a>
+            </div>
         </div>
         <p class="subtitle">Comunicação via Socket.IO com OpenAI</p>
         
         <div id="status" class="status disconnected">
             Desconectado
+        </div>
+
+        <!-- Lista de Agentes (oculta por padrão) -->
+        <div id="agentsList" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 2px solid #e0e0e0; max-height: 400px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; font-size: 1.3em; color: #333;">📋 Agentes Disponíveis</h2>
+                <button onclick="toggleAgentsList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
+            </div>
+            <div id="agentsContent">Carregando agentes...</div>
         </div>
 
         <div class="chat-container" id="chat">
@@ -651,6 +663,131 @@
         window.onload = () => {
             messageInput.focus();
         };
+
+        // Função para alternar visibilidade da lista de agentes
+        function toggleAgentsList() {
+            const agentsList = document.getElementById('agentsList');
+            if (agentsList.style.display === 'none') {
+                agentsList.style.display = 'block';
+                loadAgents();
+            } else {
+                agentsList.style.display = 'none';
+            }
+        }
+
+        // Carrega e exibe a lista de agentes
+        async function loadAgents() {
+            const agentsContent = document.getElementById('agentsContent');
+            agentsContent.innerHTML = 'Carregando agentes...';
+            
+            try {
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                
+                let html = '';
+                
+                // Main Selector
+                if (data.mainSelector) {
+                    let toolsHtml = '';
+                    if (data.mainSelector.tools && data.mainSelector.tools.length > 0) {
+                        toolsHtml = `<div style="margin-top: 8px; padding: 6px; background: rgba(255,255,255,0.2); border-radius: 5px; font-size: 0.85em;">
+                            <strong>🔧 Ferramentas (${data.mainSelector.tools.length}):</strong><br>
+                            <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+                                ${data.mainSelector.tools.map(tool => `<span style="background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">${escapeHtml(tool)}</span>`).join('')}
+                            </div>
+                        </div>`;
+                    }
+                    
+                    html += `<div style="margin-bottom: 15px; padding: 10px; background: #667eea; color: white; border-radius: 8px;">
+                        <strong>🎯 Main Selector</strong><br>
+                        <div style="margin-top: 5px; font-size: 0.9em;">
+                            <strong>${escapeHtml(data.mainSelector.name)}</strong><br>
+                            ${escapeHtml(data.mainSelector.description)}
+                            ${toolsHtml}
+                        </div>
+                    </div>`;
+                }
+                
+                // Grupos
+                if (data.groups && data.groups.length > 0) {
+                    html += '<div style="margin-bottom: 15px;"><strong style="font-size: 1.1em;">📦 Grupos</strong></div>';
+                    
+                    data.groups.forEach(group => {
+                        html += `<div style="margin-bottom: 15px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #28a745;">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: #28a745;">${escapeHtml(group.name)}</div>
+                            
+                            <div style="margin-left: 15px; margin-bottom: 8px; padding: 8px; background: rgba(102, 126, 234, 0.1); border-radius: 5px;">
+                                <strong>🎯 Orquestrador:</strong> ${escapeHtml(group.orchestrator.name)}<br>
+                                <small style="color: #666;">${escapeHtml(group.orchestrator.description)}</small>`;
+                        
+                        if (group.orchestrator.tools && group.orchestrator.tools.length > 0) {
+                            html += `<div style="margin-top: 6px; font-size: 0.85em;">
+                                <strong>🔧 Ferramentas (${group.orchestrator.tools.length}):</strong><br>
+                                <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+                                    ${group.orchestrator.tools.map(tool => `<span style="background: rgba(102, 126, 234, 0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.75em;">${escapeHtml(tool)}</span>`).join('')}
+                                </div>
+                            </div>`;
+                        }
+                        
+                        html += `</div>
+                            <div style="margin-left: 15px;">
+                                <strong>🤖 Agentes (${group.agents.length}):</strong><br>`;
+                        
+                        group.agents.forEach(agent => {
+                            let agentToolsHtml = '';
+                            if (agent.tools && agent.tools.length > 0) {
+                                agentToolsHtml = `<div style="margin-top: 4px; font-size: 0.8em;">
+                                    <strong>🔧 Ferramentas:</strong>
+                                    <div style="margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px;">
+                                        ${agent.tools.map(tool => `<span style="background: rgba(0,0,0,0.1); padding: 2px 5px; border-radius: 3px; font-size: 0.75em;">${escapeHtml(tool)}</span>`).join('')}
+                                    </div>
+                                </div>`;
+                            }
+                            
+                            html += `<div style="margin-top: 5px; padding: 6px; background: rgba(0,0,0,0.05); border-radius: 3px; font-size: 0.9em;">
+                                <strong>${escapeHtml(agent.name)}</strong><br>
+                                <small style="color: #666;">${escapeHtml(agent.description)}</small>
+                                ${agentToolsHtml}
+                            </div>`;
+                        });
+                        
+                        html += `</div></div>`;
+                    });
+                }
+                
+                // Fallback Agent
+                if (data.fallbackAgent) {
+                    let fallbackToolsHtml = '';
+                    if (data.fallbackAgent.tools && data.fallbackAgent.tools.length > 0) {
+                        fallbackToolsHtml = `<div style="margin-top: 8px; padding: 6px; background: rgba(0,0,0,0.1); border-radius: 5px; font-size: 0.85em;">
+                            <strong>🔧 Ferramentas (${data.fallbackAgent.tools.length}):</strong><br>
+                            <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+                                ${data.fallbackAgent.tools.map(tool => `<span style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">${escapeHtml(tool)}</span>`).join('')}
+                            </div>
+                        </div>`;
+                    }
+                    
+                    html += `<div style="margin-top: 15px; padding: 10px; background: #ffc107; color: #333; border-radius: 8px;">
+                        <strong>🔄 Fallback Agent</strong><br>
+                        <div style="margin-top: 5px; font-size: 0.9em;">
+                            <strong>${escapeHtml(data.fallbackAgent.name)}</strong><br>
+                            ${escapeHtml(data.fallbackAgent.description)}
+                            ${fallbackToolsHtml}
+                        </div>
+                    </div>`;
+                }
+                
+                html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px; text-align: center; font-size: 0.85em; color: #666;">
+                    Total: <strong>${data.total}</strong> agente(s) configurado(s)
+                </div>`;
+                
+                agentsContent.innerHTML = html;
+            } catch (error) {
+                agentsContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
+                    Erro ao carregar agentes: ${error.message}
+                </div>`;
+            }
+        }
     </script>
 </body>
 </html>
