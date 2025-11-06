@@ -233,6 +233,7 @@
             <h1 style="margin: 0;">🤖 ServiceIA</h1>
             <div style="display: flex; gap: 10px;">
                 <button onclick="toggleAgentsList()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#218838';" onmouseout="this.style.background='#28a745';">📋 Agentes</button>
+                <button onclick="toggleTokensList()" style="background: #ffc107; color: #333; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#e0a800';" onmouseout="this.style.background='#ffc107';">💰 Tokens</button>
                 <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor</a>
             </div>
         </div>
@@ -249,6 +250,15 @@
                 <button onclick="toggleAgentsList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
             </div>
             <div id="agentsContent">Carregando agentes...</div>
+        </div>
+
+        <!-- Histórico de Tokens (oculto por padrão) -->
+        <div id="tokensList" style="display: none; margin-bottom: 20px; padding: 15px; background: #fff3cd; border-radius: 10px; border: 2px solid #ffc107; max-height: 500px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; font-size: 1.3em; color: #333;">💰 Histórico de Tokens</h2>
+                <button onclick="toggleTokensList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
+            </div>
+            <div id="tokensContent">Carregando tokens...</div>
         </div>
 
         <div class="chat-container" id="chat">
@@ -785,6 +795,124 @@
             } catch (error) {
                 agentsContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
                     Erro ao carregar agentes: ${error.message}
+                </div>`;
+            }
+        }
+
+        // Função para alternar visibilidade do histórico de tokens
+        function toggleTokensList() {
+            const tokensList = document.getElementById('tokensList');
+            if (tokensList.style.display === 'none') {
+                tokensList.style.display = 'block';
+                loadTokens();
+            } else {
+                tokensList.style.display = 'none';
+            }
+        }
+
+        // Carrega e exibe o histórico de tokens
+        async function loadTokens() {
+            const tokensContent = document.getElementById('tokensContent');
+            tokensContent.innerHTML = 'Carregando tokens...';
+            
+            try {
+                const response = await fetch('/api/tokens');
+                const data = await response.json();
+                
+                let html = '';
+                
+                // Total de tokens
+                if (data.totalTokens) {
+                    html += `<div style="margin-bottom: 20px; padding: 15px; background: #28a745; color: white; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens</div>
+                        <div style="display: flex; justify-content: space-around; margin-top: 10px;">
+                            <div>
+                                <div style="font-size: 0.9em; opacity: 0.9;">Prompt</div>
+                                <div style="font-size: 1.3em; font-weight: bold;">${data.totalTokens.promptTokens.toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9em; opacity: 0.9;">Completion</div>
+                                <div style="font-size: 1.3em; font-weight: bold;">${data.totalTokens.completionTokens.toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9em; opacity: 0.9;">Total</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${data.totalTokens.totalTokens.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+                
+                // Histórico de entradas
+                if (data.entries && data.entries.length > 0) {
+                    html += `<div style="margin-bottom: 10px;"><strong style="font-size: 1.1em;">📜 Histórico (${data.entries.length} interação${data.entries.length > 1 ? 'ões' : ''})</strong></div>`;
+                    
+                    // Mostra as últimas 20 entradas (mais recentes primeiro)
+                    const entries = data.entries.slice().reverse().slice(0, 20);
+                    
+                    entries.forEach((entry, index) => {
+                        const date = new Date(entry.timestamp);
+                        const dateStr = date.toLocaleString('pt-BR');
+                        
+                        html += `<div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #ffc107;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                <div>
+                                    <strong style="color: #333;">${escapeHtml(entry.agentName)}</strong>
+                                    <div style="font-size: 0.85em; color: #666; margin-top: 3px;">${escapeHtml(entry.message)}</div>
+                                </div>
+                                <div style="font-size: 0.75em; color: #999; text-align: right;">
+                                    ${dateStr}
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                <div style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px;">
+                                    <div style="font-size: 0.8em; color: #666; margin-bottom: 4px;">Esta Interação</div>
+                                    <div style="font-size: 0.85em;">
+                                        <span style="color: #007bff;">Prompt:</span> ${entry.tokenUsage.promptTokens.toLocaleString()}<br>
+                                        <span style="color: #28a745;">Completion:</span> ${entry.tokenUsage.completionTokens.toLocaleString()}<br>
+                                        <span style="color: #333; font-weight: bold;">Total:</span> ${entry.tokenUsage.totalTokens.toLocaleString()}
+                                    </div>
+                                </div>
+                                <div style="padding: 8px; background: rgba(40, 167, 69, 0.1); border-radius: 5px;">
+                                    <div style="font-size: 0.8em; color: #666; margin-bottom: 4px;">Acumulado</div>
+                                    <div style="font-size: 0.85em;">
+                                        <span style="color: #007bff;">Prompt:</span> ${entry.accumulatedTokenUsage.promptTokens.toLocaleString()}<br>
+                                        <span style="color: #28a745;">Completion:</span> ${entry.accumulatedTokenUsage.completionTokens.toLocaleString()}<br>
+                                        <span style="color: #333; font-weight: bold;">Total:</span> ${entry.accumulatedTokenUsage.totalTokens.toLocaleString()}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 0.7em; color: #999; margin-top: 6px;">
+                                Thread: ${entry.threadId.substring(0, 20)}...
+                            </div>
+                        </div>`;
+                    });
+                    
+                    if (data.entries.length > 20) {
+                        html += `<div style="text-align: center; padding: 10px; color: #666; font-size: 0.9em;">
+                            Mostrando últimas 20 de ${data.entries.length} interações
+                        </div>`;
+                    }
+                } else {
+                    html += `<div style="padding: 20px; text-align: center; color: #666;">
+                        <div style="font-size: 2em; margin-bottom: 10px;">📊</div>
+                        <div>Nenhuma interação registrada ainda.</div>
+                    </div>`;
+                }
+                
+                // Última atualização
+                if (data.lastUpdated) {
+                    const lastUpdate = new Date(data.lastUpdated);
+                    html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px; text-align: center; font-size: 0.85em; color: #666;">
+                        Última atualização: ${lastUpdate.toLocaleString('pt-BR')}
+                    </div>`;
+                }
+                
+                tokensContent.innerHTML = html;
+            } catch (error) {
+                tokensContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
+                    Erro ao carregar tokens: ${error.message}
                 </div>`;
             }
         }

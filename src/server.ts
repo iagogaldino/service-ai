@@ -15,6 +15,7 @@ import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import OpenAI from 'openai';
 import path from 'path';
+import fs from 'fs';
 import { AgentManager, executeTool } from './agents/agentManager';
 import { loadEnvironmentVariables, validateRequiredEnvVars, getEnvAsNumber, logEnvironmentInfo } from './config/env';
 import { formatActionMessage } from './utils/functionDescriptions';
@@ -91,6 +92,86 @@ interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+}
+
+/**
+ * Interface para entrada de histórico de tokens no JSON
+ */
+interface TokenHistoryEntry {
+  threadId: string;
+  timestamp: string;
+  agentName: string;
+  message: string;
+  tokenUsage: TokenUsage;
+  accumulatedTokenUsage: TokenUsage;
+}
+
+/**
+ * Interface para o formato completo do arquivo JSON de tokens
+ */
+interface TokensJsonFile {
+  totalTokens: TokenUsage;
+  entries: TokenHistoryEntry[];
+  lastUpdated: string;
+}
+
+/**
+ * Salva informações de tokens em um arquivo JSON
+ * 
+ * @param threadId - ID da thread
+ * @param agentName - Nome do agente usado
+ * @param message - Mensagem do usuário
+ * @param tokenUsage - Tokens utilizados nesta mensagem
+ * @param accumulatedTokenUsage - Tokens acumulados na thread
+ */
+function saveTokensToJson(
+  threadId: string,
+  agentName: string,
+  message: string,
+  tokenUsage: TokenUsage,
+  accumulatedTokenUsage: TokenUsage
+): void {
+  try {
+    const tokensFilePath = path.join(process.cwd(), 'tokens.json');
+    
+    // Lê o arquivo existente ou cria estrutura vazia
+    let tokensData: TokensJsonFile;
+    if (fs.existsSync(tokensFilePath)) {
+      const fileContent = fs.readFileSync(tokensFilePath, 'utf-8');
+      tokensData = JSON.parse(fileContent);
+    } else {
+      tokensData = {
+        totalTokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        entries: [],
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    // Adiciona nova entrada
+    const newEntry: TokenHistoryEntry = {
+      threadId,
+      timestamp: new Date().toISOString(),
+      agentName,
+      message,
+      tokenUsage,
+      accumulatedTokenUsage
+    };
+    tokensData.entries.push(newEntry);
+
+    // Atualiza total acumulado (soma todos os tokens de todas as interações)
+    // Como cada entrada já tem seu próprio tokenUsage, somamos apenas os tokens desta mensagem
+    tokensData.totalTokens.promptTokens += tokenUsage.promptTokens;
+    tokensData.totalTokens.completionTokens += tokenUsage.completionTokens;
+    tokensData.totalTokens.totalTokens += tokenUsage.totalTokens;
+
+    tokensData.lastUpdated = new Date().toISOString();
+
+    // Salva o arquivo
+    fs.writeFileSync(tokensFilePath, JSON.stringify(tokensData, null, 2), 'utf-8');
+    console.log(`💾 Tokens salvos em tokens.json (Total: ${tokensData.totalTokens.totalTokens} tokens)`);
+  } catch (error) {
+    console.error('❌ Erro ao salvar tokens no JSON:', error);
+  }
 }
 
 /**
@@ -542,6 +623,28 @@ app.get('/api/agents', async (req, res) => {
   }
 });
 
+app.get('/api/tokens', async (req, res) => {
+  try {
+    const tokensFilePath = path.join(process.cwd(), 'tokens.json');
+    
+    if (!fs.existsSync(tokensFilePath)) {
+      return res.json({
+        totalTokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        entries: [],
+        lastUpdated: null
+      });
+    }
+    
+    const fileContent = fs.readFileSync(tokensFilePath, 'utf-8');
+    const tokensData = JSON.parse(fileContent);
+    
+    res.json(tokensData);
+  } catch (error: any) {
+    console.error('Erro ao obter tokens:', error);
+    res.status(500).json({ error: 'Erro ao obter histórico de tokens' });
+  }
+});
+
 // ============================================================================
 // CONFIGURAÇÃO DO SOCKET.IO
 // ============================================================================
@@ -767,6 +870,15 @@ io.on('connection', async (socket: Socket) => {
         console.log(`Resposta enviada pelo agente "${config.name}":`, responseMessage);
         console.log(`💰 Tokens desta mensagem: ${tokenUsage.totalTokens} (prompt: ${tokenUsage.promptTokens}, completion: ${tokenUsage.completionTokens})`);
         console.log(`💰 Total acumulado na thread: ${threadTokens.totalTokens} (prompt: ${threadTokens.promptTokens}, completion: ${threadTokens.completionTokens})`);
+
+        // Salva tokens em arquivo JSON
+        saveTokensToJson(
+          threadId,
+          config.name,
+          data.message,
+          tokenUsage,
+          threadTokens
+        );
       } catch (error: any) {
         console.error('Erro ao processar mensagem:', error);
         socket.emit('error', {
