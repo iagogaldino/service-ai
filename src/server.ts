@@ -303,10 +303,28 @@ function saveLogToJson(logEntry: Omit<LogEntry, 'id' | 'timestamp'>): void {
     let logsData: LogsJsonFile;
     if (fs.existsSync(logsFilePath)) {
       const fileContent = fs.readFileSync(logsFilePath, 'utf-8');
-      logsData = JSON.parse(fileContent);
-      // Garante compatibilidade com versões antigas
-      if (!logsData.statistics.totalCost) {
-        logsData.statistics.totalCost = 0;
+      // Verifica se o arquivo está vazio ou contém apenas espaços em branco
+      if (fileContent.trim() === '') {
+        // Arquivo vazio, cria estrutura inicial
+        logsData = {
+          totalEntries: 0,
+          entries: [],
+          lastUpdated: new Date().toISOString(),
+          statistics: {
+            totalConnections: 0,
+            totalMessages: 0,
+            totalToolExecutions: 0,
+            totalErrors: 0,
+            totalTokens: 0,
+            totalCost: 0
+          }
+        };
+      } else {
+        logsData = JSON.parse(fileContent);
+        // Garante compatibilidade com versões antigas
+        if (!logsData.statistics.totalCost) {
+          logsData.statistics.totalCost = 0;
+        }
       }
     } else {
       logsData = {
@@ -476,8 +494,34 @@ function saveConversationMessage(
     // Lê o arquivo existente ou cria estrutura vazia
     let conversationsData: ConversationsJsonFile;
     if (fs.existsSync(conversationsFilePath)) {
-      const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8');
-      conversationsData = JSON.parse(fileContent);
+      try {
+        const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8').trim();
+        
+        // Verifica se o arquivo está vazio
+        if (!fileContent || fileContent.length === 0) {
+          conversationsData = {
+            conversations: [],
+            lastUpdated: new Date().toISOString()
+          };
+        } else {
+          conversationsData = JSON.parse(fileContent);
+          
+          // Verifica se a estrutura está correta
+          if (!conversationsData || !Array.isArray(conversationsData.conversations)) {
+            console.log('⚠️ Estrutura do conversations.json inválida, recriando...');
+            conversationsData = {
+              conversations: [],
+              lastUpdated: new Date().toISOString()
+            };
+          }
+        }
+      } catch (parseError) {
+        console.error('❌ Erro ao fazer parse do conversations.json, recriando...', parseError);
+        conversationsData = {
+          conversations: [],
+          lastUpdated: new Date().toISOString()
+        };
+      }
     } else {
       conversationsData = {
         conversations: [],
@@ -551,8 +595,46 @@ function loadConversation(threadId: string): Conversation | null {
       return null;
     }
 
-    const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8');
-    const conversationsData: ConversationsJsonFile = JSON.parse(fileContent);
+    const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8').trim();
+    
+    // Verifica se o arquivo está vazio ou tem apenas espaços
+    if (!fileContent || fileContent.length === 0) {
+      console.log('⚠️ Arquivo conversations.json está vazio, criando estrutura inicial...');
+      // Cria estrutura inicial válida
+      const initialData: ConversationsJsonFile = {
+        conversations: [],
+        lastUpdated: new Date().toISOString()
+      };
+      fs.writeFileSync(conversationsFilePath, JSON.stringify(initialData, null, 2), 'utf-8');
+      return null;
+    }
+
+    // Tenta fazer o parse do JSON
+    let conversationsData: ConversationsJsonFile;
+    try {
+      conversationsData = JSON.parse(fileContent);
+    } catch (parseError) {
+      console.error('❌ Erro ao fazer parse do JSON do conversations.json:', parseError);
+      console.log('⚠️ Recriando arquivo conversations.json com estrutura válida...');
+      // Recria o arquivo com estrutura válida
+      const initialData: ConversationsJsonFile = {
+        conversations: [],
+        lastUpdated: new Date().toISOString()
+      };
+      fs.writeFileSync(conversationsFilePath, JSON.stringify(initialData, null, 2), 'utf-8');
+      return null;
+    }
+    
+    // Verifica se a estrutura está correta
+    if (!conversationsData || !Array.isArray(conversationsData.conversations)) {
+      console.log('⚠️ Estrutura do conversations.json inválida, recriando...');
+      const initialData: ConversationsJsonFile = {
+        conversations: [],
+        lastUpdated: new Date().toISOString()
+      };
+      fs.writeFileSync(conversationsFilePath, JSON.stringify(initialData, null, 2), 'utf-8');
+      return null;
+    }
     
     const conversation = conversationsData.conversations.find(conv => conv.threadId === threadId);
     return conversation || null;
@@ -1379,22 +1461,64 @@ io.on('connection', async (socket: Socket) => {
 
     // Verifica se o cliente enviou um threadId para reutilizar (reconexão)
     let threadId: string | null = null;
-    socket.once('restore_thread', async (data: { threadId?: string }) => {
+    let awaitingRestore = true; // Flag para indicar que estamos aguardando restore_thread
+    let timeoutHandle: NodeJS.Timeout | null = null; // Handle do setTimeout para poder cancelá-lo
+    
+    socket.on('restore_thread', async (data: { threadId?: string }) => {
+      awaitingRestore = false; // Marca que não estamos mais aguardando
+      console.log(`📥 restore_thread recebido para socket ${socket.id}, threadId: ${data.threadId || 'nenhum'}`);
+      
+      // Cancela o setTimeout se ainda não foi executado
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+        console.log(`🚫 Cancelando setTimeout de criação de thread para socket ${socket.id}`);
+      }
+      
       if (data.threadId && openai) {
+        const existingThreadId = threadMap.get(socket.id);
+        
+        // Se já existe a mesma thread, apenas reenvia as mensagens salvas
+        if (existingThreadId && existingThreadId === data.threadId) {
+          console.log(`♻️ Thread já restaurada para socket ${socket.id}: ${data.threadId}, reenviando mensagens...`);
+          const savedConversation = loadConversation(data.threadId);
+          if (savedConversation && savedConversation.messages && savedConversation.messages.length > 0) {
+            console.log(`📚 Reenviando ${savedConversation.messages.length} mensagem(ns) salva(s) para thread ${data.threadId}`);
+            // Usa setTimeout para garantir que o evento seja enviado após o socket estar totalmente conectado
+            setTimeout(() => {
+              socket.emit('load_conversation', {
+                messages: savedConversation.messages
+              });
+            }, 50);
+          } else {
+            console.log(`⚠️ Nenhuma mensagem encontrada para thread ${data.threadId}`);
+          }
+          socket.emit('thread_restored', { threadId: data.threadId });
+          return;
+        }
+
         try {
           // Verifica se a thread ainda existe na OpenAI
           await openai.beta.threads.retrieve(data.threadId);
           threadId = data.threadId;
+          
+          // IMPORTANTE: Adiciona ao threadMap ANTES de qualquer outra coisa
+          // para evitar que o setTimeout crie uma thread duplicada
           threadMap.set(socket.id, threadId);
-          console.log(`♻️ Thread reutilizada para socket ${socket.id}: ${threadId}`);
+          console.log(`♻️ Thread reutilizada para socket ${socket.id}: ${threadId} (adicionada ao map)`);
           
           // Carrega conversa salva
           const savedConversation = loadConversation(threadId);
-          if (savedConversation && savedConversation.messages.length > 0) {
+          if (savedConversation && savedConversation.messages && savedConversation.messages.length > 0) {
             console.log(`📚 Carregando ${savedConversation.messages.length} mensagem(ns) salva(s) para thread ${threadId}`);
-            socket.emit('load_conversation', {
-              messages: savedConversation.messages
-            });
+            // Usa setTimeout para garantir que o evento seja enviado após o socket estar totalmente conectado
+            setTimeout(() => {
+              socket.emit('load_conversation', {
+                messages: savedConversation.messages
+              });
+            }, 50);
+          } else {
+            console.log(`⚠️ Nenhuma mensagem encontrada para thread ${threadId}`);
           }
           
           // Atualiza informações da conexão
@@ -1416,24 +1540,20 @@ io.on('connection', async (socket: Socket) => {
         }
       }
       
-      // Se não conseguiu reutilizar, cria nova thread
-      if (!threadId) {
-        await createNewThread();
-        
-        // Registra informações da conexão após criar thread
-        if (threadId) {
-          const connectionInfo: ConnectionInfo = {
-            socketId: socket.id,
-            threadId: threadId,
-            connectedAt: new Date(),
-            lastActivity: new Date(),
-            messageCount: 0,
-            userAgent: socket.handshake.headers['user-agent'],
-            ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
-          };
-          connectionsMap.set(socket.id, connectionInfo);
-        }
+      // Se não conseguiu reutilizar, verifica se já existe uma thread no threadMap
+      // (pode ter sido criada pelo setTimeout)
+      const existingThreadInMap = threadMap.get(socket.id);
+      if (!threadId && !existingThreadInMap) {
+        // Só cria nova thread se realmente não há nenhuma thread no map
+        console.log(`⚠️ Nenhuma thread válida encontrada no restore_thread, mas não criando aqui - aguardando timeout do servidor...`);
+        // Não cria thread aqui, deixa o setTimeout fazer isso se necessário
+      } else if (existingThreadInMap && !threadId) {
+        // Thread já existe no map mas não foi definida aqui (foi criada pelo setTimeout)
+        console.log(`ℹ️ Thread ${existingThreadInMap} já existe no map para socket ${socket.id}, não criando nova`);
       }
+      
+      // Marca que não estamos mais aguardando (mesmo se não conseguiu restaurar)
+      awaitingRestore = false;
     });
     
     // Função auxiliar para criar nova thread
@@ -1447,11 +1567,14 @@ io.on('connection', async (socket: Socket) => {
 
       // Carrega conversa salva se existir (pode não existir para thread nova)
       const savedConversation = loadConversation(threadId);
-      if (savedConversation && savedConversation.messages.length > 0) {
+      if (savedConversation && savedConversation.messages && savedConversation.messages.length > 0) {
         console.log(`📚 Carregando ${savedConversation.messages.length} mensagem(ns) salva(s) para thread ${threadId}`);
-        socket.emit('load_conversation', {
-          messages: savedConversation.messages
-        });
+        // Usa setTimeout para garantir que o evento seja enviado após o socket estar totalmente conectado
+        setTimeout(() => {
+          socket.emit('load_conversation', {
+            messages: savedConversation.messages
+          });
+        }, 50);
       }
       
       // Emite threadId para o frontend salvar no localStorage
@@ -1494,15 +1617,54 @@ io.on('connection', async (socket: Socket) => {
     }
     
     // Aguarda um pouco para receber o evento restore_thread, depois cria nova se necessário
-    setTimeout(async () => {
-      if (!threadId) {
+    timeoutHandle = setTimeout(async () => {
+      // Verifica novamente se threadId foi definido (pode ter sido restaurado no handler acima)
+      const currentThreadId = threadMap.get(socket.id);
+      
+      // Se ainda estamos aguardando restore_thread e não há thread, aguarda mais um pouco
+      if (awaitingRestore && !currentThreadId) {
+        console.log(`⏳ Ainda aguardando restore_thread para socket ${socket.id}, aguardando mais 200ms...`);
+        setTimeout(async () => {
+          const finalThreadId = threadMap.get(socket.id);
+          if (!finalThreadId && openai) {
+            console.log(`⚠️ Nenhuma thread encontrada para socket ${socket.id} após aguardar restore_thread, criando nova...`);
+            await createNewThread();
+            
+            // Registra informações da conexão após criar thread
+            const newThreadId = threadMap.get(socket.id);
+            if (newThreadId) {
+              const connectionInfo: ConnectionInfo = {
+                socketId: socket.id,
+                threadId: newThreadId,
+                connectedAt: new Date(),
+                lastActivity: new Date(),
+                messageCount: 0,
+                userAgent: socket.handshake.headers['user-agent'],
+                ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+              };
+              connectionsMap.set(socket.id, connectionInfo);
+            }
+          } else {
+            console.log(`✅ Thread ${finalThreadId} foi restaurada para socket ${socket.id} durante a espera`);
+          }
+        }, 200);
+        return;
+      }
+      
+      // Se não está aguardando restore_thread mas não há thread, cria nova
+      // IMPORTANTE: Verifica novamente o threadMap aqui porque pode ter sido atualizado após o restore_thread
+      const finalCheckThreadId = threadMap.get(socket.id);
+      
+      if (!finalCheckThreadId && openai && !awaitingRestore) {
+        console.log(`⚠️ Nenhuma thread encontrada para socket ${socket.id} após restore_thread, criando nova...`);
         await createNewThread();
         
         // Registra informações da conexão após criar thread
-        if (threadId) {
+        const newThreadId = threadMap.get(socket.id);
+        if (newThreadId) {
           const connectionInfo: ConnectionInfo = {
             socketId: socket.id,
-            threadId: threadId,
+            threadId: newThreadId,
             connectedAt: new Date(),
             lastActivity: new Date(),
             messageCount: 0,
@@ -1511,8 +1673,15 @@ io.on('connection', async (socket: Socket) => {
           };
           connectionsMap.set(socket.id, connectionInfo);
         }
+      } else if (finalCheckThreadId) {
+        console.log(`✅ Thread ${finalCheckThreadId} já existe para socket ${socket.id} (foi restaurada ou criada), não criando nova`);
+      } else if (awaitingRestore) {
+        console.log(`⏳ Ainda aguardando restore_thread para socket ${socket.id}...`);
       }
-    }, 100);
+      
+      // Marca o timeout como executado
+      timeoutHandle = null;
+    }, 500); // Aumentado para 500ms para dar mais tempo ao restore_thread
 
 
     // Notifica monitores será feito quando connectionInfo for criado
