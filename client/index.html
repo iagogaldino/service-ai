@@ -663,7 +663,12 @@
         <!-- Chat Area -->
         <section class="chat-area">
             <div class="chat-area-header">
-                <h2>💬 Chat</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <h2 style="margin: 0;">💬 Chat</h2>
+                    <button id="clearChatBtn" onclick="clearConversation()" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.15); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; transition: all 0.3s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'" title="Limpar conversa">
+                        🗑️ Limpar
+                    </button>
+                </div>
                 <div id="status" class="status disconnected">Desconectado</div>
         </div>
 
@@ -801,6 +806,13 @@
             // myMonitorSocketId será atualizado no escopo do monitor
             if (typeof window.updateMonitorSocketId === 'function') {
                 window.updateMonitorSocketId(socket.id);
+            }
+            
+            // Tenta restaurar thread anterior do localStorage
+            const savedThreadId = localStorage.getItem('delsucia_threadId');
+            if (savedThreadId) {
+                console.log('Tentando restaurar thread:', savedThreadId);
+                socket.emit('restore_thread', { threadId: savedThreadId });
             }
         });
 
@@ -956,6 +968,61 @@
         // Recebe mensagens trocadas pelos agentes
         socket.on('agent_message', (data) => {
             addAgentMessage(data);
+        });
+
+        // Carrega conversa salva quando conectar
+        socket.on('load_conversation', (data) => {
+            const chatContainer = document.getElementById('chat');
+            if (!chatContainer || !data.messages || data.messages.length === 0) return;
+
+            // Limpa o chat antes de carregar
+            chatContainer.innerHTML = '';
+
+            // Carrega cada mensagem salva
+            data.messages.forEach(msg => {
+                if (msg.role === 'user') {
+                    addMessage('Você', msg.content, 'user');
+                } else if (msg.role === 'assistant') {
+                    const senderLabel = msg.agentName ? `IA (${msg.agentName})` : 'IA';
+                    addMessage(senderLabel, msg.content, 'bot');
+                }
+            });
+
+            // Scroll para o final
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+
+        // Handler quando conversa é limpa
+        socket.on('conversation_cleared', (data) => {
+            const chatContainer = document.getElementById('chat');
+            if (chatContainer) {
+                chatContainer.innerHTML = '';
+            }
+            // Atualiza threadId no localStorage se uma nova thread foi criada
+            if (data.newThreadId) {
+                localStorage.setItem('delsucia_threadId', data.newThreadId);
+                console.log('Conversa limpa e nova thread criada:', data.newThreadId);
+            } else {
+                // Se não recebeu novo threadId, remove do localStorage
+                localStorage.removeItem('delsucia_threadId');
+            }
+            console.log('Conversa limpa:', data.message);
+        });
+
+        // Handler quando thread é criada - salva no localStorage
+        socket.on('thread_created', (data) => {
+            if (data.threadId) {
+                localStorage.setItem('delsucia_threadId', data.threadId);
+                console.log('Thread criada e salva:', data.threadId);
+            }
+        });
+
+        // Handler quando thread é restaurada - atualiza localStorage
+        socket.on('thread_restored', (data) => {
+            if (data.threadId) {
+                localStorage.setItem('delsucia_threadId', data.threadId);
+                console.log('Thread restaurada:', data.threadId);
+            }
         });
 
         // Recebe informações de tokens em tempo real
@@ -1237,6 +1304,12 @@
                     selectionDiv.remove();
                 }
             }, 3000);
+        }
+
+        function clearConversation() {
+            if (confirm('Tem certeza que deseja limpar a conversa? Esta ação não pode ser desfeita.')) {
+                socket.emit('clear_conversation');
+            }
         }
 
         function sendMessage() {

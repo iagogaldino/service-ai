@@ -252,6 +252,37 @@ interface LogsJsonFile {
 }
 
 /**
+ * Interface para uma mensagem de conversa
+ */
+interface ConversationMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  agentName?: string;
+  tokenUsage?: TokenUsage;
+}
+
+/**
+ * Interface para uma conversa (thread)
+ */
+interface Conversation {
+  threadId: string;
+  socketId: string;
+  createdAt: string;
+  lastUpdated: string;
+  messages: ConversationMessage[];
+}
+
+/**
+ * Interface para o formato completo do arquivo JSON de conversas
+ */
+interface ConversationsJsonFile {
+  conversations: Conversation[];
+  lastUpdated: string;
+}
+
+/**
  * Salva uma entrada de log em um arquivo JSON
  * 
  * @param logEntry - Entrada de log a ser salva
@@ -418,6 +449,146 @@ function saveTokensToJson(
     console.log(`💾 Tokens salvos em tokens.json (Total: ${tokensData.totalTokens.totalTokens} tokens, Custo: $${tokensData.totalCost.totalCost.toFixed(4)})`);
   } catch (error) {
     console.error('❌ Erro ao salvar tokens no JSON:', error);
+  }
+}
+
+/**
+ * Salva uma mensagem na conversa
+ * 
+ * @param threadId - ID da thread
+ * @param socketId - ID do socket
+ * @param role - Role da mensagem (user, assistant, system)
+ * @param content - Conteúdo da mensagem
+ * @param agentName - Nome do agente (opcional)
+ * @param tokenUsage - Uso de tokens (opcional)
+ */
+function saveConversationMessage(
+  threadId: string,
+  socketId: string,
+  role: 'user' | 'assistant' | 'system',
+  content: string,
+  agentName?: string,
+  tokenUsage?: TokenUsage
+): void {
+  try {
+    const conversationsFilePath = path.join(process.cwd(), 'conversations.json');
+    
+    // Lê o arquivo existente ou cria estrutura vazia
+    let conversationsData: ConversationsJsonFile;
+    if (fs.existsSync(conversationsFilePath)) {
+      const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8');
+      conversationsData = JSON.parse(fileContent);
+    } else {
+      conversationsData = {
+        conversations: [],
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    // Procura se já existe uma conversa para esta thread
+    let conversation = conversationsData.conversations.find(conv => conv.threadId === threadId);
+    
+    if (!conversation) {
+      // Cria nova conversa
+      conversation = {
+        threadId,
+        socketId,
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        messages: []
+      };
+      conversationsData.conversations.push(conversation);
+    } else {
+      // Atualiza socketId e lastUpdated se necessário
+      conversation.socketId = socketId;
+      conversation.lastUpdated = new Date().toISOString();
+    }
+
+    // Adiciona nova mensagem
+    const newMessage: ConversationMessage = {
+      id: `${threadId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      role,
+      content,
+      timestamp: new Date().toISOString(),
+      agentName,
+      tokenUsage
+    };
+
+    conversation.messages.push(newMessage);
+
+    // Mantém apenas as últimas 1000 mensagens por conversa para evitar arquivo muito grande
+    const MAX_MESSAGES_PER_CONVERSATION = 1000;
+    if (conversation.messages.length > MAX_MESSAGES_PER_CONVERSATION) {
+      conversation.messages = conversation.messages.slice(-MAX_MESSAGES_PER_CONVERSATION);
+    }
+
+    // Mantém apenas as últimas 100 conversas para evitar arquivo muito grande
+    const MAX_CONVERSATIONS = 100;
+    if (conversationsData.conversations.length > MAX_CONVERSATIONS) {
+      conversationsData.conversations = conversationsData.conversations.slice(-MAX_CONVERSATIONS);
+    }
+
+    conversationsData.lastUpdated = new Date().toISOString();
+
+    // Salva o arquivo
+    fs.writeFileSync(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('❌ Erro ao salvar mensagem na conversa:', error);
+  }
+}
+
+/**
+ * Carrega conversa de uma thread
+ * 
+ * @param threadId - ID da thread
+ * @returns Conversa ou null se não encontrada
+ */
+function loadConversation(threadId: string): Conversation | null {
+  try {
+    const conversationsFilePath = path.join(process.cwd(), 'conversations.json');
+    
+    if (!fs.existsSync(conversationsFilePath)) {
+      return null;
+    }
+
+    const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8');
+    const conversationsData: ConversationsJsonFile = JSON.parse(fileContent);
+    
+    const conversation = conversationsData.conversations.find(conv => conv.threadId === threadId);
+    return conversation || null;
+  } catch (error) {
+    console.error('❌ Erro ao carregar conversa:', error);
+    return null;
+  }
+}
+
+/**
+ * Limpa conversa de uma thread
+ * 
+ * @param threadId - ID da thread
+ */
+function clearConversation(threadId: string): void {
+  try {
+    const conversationsFilePath = path.join(process.cwd(), 'conversations.json');
+    
+    if (!fs.existsSync(conversationsFilePath)) {
+      return;
+    }
+
+    const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8');
+    const conversationsData: ConversationsJsonFile = JSON.parse(fileContent);
+    
+    // Remove a conversa da lista
+    conversationsData.conversations = conversationsData.conversations.filter(
+      conv => conv.threadId !== threadId
+    );
+    
+    conversationsData.lastUpdated = new Date().toISOString();
+
+    // Salva o arquivo
+    fs.writeFileSync(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('❌ Erro ao limpar conversa:', error);
   }
 }
 
@@ -981,6 +1152,37 @@ app.get('/api/logs', async (req, res) => {
 /**
  * API: Obtém configuração atual
  */
+/**
+ * API: Limpa conversa de uma thread
+ */
+app.delete('/api/conversations/:threadId', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    clearConversation(threadId);
+    res.json({ success: true, message: 'Conversa limpa com sucesso' });
+  } catch (error: any) {
+    console.error('Erro ao limpar conversa:', error);
+    res.status(500).json({ error: 'Erro ao limpar conversa' });
+  }
+});
+
+/**
+ * API: Carrega conversa de uma thread
+ */
+app.get('/api/conversations/:threadId', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const conversation = loadConversation(threadId);
+    if (!conversation) {
+      return res.json({ messages: [] });
+    }
+    res.json({ messages: conversation.messages });
+  } catch (error: any) {
+    console.error('Erro ao carregar conversa:', error);
+    res.status(500).json({ error: 'Erro ao carregar conversa' });
+  }
+});
+
 app.get('/api/config', async (req, res) => {
   try {
     const config = loadConfigFromJson();
@@ -1175,45 +1377,146 @@ io.on('connection', async (socket: Socket) => {
       return;
     }
 
-    // Cria uma nova thread para esta conexão
-    const thread = await openai.beta.threads.create();
-    threadMap.set(socket.id, thread.id);
-    console.log('Thread criada para socket', socket.id, ':', thread.id);
-
-    // Registra informações da conexão
-    const connectionInfo: ConnectionInfo = {
-      socketId: socket.id,
-      threadId: thread.id,
-      connectedAt: new Date(),
-      lastActivity: new Date(),
-      messageCount: 0,
-      userAgent: socket.handshake.headers['user-agent'],
-      ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
-    };
-    connectionsMap.set(socket.id, connectionInfo);
-
-    // Log de conexão
-    saveLogToJson({
-      type: 'connection',
-      socketId: socket.id,
-      threadId: thread.id,
-      metadata: {
-        userAgent: connectionInfo.userAgent,
-        ipAddress: connectionInfo.ipAddress,
-        connectedAt: connectionInfo.connectedAt.toISOString()
+    // Verifica se o cliente enviou um threadId para reutilizar (reconexão)
+    let threadId: string | null = null;
+    socket.once('restore_thread', async (data: { threadId?: string }) => {
+      if (data.threadId && openai) {
+        try {
+          // Verifica se a thread ainda existe na OpenAI
+          await openai.beta.threads.retrieve(data.threadId);
+          threadId = data.threadId;
+          threadMap.set(socket.id, threadId);
+          console.log(`♻️ Thread reutilizada para socket ${socket.id}: ${threadId}`);
+          
+          // Carrega conversa salva
+          const savedConversation = loadConversation(threadId);
+          if (savedConversation && savedConversation.messages.length > 0) {
+            console.log(`📚 Carregando ${savedConversation.messages.length} mensagem(ns) salva(s) para thread ${threadId}`);
+            socket.emit('load_conversation', {
+              messages: savedConversation.messages
+            });
+          }
+          
+          // Atualiza informações da conexão
+          const connectionInfo: ConnectionInfo = {
+            socketId: socket.id,
+            threadId: threadId,
+            connectedAt: new Date(),
+            lastActivity: new Date(),
+            messageCount: savedConversation?.messages.filter(m => m.role === 'user').length || 0,
+            userAgent: socket.handshake.headers['user-agent'],
+            ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+          };
+          connectionsMap.set(socket.id, connectionInfo);
+          
+          socket.emit('thread_restored', { threadId: threadId });
+          return;
+        } catch (error) {
+          console.log(`⚠️ Thread ${data.threadId} não encontrada ou inválida, criando nova...`);
+        }
+      }
+      
+      // Se não conseguiu reutilizar, cria nova thread
+      if (!threadId) {
+        await createNewThread();
+        
+        // Registra informações da conexão após criar thread
+        if (threadId) {
+          const connectionInfo: ConnectionInfo = {
+            socketId: socket.id,
+            threadId: threadId,
+            connectedAt: new Date(),
+            lastActivity: new Date(),
+            messageCount: 0,
+            userAgent: socket.handshake.headers['user-agent'],
+            ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+          };
+          connectionsMap.set(socket.id, connectionInfo);
+        }
       }
     });
+    
+    // Função auxiliar para criar nova thread
+    async function createNewThread() {
+      if (!openai) return;
+      
+      const thread = await openai.beta.threads.create();
+      threadId = thread.id;
+      threadMap.set(socket.id, threadId);
+      console.log('Thread criada para socket', socket.id, ':', threadId);
 
-    // Notifica todos os monitores sobre nova conexão
-    emitToMonitors(socket.id, 'connection', {
-      socketId: connectionInfo.socketId,
-      threadId: connectionInfo.threadId,
-      connectedAt: connectionInfo.connectedAt.toISOString(),
-      lastActivity: connectionInfo.lastActivity.toISOString(),
-      messageCount: connectionInfo.messageCount,
-      userAgent: connectionInfo.userAgent,
-      ipAddress: connectionInfo.ipAddress
-    });
+      // Carrega conversa salva se existir (pode não existir para thread nova)
+      const savedConversation = loadConversation(threadId);
+      if (savedConversation && savedConversation.messages.length > 0) {
+        console.log(`📚 Carregando ${savedConversation.messages.length} mensagem(ns) salva(s) para thread ${threadId}`);
+        socket.emit('load_conversation', {
+          messages: savedConversation.messages
+        });
+      }
+      
+      // Emite threadId para o frontend salvar no localStorage
+      socket.emit('thread_created', { threadId: threadId });
+      
+      // Registra informações da conexão após criar thread
+      const connectionInfo: ConnectionInfo = {
+        socketId: socket.id,
+        threadId: threadId,
+        connectedAt: new Date(),
+        lastActivity: new Date(),
+        messageCount: 0,
+        userAgent: socket.handshake.headers['user-agent'],
+        ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+      };
+      connectionsMap.set(socket.id, connectionInfo);
+      
+      // Notifica monitores sobre nova conexão
+      emitToMonitors(socket.id, 'connection', {
+        socketId: connectionInfo.socketId,
+        threadId: connectionInfo.threadId,
+        connectedAt: connectionInfo.connectedAt.toISOString(),
+        lastActivity: connectionInfo.lastActivity.toISOString(),
+        messageCount: connectionInfo.messageCount,
+        userAgent: connectionInfo.userAgent,
+        ipAddress: connectionInfo.ipAddress
+      });
+      
+      // Log de conexão nova
+      saveLogToJson({
+        type: 'connection',
+        socketId: socket.id,
+        threadId: threadId,
+        metadata: {
+          userAgent: connectionInfo.userAgent,
+          ipAddress: connectionInfo.ipAddress,
+          restored: false
+        }
+      });
+    }
+    
+    // Aguarda um pouco para receber o evento restore_thread, depois cria nova se necessário
+    setTimeout(async () => {
+      if (!threadId) {
+        await createNewThread();
+        
+        // Registra informações da conexão após criar thread
+        if (threadId) {
+          const connectionInfo: ConnectionInfo = {
+            socketId: socket.id,
+            threadId: threadId,
+            connectedAt: new Date(),
+            lastActivity: new Date(),
+            messageCount: 0,
+            userAgent: socket.handshake.headers['user-agent'],
+            ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+          };
+          connectionsMap.set(socket.id, connectionInfo);
+        }
+      }
+    }, 100);
+
+
+    // Notifica monitores será feito quando connectionInfo for criado
+    // (será feito dentro de createNewThread ou restore_thread)
 
     // Handler para iniciar monitoramento de uma conexão
     socket.on('start_monitoring', (data: { targetSocketId: string }) => {
@@ -1258,6 +1561,72 @@ io.on('connection', async (socket: Socket) => {
         message: 'Monitoramento parado'
       });
       console.log(`Socket ${socket.id} parou de monitorar`);
+    });
+
+    // Handler para limpar conversa
+    socket.on('clear_conversation', async () => {
+      const oldThreadId = threadMap.get(socket.id);
+      
+      if (!openai) {
+        socket.emit('error', {
+          message: 'OpenAI não configurado'
+        });
+        return;
+      }
+
+      try {
+        // Limpa a conversa antiga do JSON se existir
+        if (oldThreadId) {
+          clearConversation(oldThreadId);
+          console.log(`🗑️ Conversa limpa para thread ${oldThreadId}`);
+        }
+
+        // Cria uma nova thread
+        const newThread = await openai.beta.threads.create();
+        const newThreadId = newThread.id;
+        
+        // Atualiza o threadMap com a nova thread
+        threadMap.set(socket.id, newThreadId);
+        console.log(`🆕 Nova thread criada após limpar conversa: ${newThreadId} (socket: ${socket.id})`);
+
+        // Atualiza informações da conexão
+        const connectionInfo: ConnectionInfo = {
+          socketId: socket.id,
+          threadId: newThreadId,
+          connectedAt: new Date(),
+          lastActivity: new Date(),
+          messageCount: 0,
+          userAgent: socket.handshake.headers['user-agent'],
+          ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+        };
+        connectionsMap.set(socket.id, connectionInfo);
+
+        // Emite eventos para o frontend
+        socket.emit('conversation_cleared', {
+          message: 'Conversa limpa com sucesso',
+          newThreadId: newThreadId
+        });
+        
+        // Emite novo threadId para salvar no localStorage
+        socket.emit('thread_created', { threadId: newThreadId });
+
+        // Log de limpeza e criação de nova thread
+        saveLogToJson({
+          type: 'connection',
+          socketId: socket.id,
+          threadId: newThreadId,
+          metadata: {
+            action: 'conversation_cleared',
+            oldThreadId: oldThreadId,
+            newThreadId: newThreadId
+          }
+        });
+      } catch (error: any) {
+        console.error('Erro ao limpar conversa e criar nova thread:', error);
+        socket.emit('error', {
+          message: 'Erro ao limpar conversa'
+        });
+      }
     });
 
     /**
@@ -1350,6 +1719,9 @@ io.on('connection', async (socket: Socket) => {
         socket.emit('agent_message', userMessageData);
         emitToMonitors(socket.id, 'agent_message', userMessageData);
 
+        // Salva mensagem do usuário na conversa
+        saveConversationMessage(threadId, socket.id, 'user', data.message);
+
         console.log(`✅ Mensagem adicionada à thread com sucesso (ID: ${userMessage.id})`);
 
         // Log de mensagem enviada
@@ -1419,6 +1791,16 @@ io.on('connection', async (socket: Socket) => {
         console.log(`Resposta enviada pelo agente "${config.name}":`, responseMessage);
         console.log(`💰 Tokens desta mensagem: ${tokenUsage.totalTokens} (prompt: ${tokenUsage.promptTokens}, completion: ${tokenUsage.completionTokens})`);
         console.log(`💰 Total acumulado na thread: ${threadTokens.totalTokens} (prompt: ${threadTokens.promptTokens}, completion: ${threadTokens.completionTokens})`);
+
+        // Salva mensagem do assistente na conversa
+        saveConversationMessage(
+          threadId,
+          socket.id,
+          'assistant',
+          responseMessage,
+          config.name,
+          tokenUsage
+        );
 
         // Salva tokens em arquivo JSON
         saveTokensToJson(
