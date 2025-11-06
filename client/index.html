@@ -235,6 +235,7 @@
                 <button onclick="toggleAgentsList()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#218838';" onmouseout="this.style.background='#28a745';">📋 Agentes</button>
                 <button onclick="toggleTokensList()" style="background: #ffc107; color: #333; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#e0a800';" onmouseout="this.style.background='#ffc107';">💰 Tokens</button>
                 <button onclick="toggleLogsList()" style="background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#138496';" onmouseout="this.style.background='#17a2b8';">📝 Logs</button>
+                <button onclick="toggleConfigPanel()" style="background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#5a6268';" onmouseout="this.style.background='#6c757d';">⚙️ Config</button>
                 <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor</a>
             </div>
         </div>
@@ -269,6 +270,44 @@
                 <button onclick="toggleLogsList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
             </div>
             <div id="logsContent">Carregando logs...</div>
+        </div>
+
+        <!-- Painel de Configuração (oculto por padrão) -->
+        <div id="configPanel" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 2px solid #6c757d;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; font-size: 1.3em; color: #333;">⚙️ Configuração</h2>
+                <button onclick="toggleConfigPanel()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
+            </div>
+            <div id="configContent">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">OpenAI API Key</label>
+                    <input 
+                        type="password" 
+                        id="apiKeyInput" 
+                        placeholder="sk-..." 
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;"
+                    >
+                    <div id="apiKeyStatus" style="margin-top: 5px; font-size: 0.85em;"></div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Porta (opcional)</label>
+                    <input 
+                        type="number" 
+                        id="portInput" 
+                        placeholder="3000" 
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;"
+                    >
+                </div>
+                <button 
+                    onclick="saveConfig()" 
+                    style="width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold;"
+                    onmouseover="this.style.background='#218838';"
+                    onmouseout="this.style.background='#28a745';"
+                >
+                    💾 Salvar Configuração
+                </button>
+                <div id="configMessage" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
+            </div>
         </div>
 
         <div class="chat-container" id="chat">
@@ -1105,6 +1144,123 @@
                 logsContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
                     Erro ao carregar logs: ${error.message}
                 </div>`;
+            }
+        }
+
+        // Função para alternar visibilidade do painel de configuração
+        function toggleConfigPanel() {
+            const configPanel = document.getElementById('configPanel');
+            if (configPanel.style.display === 'none') {
+                configPanel.style.display = 'block';
+                loadConfig();
+            } else {
+                configPanel.style.display = 'none';
+            }
+        }
+
+        // Carrega configuração atual
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                
+                const apiKeyInput = document.getElementById('apiKeyInput');
+                const portInput = document.getElementById('portInput');
+                const apiKeyStatus = document.getElementById('apiKeyStatus');
+                
+                if (data.hasApiKey) {
+                    apiKeyInput.value = '';
+                    apiKeyInput.placeholder = data.apiKeyPreview || 'sk-...';
+                    apiKeyStatus.innerHTML = `<span style="color: #28a745;">✅ API Key configurada: ${data.apiKeyPreview}</span>`;
+                    if (data.lastUpdated) {
+                        const date = new Date(data.lastUpdated);
+                        apiKeyStatus.innerHTML += `<br><span style="color: #666; font-size: 0.85em;">Atualizada em: ${date.toLocaleString('pt-BR')}</span>`;
+                    }
+                } else {
+                    apiKeyInput.value = '';
+                    apiKeyInput.placeholder = 'sk-...';
+                    apiKeyStatus.innerHTML = `<span style="color: #dc3545;">⚠️ API Key não configurada</span>`;
+                }
+                
+                portInput.value = data.port || '3000';
+            } catch (error) {
+                console.error('Erro ao carregar configuração:', error);
+            }
+        }
+
+        // Salva configuração
+        async function saveConfig() {
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const portInput = document.getElementById('portInput');
+            const configMessage = document.getElementById('configMessage');
+            
+            const apiKey = apiKeyInput.value.trim();
+            const port = parseInt(portInput.value) || null;
+            
+            if (!apiKey) {
+                configMessage.style.display = 'block';
+                configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
+                configMessage.style.color = '#dc3545';
+                configMessage.style.border = '1px solid #dc3545';
+                configMessage.textContent = '❌ Por favor, insira uma API Key';
+                return;
+            }
+            
+            if (!apiKey.startsWith('sk-')) {
+                configMessage.style.display = 'block';
+                configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
+                configMessage.style.color = '#dc3545';
+                configMessage.style.border = '1px solid #dc3545';
+                configMessage.textContent = '❌ API Key inválida. Deve começar com "sk-"';
+                return;
+            }
+            
+            try {
+                configMessage.style.display = 'block';
+                configMessage.style.background = 'rgba(23, 162, 184, 0.1)';
+                configMessage.style.color = '#17a2b8';
+                configMessage.style.border = '1px solid #17a2b8';
+                configMessage.textContent = '⏳ Salvando configuração...';
+                
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        openaiApiKey: apiKey,
+                        port: port
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    configMessage.style.background = 'rgba(40, 167, 69, 0.1)';
+                    configMessage.style.color = '#28a745';
+                    configMessage.style.border = '1px solid #28a745';
+                    configMessage.textContent = `✅ ${data.message}`;
+                    
+                    // Limpa o campo de API key por segurança
+                    apiKeyInput.value = '';
+                    apiKeyInput.placeholder = data.apiKeyPreview;
+                    
+                    // Recarrega status
+                    setTimeout(() => {
+                        loadConfig();
+                    }, 1000);
+                } else {
+                    configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
+                    configMessage.style.color = '#dc3545';
+                    configMessage.style.border = '1px solid #dc3545';
+                    configMessage.textContent = `❌ ${data.error || 'Erro ao salvar configuração'}`;
+                }
+            } catch (error) {
+                configMessage.style.display = 'block';
+                configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
+                configMessage.style.color = '#dc3545';
+                configMessage.style.border = '1px solid #dc3545';
+                configMessage.textContent = `❌ Erro ao salvar configuração: ${error.message}`;
             }
         }
     </script>

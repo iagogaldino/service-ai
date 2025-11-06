@@ -1,12 +1,23 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
 /**
  * Configuração e carregamento de variáveis de ambiente
  * 
  * Este módulo gerencia o carregamento do arquivo .env com múltiplas
  * estratégias de fallback para garantir compatibilidade em diferentes ambientes.
+ * Agora também suporta carregamento de configurações via config.json.
  */
+
+/**
+ * Interface para o arquivo config.json
+ */
+export interface AppConfig {
+  openaiApiKey?: string;
+  port?: number;
+  lastUpdated?: string;
+}
 
 /**
  * Caminhos possíveis para o arquivo .env
@@ -18,14 +29,64 @@ const ENV_PATHS = [
 ];
 
 /**
+ * Carrega configuração do arquivo config.json
+ * 
+ * @returns {AppConfig | null} Configuração carregada ou null se não existir
+ */
+export function loadConfigFromJson(): AppConfig | null {
+  try {
+    const configPath = path.join(process.cwd(), 'config.json');
+    if (fs.existsSync(configPath)) {
+      const fileContent = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(fileContent) as AppConfig;
+      console.log(`✅ Arquivo config.json carregado`);
+      return config;
+    }
+  } catch (error) {
+    console.warn('⚠️  Erro ao carregar config.json:', error);
+  }
+  return null;
+}
+
+/**
+ * Salva configuração no arquivo config.json
+ * 
+ * @param config - Configuração a ser salva
+ */
+export function saveConfigToJson(config: AppConfig): void {
+  try {
+    const configPath = path.join(process.cwd(), 'config.json');
+    const configToSave: AppConfig = {
+      ...config,
+      lastUpdated: new Date().toISOString()
+    };
+    fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2), 'utf-8');
+    console.log(`✅ Configuração salva em config.json`);
+  } catch (error) {
+    console.error('❌ Erro ao salvar config.json:', error);
+    throw error;
+  }
+}
+
+/**
  * Carrega variáveis de ambiente do arquivo .env
  * Tenta múltiplos caminhos até encontrar o arquivo
  * 
  * @returns {boolean} Retorna true se o arquivo foi carregado com sucesso
  */
 export function loadEnvironmentVariables(): boolean {
-  let envLoaded = false;
+  // Primeiro tenta carregar do config.json
+  const config = loadConfigFromJson();
+  if (config?.openaiApiKey) {
+    process.env.OPENAI_API_KEY = config.openaiApiKey;
+    if (config.port) {
+      process.env.PORT = config.port.toString();
+    }
+    console.log('✅ API Key carregada do config.json');
+  }
 
+  // Depois tenta carregar do .env (fallback)
+  let envLoaded = false;
   for (const envPath of ENV_PATHS) {
     const result = dotenv.config({ path: envPath });
     if (!result.error) {
@@ -35,13 +96,13 @@ export function loadEnvironmentVariables(): boolean {
     }
   }
 
-  if (!envLoaded) {
+  if (!envLoaded && !config?.openaiApiKey) {
     console.warn('⚠️  Aviso: Arquivo .env não encontrado nos caminhos padrão');
     console.warn('   Tentando carregar do diretório atual...');
     dotenv.config(); // Tenta carregar do diretório atual
   }
 
-  return envLoaded;
+  return envLoaded || !!config?.openaiApiKey;
 }
 
 /**
@@ -64,8 +125,9 @@ export function validateRequiredEnvVars(requiredVars: string[]): void {
     missing.forEach(varName => {
       console.error(`   - ${varName}`);
     });
-    console.error(`\nPor favor, crie um arquivo .env na raiz do projeto com essas variáveis.`);
-    process.exit(1);
+    console.error(`\nPor favor, configure a API key através do frontend ou crie um arquivo .env na raiz do projeto.`);
+    // Não faz exit(1) para permitir que o usuário configure via frontend
+    console.warn(`⚠️  Continuando sem API key - configure através do frontend antes de usar`);
   }
 }
 

@@ -6,4 +6,5 @@ dist/
 *.tsbuildinfo
 tokens.json
 logs.json
+config.json
 

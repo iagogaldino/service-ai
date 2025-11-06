@@ -17,7 +17,7 @@ import OpenAI from 'openai';
 import path from 'path';
 import fs from 'fs';
 import { AgentManager, executeTool } from './agents/agentManager';
-import { loadEnvironmentVariables, validateRequiredEnvVars, getEnvAsNumber, logEnvironmentInfo } from './config/env';
+import { loadEnvironmentVariables, validateRequiredEnvVars, getEnvAsNumber, logEnvironmentInfo, loadConfigFromJson, saveConfigToJson, AppConfig } from './config/env';
 import { formatActionMessage } from './utils/functionDescriptions';
 import { isRunningUnderNodemon, getShutdownConfig, gracefulShutdown as performGracefulShutdown } from './utils/serverHelpers';
 import { initializeAgents, getAgentsConfig } from './agents/config';
@@ -47,19 +47,45 @@ const io = new Server(httpServer, {
 app.use(cors());
 app.use(express.json());
 
-// Inicializa o cliente OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// Inicializa o cliente OpenAI (será atualizado quando a API key for configurada)
+let openai: OpenAI | undefined;
+
+// Função para inicializar/atualizar o cliente OpenAI
+function initializeOpenAIClient(): void {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (apiKey) {
+    openai = new OpenAI({
+      apiKey: apiKey,
+    });
+    console.log('✅ Cliente OpenAI inicializado');
+  } else {
+    openai = undefined;
+    console.warn('⚠️  Cliente OpenAI não inicializado - API key não configurada');
+  }
+}
+
+// Inicializa na primeira vez
+initializeOpenAIClient();
 
 const PORT = getEnvAsNumber('PORT', 3000);
-const agentManager = new AgentManager(openai);
+let agentManager: AgentManager;
+
+// Inicializa AgentManager se openai estiver disponível
+if (openai) {
+  agentManager = new AgentManager(openai);
+} else {
+  // Cria um AgentManager temporário (será atualizado quando a API key for configurada)
+  agentManager = new AgentManager(new OpenAI({ apiKey: 'temp' }));
+}
 
 // Inicializa agentes (carrega do JSON e faz cache na inicialização)
-initializeAgents().catch((err: any) => {
-  console.error('❌ Erro ao inicializar agentes:', err);
-  process.exit(1);
-});
+// Só inicializa se tiver API key configurada
+if (openai) {
+  initializeAgents().catch((err: any) => {
+    console.error('❌ Erro ao inicializar agentes:', err);
+    // Não faz exit(1) para permitir configuração via frontend
+  });
+}
 
 // Armazena threads por socket ID (mapeia socket.id -> thread.id)
 const threadMap = new Map<string, string>();
@@ -413,6 +439,10 @@ async function waitForRunCompletion(
   runId: string,
   socket: Socket
 ): Promise<{ message: string; tokenUsage: TokenUsage }> {
+  if (!openai) {
+    throw new Error('OpenAI client não está configurado. Configure a API key primeiro.');
+  }
+
   let iterationCount = 0;
   const MAX_ITERATIONS = 100; // Previne loops infinitos
   
@@ -927,7 +957,8 @@ app.get('/api/logs', async (req, res) => {
           totalMessages: 0,
           totalToolExecutions: 0,
           totalErrors: 0,
-          totalTokens: 0
+          totalTokens: 0,
+          totalCost: 0
         }
       });
     }
@@ -935,10 +966,104 @@ app.get('/api/logs', async (req, res) => {
     const fileContent = fs.readFileSync(logsFilePath, 'utf-8');
     const logsData = JSON.parse(fileContent);
     
+    // Garante compatibilidade
+    if (!logsData.statistics.totalCost) {
+      logsData.statistics.totalCost = 0;
+    }
+    
     res.json(logsData);
   } catch (error: any) {
     console.error('Erro ao obter logs:', error);
     res.status(500).json({ error: 'Erro ao obter histórico de logs' });
+  }
+});
+
+/**
+ * API: Obtém configuração atual
+ */
+app.get('/api/config', async (req, res) => {
+  try {
+    const config = loadConfigFromJson();
+    
+    // Retorna apenas se a API key existe (sem mostrar o valor completo)
+    if (config?.openaiApiKey) {
+      const maskedKey = config.openaiApiKey.substring(0, 7) + '...' + config.openaiApiKey.substring(config.openaiApiKey.length - 4);
+      res.json({
+        hasApiKey: true,
+        apiKeyPreview: maskedKey,
+        port: config.port || 3000,
+        lastUpdated: config.lastUpdated
+      });
+    } else {
+      res.json({
+        hasApiKey: false,
+        apiKeyPreview: null,
+        port: config?.port || 3000,
+        lastUpdated: config?.lastUpdated || null
+      });
+    }
+  } catch (error: any) {
+    console.error('Erro ao obter configuração:', error);
+    res.status(500).json({ error: 'Erro ao obter configuração' });
+  }
+});
+
+/**
+ * API: Salva configuração (API key)
+ */
+app.post('/api/config', async (req, res) => {
+  try {
+    const { openaiApiKey, port } = req.body;
+    
+    if (!openaiApiKey || typeof openaiApiKey !== 'string' || openaiApiKey.trim() === '') {
+      return res.status(400).json({ error: 'API key é obrigatória' });
+    }
+    
+    // Valida formato básico da API key (deve começar com sk-)
+    if (!openaiApiKey.startsWith('sk-')) {
+      return res.status(400).json({ error: 'API key inválida. Deve começar com "sk-"' });
+    }
+    
+    // Carrega configuração existente
+    const existingConfig = loadConfigFromJson() || {};
+    
+    // Atualiza configuração
+    const newConfig: AppConfig = {
+      ...existingConfig,
+      openaiApiKey: openaiApiKey.trim(),
+      port: port || existingConfig.port || 3000
+    };
+    
+    // Salva no config.json
+    saveConfigToJson(newConfig);
+    
+    // Atualiza variável de ambiente
+    process.env.OPENAI_API_KEY = newConfig.openaiApiKey!;
+    if (newConfig.port) {
+      process.env.PORT = newConfig.port.toString();
+    }
+    
+    // Reinicializa cliente OpenAI
+    initializeOpenAIClient();
+    
+    // Recria AgentManager com novo cliente OpenAI
+    if (openai) {
+      agentManager = new AgentManager(openai);
+      // Reinicializa agentes com o novo cliente
+      initializeAgents().catch((err: any) => {
+        console.error('❌ Erro ao reinicializar agentes:', err);
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Configuração salva com sucesso',
+      apiKeyPreview: openaiApiKey.substring(0, 7) + '...' + openaiApiKey.substring(openaiApiKey.length - 4),
+      lastUpdated: newConfig.lastUpdated
+    });
+  } catch (error: any) {
+    console.error('Erro ao salvar configuração:', error);
+    res.status(500).json({ error: 'Erro ao salvar configuração: ' + error.message });
   }
 });
 
@@ -984,6 +1109,14 @@ io.on('connection', async (socket: Socket) => {
   console.log('Cliente conectado:', socket.id);
 
   try {
+    // Verifica se openai está configurado
+    if (!openai) {
+      socket.emit('error', {
+        message: 'API key não configurada. Por favor, configure a API key através do painel de configuração.'
+      });
+      return;
+    }
+
     // Cria uma nova thread para esta conexão
     const thread = await openai.beta.threads.create();
     threadMap.set(socket.id, thread.id);
@@ -1080,6 +1213,14 @@ io.on('connection', async (socket: Socket) => {
      */
     socket.on('message', async (data: { message: string }) => {
       console.log('Mensagem recebida:', data.message);
+
+      // Verifica se openai está configurado
+      if (!openai) {
+        socket.emit('error', {
+          message: 'API key não configurada. Por favor, configure a API key através do painel de configuração.'
+        });
+        return;
+      }
 
       const threadId = threadMap.get(socket.id);
       if (!threadId) {
