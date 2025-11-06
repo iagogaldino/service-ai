@@ -234,6 +234,7 @@
             <div style="display: flex; gap: 10px;">
                 <button onclick="toggleAgentsList()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#218838';" onmouseout="this.style.background='#28a745';">📋 Agentes</button>
                 <button onclick="toggleTokensList()" style="background: #ffc107; color: #333; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#e0a800';" onmouseout="this.style.background='#ffc107';">💰 Tokens</button>
+                <button onclick="toggleLogsList()" style="background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s;" onmouseover="this.style.background='#138496';" onmouseout="this.style.background='#17a2b8';">📝 Logs</button>
                 <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor</a>
             </div>
         </div>
@@ -259,6 +260,15 @@
                 <button onclick="toggleTokensList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
             </div>
             <div id="tokensContent">Carregando tokens...</div>
+        </div>
+
+        <!-- Histórico de Logs (oculto por padrão) -->
+        <div id="logsList" style="display: none; margin-bottom: 20px; padding: 15px; background: #d1ecf1; border-radius: 10px; border: 2px solid #17a2b8; max-height: 600px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; font-size: 1.3em; color: #333;">📝 Histórico de Logs</h2>
+                <button onclick="toggleLogsList()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕ Fechar</button>
+            </div>
+            <div id="logsContent">Carregando logs...</div>
         </div>
 
         <div class="chat-container" id="chat">
@@ -823,20 +833,24 @@
                 
                 // Total de tokens
                 if (data.totalTokens) {
+                    const totalCost = data.totalCost || { promptCost: 0, completionCost: 0, totalCost: 0 };
                     html += `<div style="margin-bottom: 20px; padding: 15px; background: #28a745; color: white; border-radius: 8px; text-align: center;">
                         <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens</div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px;">
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Prompt</div>
                                 <div style="font-size: 1.3em; font-weight: bold;">${data.totalTokens.promptTokens.toLocaleString()}</div>
+                                <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${totalCost.promptCost.toFixed(4)}</div>
                             </div>
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Completion</div>
                                 <div style="font-size: 1.3em; font-weight: bold;">${data.totalTokens.completionTokens.toLocaleString()}</div>
+                                <div style="font-size: 0.8em; opacity: 0.8; margin-top: 3px;">$${totalCost.completionCost.toFixed(4)}</div>
                             </div>
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Total</div>
                                 <div style="font-size: 1.5em; font-weight: bold;">${data.totalTokens.totalTokens.toLocaleString()}</div>
+                                <div style="font-size: 0.9em; opacity: 0.9; margin-top: 3px; font-weight: bold;">$${totalCost.totalCost.toFixed(4)}</div>
                             </div>
                         </div>
                     </div>`;
@@ -871,6 +885,7 @@
                                         <span style="color: #007bff;">Prompt:</span> ${entry.tokenUsage.promptTokens.toLocaleString()}<br>
                                         <span style="color: #28a745;">Completion:</span> ${entry.tokenUsage.completionTokens.toLocaleString()}<br>
                                         <span style="color: #333; font-weight: bold;">Total:</span> ${entry.tokenUsage.totalTokens.toLocaleString()}
+                                        ${entry.cost ? `<br><span style="color: #ffc107; font-weight: bold; margin-top: 3px; display: block;">💰 Custo: $${entry.cost.totalCost.toFixed(4)}</span>` : ''}
                                     </div>
                                 </div>
                                 <div style="padding: 8px; background: rgba(40, 167, 69, 0.1); border-radius: 5px;">
@@ -879,6 +894,7 @@
                                         <span style="color: #007bff;">Prompt:</span> ${entry.accumulatedTokenUsage.promptTokens.toLocaleString()}<br>
                                         <span style="color: #28a745;">Completion:</span> ${entry.accumulatedTokenUsage.completionTokens.toLocaleString()}<br>
                                         <span style="color: #333; font-weight: bold;">Total:</span> ${entry.accumulatedTokenUsage.totalTokens.toLocaleString()}
+                                        ${entry.accumulatedCost ? `<br><span style="color: #ffc107; font-weight: bold; margin-top: 3px; display: block;">💰 Custo: $${entry.accumulatedCost.totalCost.toFixed(4)}</span>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -913,6 +929,181 @@
             } catch (error) {
                 tokensContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
                     Erro ao carregar tokens: ${error.message}
+                </div>`;
+            }
+        }
+
+        // Função para alternar visibilidade do histórico de logs
+        function toggleLogsList() {
+            const logsList = document.getElementById('logsList');
+            if (logsList.style.display === 'none') {
+                logsList.style.display = 'block';
+                loadLogs();
+            } else {
+                logsList.style.display = 'none';
+            }
+        }
+
+        // Função para obter cor baseada no tipo de log
+        function getLogTypeColor(type) {
+            const colors = {
+                'connection': '#28a745',
+                'disconnection': '#dc3545',
+                'agent_selection': '#667eea',
+                'message_sent': '#17a2b8',
+                'message_received': '#17a2b8',
+                'tool_execution': '#ffc107',
+                'tool_result': '#ffc107',
+                'run_status': '#6c757d',
+                'error': '#dc3545',
+                'response': '#28a745',
+                'token_usage': '#ffc107',
+                'monitoring': '#6f42c1'
+            };
+            return colors[type] || '#6c757d';
+        }
+
+        // Função para obter ícone baseado no tipo de log
+        function getLogTypeIcon(type) {
+            const icons = {
+                'connection': '🔌',
+                'disconnection': '🔌',
+                'agent_selection': '🤖',
+                'message_sent': '📤',
+                'message_received': '📥',
+                'tool_execution': '🔧',
+                'tool_result': '✅',
+                'run_status': '⚙️',
+                'error': '❌',
+                'response': '💬',
+                'token_usage': '💰',
+                'monitoring': '👁️'
+            };
+            return icons[type] || '📝';
+        }
+
+        // Carrega e exibe o histórico de logs
+        async function loadLogs() {
+            const logsContent = document.getElementById('logsContent');
+            logsContent.innerHTML = 'Carregando logs...';
+            
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                
+                let html = '';
+                
+                // Estatísticas
+                if (data.statistics) {
+                    html += `<div style="margin-bottom: 20px; padding: 15px; background: #17a2b8; color: white; border-radius: 8px;">
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">📊 Estatísticas</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.9em; opacity: 0.9;">Conexões</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${data.statistics.totalConnections || 0}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.9em; opacity: 0.9;">Mensagens</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${data.statistics.totalMessages || 0}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.9em; opacity: 0.9;">Tools</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${data.statistics.totalToolExecutions || 0}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.9em; opacity: 0.9;">Erros</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${data.statistics.totalErrors || 0}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.9em; opacity: 0.9;">Tokens</div>
+                                <div style="font-size: 1.5em; font-weight: bold;">${(data.statistics.totalTokens || 0).toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+                
+                // Histórico de logs
+                if (data.entries && data.entries.length > 0) {
+                    html += `<div style="margin-bottom: 10px;">
+                        <strong style="font-size: 1.1em;">📜 Logs (${data.entries.length} entrada${data.entries.length > 1 ? 's' : ''})</strong>
+                        <div style="margin-top: 5px; font-size: 0.85em; color: #666;">
+                            Mostrando últimas 50 entradas (mais recentes primeiro)
+                        </div>
+                    </div>`;
+                    
+                    // Mostra as últimas 50 entradas (mais recentes primeiro)
+                    const logs = data.entries.slice().reverse().slice(0, 50);
+                    
+                    logs.forEach((log, index) => {
+                        const date = new Date(log.timestamp);
+                        const dateStr = date.toLocaleString('pt-BR');
+                        const typeColor = getLogTypeColor(log.type);
+                        const typeIcon = getLogTypeIcon(log.type);
+                        
+                        html += `<div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid ${typeColor};">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                        <span style="font-size: 1.2em;">${typeIcon}</span>
+                                        <strong style="color: ${typeColor}; text-transform: uppercase; font-size: 0.9em;">${escapeHtml(log.type)}</strong>
+                                        ${log.agentName ? `<span style="font-size: 0.85em; color: #666;">🤖 ${escapeHtml(log.agentName)}</span>` : ''}
+                                    </div>
+                                    ${log.message ? `<div style="font-size: 0.85em; color: #333; margin-top: 5px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 3px;">💬 ${escapeHtml(log.message)}</div>` : ''}
+                                    ${log.response ? `<div style="font-size: 0.85em; color: #28a745; margin-top: 5px; padding: 5px; background: rgba(40,167,69,0.1); border-radius: 3px;">✅ ${escapeHtml(log.response.substring(0, 200))}${log.response.length > 200 ? '...' : ''}</div>` : ''}
+                                    ${log.error ? `<div style="font-size: 0.85em; color: #dc3545; margin-top: 5px; padding: 5px; background: rgba(220,53,69,0.1); border-radius: 3px;">❌ ${escapeHtml(log.error)}</div>` : ''}
+                                    ${log.toolName ? `<div style="font-size: 0.85em; color: #333; margin-top: 5px;">
+                                        <strong>🔧 ${escapeHtml(log.toolName)}</strong>
+                                        ${log.toolExecutionTime ? `<span style="color: #666;"> (${log.toolExecutionTime}ms)</span>` : ''}
+                                    </div>` : ''}
+                                    ${log.tokenUsage ? `<div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                                        💰 Tokens: ${log.tokenUsage.totalTokens.toLocaleString()} (prompt: ${log.tokenUsage.promptTokens.toLocaleString()}, completion: ${log.tokenUsage.completionTokens.toLocaleString()})
+                                        ${log.tokenCost ? `<br><span style="color: #ffc107; font-weight: bold;">💰 Custo: $${log.tokenCost.totalCost.toFixed(4)}</span>` : ''}
+                                    </div>` : ''}
+                                </div>
+                                <div style="font-size: 0.75em; color: #999; text-align: right; min-width: 150px;">
+                                    ${dateStr}
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 0.7em; color: #999; flex-wrap: wrap;">
+                                ${log.socketId ? `<span>Socket: ${log.socketId.substring(0, 12)}...</span>` : ''}
+                                ${log.threadId ? `<span>Thread: ${log.threadId.substring(0, 12)}...</span>` : ''}
+                                ${log.runId ? `<span>Run: ${log.runId.substring(0, 12)}...</span>` : ''}
+                            </div>
+                            
+                            ${log.metadata && Object.keys(log.metadata).length > 0 ? `
+                                <details style="margin-top: 8px;">
+                                    <summary style="font-size: 0.8em; color: #666; cursor: pointer;">📋 Mais detalhes</summary>
+                                    <pre style="margin-top: 5px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 3px; font-size: 0.75em; overflow-x: auto;">${escapeHtml(JSON.stringify(log.metadata, null, 2))}</pre>
+                                </details>
+                            ` : ''}
+                        </div>`;
+                    });
+                    
+                    if (data.entries.length > 50) {
+                        html += `<div style="text-align: center; padding: 10px; color: #666; font-size: 0.9em;">
+                            Mostrando últimas 50 de ${data.entries.length} entradas
+                        </div>`;
+                    }
+                } else {
+                    html += `<div style="padding: 20px; text-align: center; color: #666;">
+                        <div style="font-size: 2em; margin-bottom: 10px;">📊</div>
+                        <div>Nenhum log registrado ainda.</div>
+                    </div>`;
+                }
+                
+                // Última atualização
+                if (data.lastUpdated) {
+                    const lastUpdate = new Date(data.lastUpdated);
+                    html += `<div style="margin-top: 15px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 5px; text-align: center; font-size: 0.85em; color: #666;">
+                        Última atualização: ${lastUpdate.toLocaleString('pt-BR')}
+                    </div>`;
+                }
+                
+                logsContent.innerHTML = html;
+            } catch (error) {
+                logsContent.innerHTML = `<div style="color: #dc3545; padding: 10px; background: rgba(220, 53, 69, 0.1); border-radius: 5px;">
+                    Erro ao carregar logs: ${error.message}
                 </div>`;
             }
         }

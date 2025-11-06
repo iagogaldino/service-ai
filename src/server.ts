@@ -95,6 +95,50 @@ interface TokenUsage {
 }
 
 /**
+ * Interface para custo em dólares
+ */
+interface TokenCost {
+  promptCost: number;
+  completionCost: number;
+  totalCost: number;
+}
+
+/**
+ * Preços por modelo (por 1000 tokens) - atualizado em 2024
+ */
+const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
+  'gpt-4-turbo-preview': { prompt: 0.01, completion: 0.03 }, // $0.01 input, $0.03 output
+  'gpt-4': { prompt: 0.03, completion: 0.06 }, // $0.03 input, $0.06 output (8k context)
+  'gpt-4-32k': { prompt: 0.06, completion: 0.12 }, // $0.06 input, $0.12 output (32k context)
+  'gpt-4-0125-preview': { prompt: 0.01, completion: 0.03 }, // $0.01 input, $0.03 output
+  'gpt-4-1106-preview': { prompt: 0.01, completion: 0.03 }, // $0.01 input, $0.03 output
+  'gpt-3.5-turbo': { prompt: 0.0005, completion: 0.0015 }, // $0.0005 input, $0.0015 output
+  'gpt-3.5-turbo-16k': { prompt: 0.003, completion: 0.004 }, // $0.003 input, $0.004 output
+};
+
+/**
+ * Calcula o custo em dólares baseado nos tokens e modelo usado
+ * 
+ * @param tokenUsage - Uso de tokens
+ * @param model - Modelo usado (padrão: gpt-4-turbo-preview)
+ * @returns Custo em dólares
+ */
+function calculateTokenCost(tokenUsage: TokenUsage, model: string = 'gpt-4-turbo-preview'): TokenCost {
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['gpt-4-turbo-preview'];
+  
+  // Calcula custo: (tokens / 1000) * preço por 1000 tokens
+  const promptCost = (tokenUsage.promptTokens / 1000) * pricing.prompt;
+  const completionCost = (tokenUsage.completionTokens / 1000) * pricing.completion;
+  const totalCost = promptCost + completionCost;
+  
+  return {
+    promptCost: Math.round(promptCost * 10000) / 10000, // Arredonda para 4 casas decimais
+    completionCost: Math.round(completionCost * 10000) / 10000,
+    totalCost: Math.round(totalCost * 10000) / 10000
+  };
+}
+
+/**
  * Interface para entrada de histórico de tokens no JSON
  */
 interface TokenHistoryEntry {
@@ -104,6 +148,9 @@ interface TokenHistoryEntry {
   message: string;
   tokenUsage: TokenUsage;
   accumulatedTokenUsage: TokenUsage;
+  cost?: TokenCost;
+  accumulatedCost?: TokenCost;
+  model?: string;
 }
 
 /**
@@ -111,8 +158,158 @@ interface TokenHistoryEntry {
  */
 interface TokensJsonFile {
   totalTokens: TokenUsage;
+  totalCost: TokenCost;
   entries: TokenHistoryEntry[];
   lastUpdated: string;
+}
+
+/**
+ * Tipos de logs disponíveis
+ */
+type LogType = 
+  | 'connection' 
+  | 'disconnection' 
+  | 'agent_selection' 
+  | 'message_sent' 
+  | 'message_received' 
+  | 'tool_execution' 
+  | 'tool_result' 
+  | 'run_status' 
+  | 'error' 
+  | 'response' 
+  | 'token_usage'
+  | 'monitoring';
+
+/**
+ * Interface para entrada de log
+ */
+interface LogEntry {
+  id: string;
+  type: LogType;
+  timestamp: string;
+  socketId?: string;
+  threadId?: string;
+  runId?: string;
+  agentName?: string;
+  agentId?: string;
+  message?: string;
+  response?: string;
+  toolName?: string;
+  toolArgs?: any;
+  toolResult?: string;
+  toolExecutionTime?: number;
+  error?: string;
+  errorStack?: string;
+  status?: string;
+  tokenUsage?: TokenUsage;
+  accumulatedTokenUsage?: TokenUsage;
+  tokenCost?: TokenCost;
+  accumulatedTokenCost?: TokenCost;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Interface para o formato completo do arquivo JSON de logs
+ */
+interface LogsJsonFile {
+  totalEntries: number;
+  entries: LogEntry[];
+  lastUpdated: string;
+  statistics: {
+    totalConnections: number;
+    totalMessages: number;
+    totalToolExecutions: number;
+    totalErrors: number;
+    totalTokens: number;
+    totalCost: number;
+  };
+}
+
+/**
+ * Salva uma entrada de log em um arquivo JSON
+ * 
+ * @param logEntry - Entrada de log a ser salva
+ */
+function saveLogToJson(logEntry: Omit<LogEntry, 'id' | 'timestamp'>): void {
+  try {
+    const logsFilePath = path.join(process.cwd(), 'logs.json');
+    
+    // Gera ID único para o log
+    const id = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const fullLogEntry: LogEntry = {
+      ...logEntry,
+      id,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Lê o arquivo existente ou cria estrutura vazia
+    let logsData: LogsJsonFile;
+    if (fs.existsSync(logsFilePath)) {
+      const fileContent = fs.readFileSync(logsFilePath, 'utf-8');
+      logsData = JSON.parse(fileContent);
+      // Garante compatibilidade com versões antigas
+      if (!logsData.statistics.totalCost) {
+        logsData.statistics.totalCost = 0;
+      }
+    } else {
+      logsData = {
+        totalEntries: 0,
+        entries: [],
+        lastUpdated: new Date().toISOString(),
+        statistics: {
+          totalConnections: 0,
+          totalMessages: 0,
+          totalToolExecutions: 0,
+          totalErrors: 0,
+          totalTokens: 0,
+          totalCost: 0
+        }
+      };
+    }
+
+    // Adiciona nova entrada
+    logsData.entries.push(fullLogEntry);
+    logsData.totalEntries = logsData.entries.length;
+    logsData.lastUpdated = new Date().toISOString();
+
+    // Atualiza estatísticas
+    switch (fullLogEntry.type) {
+      case 'connection':
+        logsData.statistics.totalConnections++;
+        break;
+      case 'message_sent':
+      case 'message_received':
+        logsData.statistics.totalMessages++;
+        break;
+      case 'tool_execution':
+        logsData.statistics.totalToolExecutions++;
+        break;
+      case 'error':
+        logsData.statistics.totalErrors++;
+        break;
+      case 'token_usage':
+        if (fullLogEntry.tokenUsage) {
+          logsData.statistics.totalTokens += fullLogEntry.tokenUsage.totalTokens;
+        }
+        if (fullLogEntry.tokenCost) {
+          logsData.statistics.totalCost += fullLogEntry.tokenCost.totalCost;
+          logsData.statistics.totalCost = Math.round(logsData.statistics.totalCost * 10000) / 10000;
+        }
+        break;
+    }
+
+    // Mantém apenas as últimas 10000 entradas para evitar arquivo muito grande
+    const MAX_ENTRIES = 10000;
+    if (logsData.entries.length > MAX_ENTRIES) {
+      logsData.entries = logsData.entries.slice(-MAX_ENTRIES);
+      logsData.totalEntries = logsData.entries.length;
+    }
+
+    // Salva o arquivo
+    fs.writeFileSync(logsFilePath, JSON.stringify(logsData, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('❌ Erro ao salvar log no JSON:', error);
+  }
 }
 
 /**
@@ -123,25 +320,37 @@ interface TokensJsonFile {
  * @param message - Mensagem do usuário
  * @param tokenUsage - Tokens utilizados nesta mensagem
  * @param accumulatedTokenUsage - Tokens acumulados na thread
+ * @param model - Modelo usado (padrão: gpt-4-turbo-preview)
  */
 function saveTokensToJson(
   threadId: string,
   agentName: string,
   message: string,
   tokenUsage: TokenUsage,
-  accumulatedTokenUsage: TokenUsage
+  accumulatedTokenUsage: TokenUsage,
+  model: string = 'gpt-4-turbo-preview'
 ): void {
   try {
     const tokensFilePath = path.join(process.cwd(), 'tokens.json');
+    
+    // Calcula custos
+    const cost = calculateTokenCost(tokenUsage, model);
+    const accumulatedCost = calculateTokenCost(accumulatedTokenUsage, model);
     
     // Lê o arquivo existente ou cria estrutura vazia
     let tokensData: TokensJsonFile;
     if (fs.existsSync(tokensFilePath)) {
       const fileContent = fs.readFileSync(tokensFilePath, 'utf-8');
-      tokensData = JSON.parse(fileContent);
+      const parsed = JSON.parse(fileContent);
+      // Garante que totalCost existe (compatibilidade com versões antigas)
+      if (!parsed.totalCost) {
+        parsed.totalCost = { promptCost: 0, completionCost: 0, totalCost: 0 };
+      }
+      tokensData = parsed;
     } else {
       tokensData = {
         totalTokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        totalCost: { promptCost: 0, completionCost: 0, totalCost: 0 },
         entries: [],
         lastUpdated: new Date().toISOString()
       };
@@ -154,21 +363,33 @@ function saveTokensToJson(
       agentName,
       message,
       tokenUsage,
-      accumulatedTokenUsage
+      accumulatedTokenUsage,
+      cost,
+      accumulatedCost,
+      model
     };
     tokensData.entries.push(newEntry);
 
     // Atualiza total acumulado (soma todos os tokens de todas as interações)
-    // Como cada entrada já tem seu próprio tokenUsage, somamos apenas os tokens desta mensagem
     tokensData.totalTokens.promptTokens += tokenUsage.promptTokens;
     tokensData.totalTokens.completionTokens += tokenUsage.completionTokens;
     tokensData.totalTokens.totalTokens += tokenUsage.totalTokens;
+
+    // Atualiza custo total acumulado
+    tokensData.totalCost.promptCost += cost.promptCost;
+    tokensData.totalCost.completionCost += cost.completionCost;
+    tokensData.totalCost.totalCost += cost.totalCost;
+    
+    // Arredonda para evitar problemas de ponto flutuante
+    tokensData.totalCost.promptCost = Math.round(tokensData.totalCost.promptCost * 10000) / 10000;
+    tokensData.totalCost.completionCost = Math.round(tokensData.totalCost.completionCost * 10000) / 10000;
+    tokensData.totalCost.totalCost = Math.round(tokensData.totalCost.totalCost * 10000) / 10000;
 
     tokensData.lastUpdated = new Date().toISOString();
 
     // Salva o arquivo
     fs.writeFileSync(tokensFilePath, JSON.stringify(tokensData, null, 2), 'utf-8');
-    console.log(`💾 Tokens salvos em tokens.json (Total: ${tokensData.totalTokens.totalTokens} tokens)`);
+    console.log(`💾 Tokens salvos em tokens.json (Total: ${tokensData.totalTokens.totalTokens} tokens, Custo: $${tokensData.totalCost.totalCost.toFixed(4)})`);
   } catch (error) {
     console.error('❌ Erro ao salvar tokens no JSON:', error);
   }
@@ -317,6 +538,22 @@ async function waitForRunCompletion(
     if (run.status === 'failed') {
       const errorMessage = run.last_error?.message || 'Erro desconhecido';
       console.error(`❌ Run falhou: ${errorMessage}`);
+      
+      // Log de erro de run
+      saveLogToJson({
+        type: 'error',
+        socketId: socket.id,
+        threadId: threadId,
+        runId: run.id,
+        error: errorMessage,
+        errorStack: run.last_error?.code || 'unknown',
+        status: 'failed',
+        metadata: {
+          errorType: 'run_failed',
+          lastError: run.last_error
+        }
+      });
+      
       throw new Error(`Run falhou: ${errorMessage}`);
     }
 
@@ -382,12 +619,43 @@ async function waitForRunCompletion(
           socket.emit('agent_action', agentActionData);
           emitToMonitors(socket.id, 'agent_action', agentActionData);
           
+          // Log de execução de tool
+          saveLogToJson({
+            type: 'tool_execution',
+            socketId: socket.id,
+            threadId: threadId,
+            runId: run.id,
+            toolName: functionName,
+            toolArgs: args,
+            metadata: {
+              toolCallId: toolCall.id,
+              index: index + 1,
+              total: toolCalls.length
+            }
+          });
+          
           // Executa a função
           const startTime = Date.now();
           const result = await executeTool(functionName, args, socket);
           const executionTime = Date.now() - startTime;
           
           console.log(`✅ [${index + 1}/${toolCalls.length}] Função ${functionName} executada (${executionTime}ms) - Resultado: ${result.length} caracteres`);
+
+          // Log de resultado de tool
+          saveLogToJson({
+            type: 'tool_result',
+            socketId: socket.id,
+            threadId: threadId,
+            runId: run.id,
+            toolName: functionName,
+            toolResult: result.substring(0, 500), // Limita tamanho do log
+            toolExecutionTime: executionTime,
+            metadata: {
+              toolCallId: toolCall.id,
+              resultLength: result.length,
+              success: !result.startsWith('Erro:')
+            }
+          });
 
           // Emite resultado da função para o cliente
           const functionResultData = {
@@ -645,6 +913,35 @@ app.get('/api/tokens', async (req, res) => {
   }
 });
 
+app.get('/api/logs', async (req, res) => {
+  try {
+    const logsFilePath = path.join(process.cwd(), 'logs.json');
+    
+    if (!fs.existsSync(logsFilePath)) {
+      return res.json({
+        totalEntries: 0,
+        entries: [],
+        lastUpdated: null,
+        statistics: {
+          totalConnections: 0,
+          totalMessages: 0,
+          totalToolExecutions: 0,
+          totalErrors: 0,
+          totalTokens: 0
+        }
+      });
+    }
+    
+    const fileContent = fs.readFileSync(logsFilePath, 'utf-8');
+    const logsData = JSON.parse(fileContent);
+    
+    res.json(logsData);
+  } catch (error: any) {
+    console.error('Erro ao obter logs:', error);
+    res.status(500).json({ error: 'Erro ao obter histórico de logs' });
+  }
+});
+
 // ============================================================================
 // CONFIGURAÇÃO DO SOCKET.IO
 // ============================================================================
@@ -703,6 +1000,18 @@ io.on('connection', async (socket: Socket) => {
       ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
     };
     connectionsMap.set(socket.id, connectionInfo);
+
+    // Log de conexão
+    saveLogToJson({
+      type: 'connection',
+      socketId: socket.id,
+      threadId: thread.id,
+      metadata: {
+        userAgent: connectionInfo.userAgent,
+        ipAddress: connectionInfo.ipAddress,
+        connectedAt: connectionInfo.connectedAt.toISOString()
+      }
+    });
 
     // Notifica todos os monitores sobre nova conexão
     emitToMonitors(socket.id, 'connection', {
@@ -805,6 +1114,16 @@ io.on('connection', async (socket: Socket) => {
 
         console.log(`✅ Agente selecionado: "${config.name}" (ID: ${agentId})`);
 
+        // Log de seleção de agente
+        saveLogToJson({
+          type: 'agent_selection',
+          socketId: socket.id,
+          threadId: threadId,
+          agentName: config.name,
+          agentId: agentId,
+          message: data.message
+        });
+
         // Adiciona mensagem do usuário à thread
         console.log(`📝 Adicionando mensagem à thread...`);
 
@@ -829,6 +1148,19 @@ io.on('connection', async (socket: Socket) => {
 
         console.log(`✅ Mensagem adicionada à thread com sucesso (ID: ${userMessage.id})`);
 
+        // Log de mensagem enviada
+        saveLogToJson({
+          type: 'message_sent',
+          socketId: socket.id,
+          threadId: threadId,
+          message: data.message,
+          agentName: config.name,
+          metadata: {
+            messageId: userMessage.id,
+            createdAt: userMessage.created_at
+          }
+        });
+
         // Cria um run para processar a mensagem com o agente selecionado
         console.log(`🚀 Criando run para processar mensagem...`);
 
@@ -837,6 +1169,19 @@ io.on('connection', async (socket: Socket) => {
         });
 
         console.log(`✅ Run criado: ${run.id} (Status: ${run.status})`);
+
+        // Log de criação de run
+        saveLogToJson({
+          type: 'run_status',
+          socketId: socket.id,
+          threadId: threadId,
+          runId: run.id,
+          agentName: config.name,
+          status: run.status,
+          metadata: {
+            assistantId: agentId
+          }
+        });
 
         // Aguarda a conclusão do run e processa ações necessárias
         const { message: responseMessage, tokenUsage } = await waitForRunCompletion(threadId, run.id, socket);
@@ -877,10 +1222,66 @@ io.on('connection', async (socket: Socket) => {
           config.name,
           data.message,
           tokenUsage,
-          threadTokens
+          threadTokens,
+          config.model
         );
+
+        // Calcula custos para os logs
+        const tokenCost = calculateTokenCost(tokenUsage, config.model);
+        const accumulatedTokenCost = calculateTokenCost(threadTokens, config.model);
+
+        // Log de resposta
+        saveLogToJson({
+          type: 'response',
+          socketId: socket.id,
+          threadId: threadId,
+          runId: run.id,
+          agentName: config.name,
+          agentId: agentId,
+          message: data.message,
+          response: responseMessage,
+          tokenUsage: tokenUsage,
+          accumulatedTokenUsage: threadTokens,
+          tokenCost: tokenCost,
+          accumulatedTokenCost: accumulatedTokenCost,
+          metadata: {
+            responseLength: responseMessage.length,
+            model: config.model
+          }
+        });
+
+        // Log de uso de tokens
+        saveLogToJson({
+          type: 'token_usage',
+          socketId: socket.id,
+          threadId: threadId,
+          runId: run.id,
+          agentName: config.name,
+          tokenUsage: tokenUsage,
+          accumulatedTokenUsage: threadTokens,
+          tokenCost: tokenCost,
+          accumulatedTokenCost: accumulatedTokenCost,
+          metadata: {
+            model: config.model
+          }
+        });
       } catch (error: any) {
         console.error('Erro ao processar mensagem:', error);
+        
+        // Log de erro
+        const errorThreadId = threadMap.get(socket.id);
+        saveLogToJson({
+          type: 'error',
+          socketId: socket.id,
+          threadId: errorThreadId,
+          error: error.message || 'Erro desconhecido',
+          errorStack: error.stack,
+          metadata: {
+            errorName: error.name,
+            errorType: 'message_processing'
+          }
+        });
+        
         socket.emit('error', {
           message: error.message || 'Erro ao processar sua mensagem. Por favor, tente novamente.'
         });
@@ -894,6 +1295,21 @@ io.on('connection', async (socket: Socket) => {
      */
     socket.on('disconnect', async () => {
       console.log('Cliente desconectado:', socket.id);
+      
+      const disconnectThreadId = threadMap.get(socket.id);
+      const connInfo = connectionsMap.get(socket.id);
+      
+      // Log de desconexão
+      saveLogToJson({
+        type: 'disconnection',
+        socketId: socket.id,
+        threadId: disconnectThreadId,
+        metadata: {
+          messageCount: connInfo?.messageCount || 0,
+          connectedAt: connInfo?.connectedAt.toISOString(),
+          lastActivity: connInfo?.lastActivity.toISOString()
+        }
+      });
       
       // Notifica monitores sobre desconexão
       emitToMonitors(socket.id, 'disconnect', { socketId: socket.id });
@@ -921,11 +1337,10 @@ io.on('connection', async (socket: Socket) => {
         monitoringSockets.delete(monitorId);
       });
       
-      const threadId = threadMap.get(socket.id);
-      if (threadId) {
+      if (disconnectThreadId) {
         threadMap.delete(socket.id);
         // Limpa tokens acumulados da thread
-        threadTokensMap.delete(threadId);
+        threadTokensMap.delete(disconnectThreadId);
         // Opcionalmente, você pode deletar a thread aqui
         // await openai.beta.threads.del(threadId);
         console.log('Thread removida para socket:', socket.id);
@@ -934,8 +1349,21 @@ io.on('connection', async (socket: Socket) => {
       // Remove da lista de conexões
       connectionsMap.delete(socket.id);
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao configurar conexão:', error);
+    
+    // Log de erro na conexão
+    saveLogToJson({
+      type: 'error',
+      socketId: socket.id,
+      error: error.message || 'Erro desconhecido ao configurar conexão',
+      errorStack: error.stack,
+      metadata: {
+        errorName: error.name,
+        errorType: 'connection_setup'
+      }
+    });
+    
     socket.emit('error', {
       message: 'Erro ao inicializar assistente. Tente novamente.'
     });
