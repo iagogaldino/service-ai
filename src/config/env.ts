@@ -11,7 +11,18 @@ import fs from 'fs';
  * Interface para o arquivo config.json
  */
 export interface AppConfig {
+  // Provider escolhido
+  llmProvider?: 'openai' | 'stackspot';
+  
+  // Configuração OpenAI
   openaiApiKey?: string;
+  
+  // Configuração StackSpot
+  stackspotClientId?: string;
+  stackspotClientSecret?: string;
+  stackspotRealm?: string;
+  
+  // Outras configurações
   port?: number;
   lastUpdated?: string;
 }

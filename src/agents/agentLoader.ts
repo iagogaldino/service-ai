@@ -35,6 +35,8 @@ interface AgentJsonConfig {
   tools?: string[]; // Opcional para permitir agentes sem tools
   instructions: string;
   shouldUse: ShouldUseRule;
+  stackspotAgentId?: string; // ID do agente no StackSpot (opcional)
+  [key: string]: any; // Permite campos extras
 }
 
 /**
@@ -271,6 +273,15 @@ function convertAgentJsonToConfig(
 
   // Adiciona prioridade como propriedade customizada
   (agentConfig as any).priority = agentJson.priority;
+  
+  // Preserva campos extras do JSON (como stackspotAgentId)
+  // Copia todas as propriedades que não são campos padrão do AgentConfig
+  const standardFields = ['name', 'description', 'instructions', 'model', 'tools', 'shouldUse', 'priority'];
+  for (const key in agentJson) {
+    if (!standardFields.includes(key)) {
+      (agentConfig as any)[key] = agentJson[key];
+    }
+  }
 
   return agentConfig;
 }

@@ -1,113 +1,60 @@
 /**
- * Gerenciador de Agentes OpenAI
+ * Gerenciador de Agentes Multi-LLM
  * 
  * Este módulo gerencia a criação, cache e seleção de agentes (assistants)
- * da OpenAI Assistants API. Mantém um cache de IDs de agentes para evitar
- * recriações desnecessárias e atualiza agentes existentes com configurações
- * mais recentes.
+ * usando adaptadores de LLM (OpenAI, StackSpot, etc.). Mantém um cache de IDs 
+ * de agentes para evitar recriações desnecessárias e atualiza agentes existentes 
+ * com configurações mais recentes.
  */
 
-import OpenAI from 'openai';
 import { Socket } from 'socket.io';
 import { AgentConfig, selectAgent } from './config';
 import { fileSystemFunctions } from '../tools/fileSystemTools';
 import { executeCommand, checkServiceStatus, startService, stopService, killProcessOnPort } from '../tools/terminalTools';
+import { LLMAdapter } from '../llm/adapters/LLMAdapter';
 
 /**
- * Gerenciador de agentes OpenAI
+ * Gerenciador de agentes Multi-LLM
  * 
  * Responsável por:
- * - Criar e manter agentes (assistants) na OpenAI
+ * - Criar e manter agentes (assistants) usando o adaptador configurado
  * - Cachear IDs de agentes para melhor performance
  * - Atualizar agentes existentes com novas configurações
  * - Selecionar o agente apropriado para cada mensagem
  */
 export class AgentManager {
-  private openai: OpenAI;
+  private llmAdapter: LLMAdapter;
   private agentCache: Map<string, string> = new Map(); // Cache de IDs dos agentes (nome -> ID)
 
   /**
    * Construtor do AgentManager
    * 
-   * @param {OpenAI} openai - Cliente OpenAI configurado
+   * @param {LLMAdapter} llmAdapter - Adaptador de LLM configurado
    */
-  constructor(openai: OpenAI) {
-    this.openai = openai;
+  constructor(llmAdapter: LLMAdapter) {
+    this.llmAdapter = llmAdapter;
   }
 
   /**
    * Obtém ou cria um agente baseado na configuração
    * 
-   * Esta função:
-   * 1. Verifica o cache local primeiro
-   * 2. Se encontrado no cache, atualiza o agente com as configurações mais recentes
-   * 3. Se não encontrado, busca na API da OpenAI
-   * 4. Se não encontrado na API, cria um novo agente
+   * Esta função usa o adaptador de LLM para criar/obter agentes.
    * 
    * @param {AgentConfig} config - Configuração do agente a ser criado/obtido
-   * @returns {Promise<string>} ID do agente na OpenAI
+   * @returns {Promise<string>} ID do agente
    * @throws {Error} Se houver erro ao criar ou atualizar o agente
    */
   async getOrCreateAgent(config: AgentConfig): Promise<string> {
-    // Verifica o cache primeiro
-    if (this.agentCache.has(config.name)) {
-      const cachedId = this.agentCache.get(config.name)!;
-      
-      // Atualiza o agente com as configurações mais recentes
-      try {
-        await this.openai.beta.assistants.update(cachedId, {
-          tools: config.tools,
-          instructions: config.instructions,
-        });
-        console.log(`✅ Agente "${config.name}" atualizado (ID: ${cachedId})`);
-        return cachedId;
-      } catch (error) {
-        console.log(`⚠️ Erro ao atualizar agente, tentando criar novo...`);
-        this.agentCache.delete(config.name);
-      }
+    // Usa o adaptador para obter ou criar o agente
+    const agentId = await this.llmAdapter.getOrCreateAgent(config);
+    
+    // Atualiza cache
+    if (!this.agentCache.has(config.name)) {
+      this.agentCache.set(config.name, agentId);
+      console.log(`✅ Agente "${config.name}" criado/obtido (ID: ${agentId})`);
     }
-
-    // Busca agentes existentes na API
-    try {
-      const assistants = await this.openai.beta.assistants.list({
-        limit: 20
-      });
-
-      const existingAssistant = assistants.data.find(
-        (a) => a.name === config.name
-      );
-
-      if (existingAssistant) {
-        // Atualiza o assistente existente
-        await this.openai.beta.assistants.update(existingAssistant.id, {
-          tools: config.tools,
-          instructions: config.instructions,
-        });
-        
-        this.agentCache.set(config.name, existingAssistant.id);
-        console.log(`✅ Agente "${config.name}" encontrado e atualizado (ID: ${existingAssistant.id})`);
-        return existingAssistant.id;
-      }
-    } catch (error) {
-      console.error(`Erro ao buscar agentes:`, error);
-    }
-
-    // Cria um novo agente se não foi encontrado
-    try {
-      const assistant = await this.openai.beta.assistants.create({
-        name: config.name,
-        instructions: config.instructions,
-        model: config.model,
-        tools: config.tools,
-      });
-
-      this.agentCache.set(config.name, assistant.id);
-      console.log(`✅ Novo agente "${config.name}" criado (ID: ${assistant.id})`);
-      return assistant.id;
-    } catch (error) {
-      console.error(`Erro ao criar agente "${config.name}":`, error);
-      throw error;
-    }
+    
+    return agentId;
   }
 
   /**

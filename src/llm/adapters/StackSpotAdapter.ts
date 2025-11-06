@@ -1,0 +1,202 @@
+/**
+ * Adaptador para StackSpot SDK
+ */
+
+import { Socket } from 'socket.io';
+import { AgentConfig } from '../../agents/config';
+import { LLMAdapter, LLMThread, LLMMessage, LLMRun, TokenUsage } from './LLMAdapter';
+// Importação dinâmica do StackSpot SDK
+// Nota: Ajuste o caminho conforme necessário
+let StackSpotClass: any;
+try {
+  StackSpotClass = require('../../sdk-stackspot/src/index').default;
+} catch (error) {
+  // Se não encontrar, tenta caminho alternativo
+  try {
+    StackSpotClass = require('../../../sdk-stackspot/src/index').default;
+  } catch (e) {
+    throw new Error('StackSpot SDK não encontrado. Certifique-se de que o SDK está compilado.');
+  }
+}
+
+export interface StackSpotConfig {
+  clientId: string;
+  clientSecret: string;
+  realm?: string;
+}
+
+export class StackSpotAdapter implements LLMAdapter {
+  readonly provider = 'stackspot';
+  private stackspot: any;
+  private agentCache: Map<string, string> = new Map();
+
+  constructor(config: StackSpotConfig) {
+    if (!config.clientId || !config.clientSecret) {
+      throw new Error('StackSpot clientId e clientSecret são obrigatórios');
+    }
+    this.stackspot = new StackSpotClass({
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      realm: config.realm || 'stackspot-freemium',
+    });
+  }
+
+  isConfigured(): boolean {
+    return !!this.stackspot;
+  }
+
+  async getOrCreateAgent(config: AgentConfig): Promise<string> {
+    // StackSpot não permite criar agentes via API
+    // O agente deve ser criado no painel e o ID deve estar na configuração
+    const agentId = (config as any).stackspotAgentId || config.name;
+    
+    if (!(config as any).stackspotAgentId) {
+      console.warn(`⚠️ Agente "${config.name}" não tem stackspotAgentId configurado. Usando nome como ID: "${agentId}"`);
+      console.warn(`⚠️ Para usar o StackSpot corretamente, adicione "stackspotAgentId": "SEU_ID_AQUI" no agents.json para o agente "${config.name}"`);
+    } else {
+      console.log(`✅ Usando StackSpot Agent ID: ${agentId} para agente "${config.name}"`);
+    }
+    
+    if (!this.agentCache.has(config.name)) {
+      this.agentCache.set(config.name, agentId);
+    }
+    
+    return agentId;
+  }
+
+  async createThread(metadata?: Record<string, any>): Promise<LLMThread> {
+    const thread = await this.stackspot.beta.threads.create({ metadata });
+    return {
+      id: thread.id,
+      created_at: thread.created_at,
+      metadata: thread.metadata,
+    };
+  }
+
+  async retrieveThread(threadId: string): Promise<LLMThread> {
+    const thread = await this.stackspot.beta.threads.retrieve(threadId);
+    return {
+      id: thread.id,
+      created_at: thread.created_at,
+      metadata: thread.metadata,
+    };
+  }
+
+  async addMessage(
+    threadId: string,
+    role: 'user' | 'assistant' | 'system',
+    content: string
+  ): Promise<LLMMessage> {
+    const message = await this.stackspot.beta.threads.messages.create(threadId, {
+      role,
+      content,
+    });
+
+    return {
+      id: message.id,
+      role: message.role,
+      content: message.content[0].text.value,
+      created_at: message.created_at,
+    };
+  }
+
+  async listMessages(threadId: string, limit: number = 20): Promise<LLMMessage[]> {
+    const messages = await this.stackspot.beta.threads.messages.list(threadId, { limit });
+    return messages.data.map((msg: any) => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content[0]?.text?.value || '',
+      created_at: msg.created_at,
+    }));
+  }
+
+  async createRun(threadId: string, assistantId: string, socket?: Socket): Promise<LLMRun> {
+    const run = await this.stackspot.beta.threads.runs.create(threadId, {
+      assistant_id: assistantId,
+      stream: false,
+    });
+
+    return {
+      id: run.id,
+      thread_id: run.thread_id,
+      assistant_id: run.assistant_id,
+      status: run.status,
+      created_at: run.created_at,
+      started_at: run.started_at,
+      completed_at: run.completed_at,
+      failed_at: run.failed_at,
+      last_error: run.last_error,
+    };
+  }
+
+  async retrieveRun(threadId: string, runId: string): Promise<LLMRun> {
+    const run = await this.stackspot.beta.threads.runs.retrieve(threadId, runId);
+    return {
+      id: run.id,
+      thread_id: run.thread_id,
+      assistant_id: run.assistant_id,
+      status: run.status,
+      created_at: run.created_at,
+      started_at: run.started_at,
+      completed_at: run.completed_at,
+      failed_at: run.failed_at,
+      last_error: run.last_error,
+    };
+  }
+
+  async waitForRunCompletion(
+    threadId: string,
+    runId: string,
+    socket?: Socket
+  ): Promise<{ message: string; tokenUsage: TokenUsage }> {
+    let iterationCount = 0;
+    const MAX_ITERATIONS = 30;
+
+    while (iterationCount < MAX_ITERATIONS) {
+      iterationCount++;
+      const run = await this.stackspot.beta.threads.runs.retrieve(threadId, runId);
+
+      if (run.status === 'completed') {
+        const messages = await this.stackspot.beta.threads.messages.list(threadId, {
+          order: 'asc',
+        });
+        const lastMessage = messages.data[messages.data.length - 1];
+        
+        // Extrai tokens do metadata se disponível
+        const tokens = (lastMessage.metadata as any)?.tokens || {};
+        const tokenUsage: TokenUsage = {
+          promptTokens: tokens.input || 0,
+          completionTokens: tokens.output || 0,
+          totalTokens: (tokens.input || 0) + (tokens.output || 0),
+        };
+
+        return {
+          message: lastMessage.content[0].text.value,
+          tokenUsage,
+        };
+      }
+
+      if (run.status === 'failed') {
+        const errorMsg = run.last_error?.message || 'Run falhou';
+        console.error(`❌ Run falhou: ${errorMsg}`);
+        console.error(`📋 Detalhes do erro:`, run.last_error);
+        throw new Error(errorMsg);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    throw new Error(`Run não completou após ${MAX_ITERATIONS} iterações`);
+  }
+
+  async submitToolOutputs(
+    threadId: string,
+    runId: string,
+    toolOutputs: Array<{ tool_call_id: string; output: string }>
+  ): Promise<LLMRun> {
+    await this.stackspot.beta.threads.runs.submitToolOutputs(threadId, runId, {
+      tool_outputs: toolOutputs,
+    });
+    return this.retrieveRun(threadId, runId);
+  }
+}

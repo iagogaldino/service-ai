@@ -1,0 +1,31 @@
+{
+  "name": "@stackspot/sdk",
+  "version": "1.0.0",
+  "description": "SDK do StackSpot similar ao OpenAI SDK para integração com StackSpot GenAI API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "example:basic": "ts-node examples/basic-usage.ts",
+    "example:thread-id": "ts-node examples/thread-id-usage.ts",
+    "example:comparison": "ts-node examples/comparison-openai.ts"
+  },
+  "keywords": [
+    "stackspot",
+    "genai",
+    "ai",
+    "sdk",
+    "openai-compatible"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -772,16 +772,66 @@
                     <h2>⚙️ Configuração</h2>
                 </div>
                 <div id="configContent">
-                    <div style="margin-bottom: 15px;">
-                        <label class="config-label">OpenAI API Key</label>
-                        <input 
-                            type="password" 
-                            id="apiKeyInput" 
-                            placeholder="sk-..." 
-                            class="config-input"
-                        >
-                        <div id="apiKeyStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                    <!-- Seleção de Provider -->
+                    <div style="margin-bottom: 20px;">
+                        <label class="config-label">LLM Provider</label>
+                        <select id="providerSelect" class="config-input" onchange="onProviderChange()">
+                            <option value="openai">OpenAI</option>
+                            <option value="stackspot">StackSpot</option>
+                        </select>
+                        <div style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);">
+                            Escolha qual LLM Provider deseja usar
+                        </div>
                     </div>
+
+                    <!-- Configuração OpenAI -->
+                    <div id="openaiConfig" style="display: none;">
+                        <div style="margin-bottom: 15px;">
+                            <label class="config-label">OpenAI API Key</label>
+                            <input 
+                                type="password" 
+                                id="openaiApiKeyInput" 
+                                placeholder="sk-..." 
+                                class="config-input"
+                            >
+                            <div id="openaiApiKeyStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Configuração StackSpot -->
+                    <div id="stackspotConfig" style="display: none;">
+                        <div style="margin-bottom: 15px;">
+                            <label class="config-label">StackSpot Client ID</label>
+                            <input 
+                                type="text" 
+                                id="stackspotClientIdInput" 
+                                placeholder="Seu Client ID" 
+                                class="config-input"
+                            >
+                            <div id="stackspotClientIdStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label class="config-label">StackSpot Client Secret</label>
+                            <input 
+                                type="password" 
+                                id="stackspotClientSecretInput" 
+                                placeholder="Seu Client Secret" 
+                                class="config-input"
+                            >
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label class="config-label">StackSpot Realm (opcional)</label>
+                            <input 
+                                type="text" 
+                                id="stackspotRealmInput" 
+                                placeholder="stackspot-freemium" 
+                                class="config-input"
+                                value="stackspot-freemium"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Porta -->
                     <div style="margin-bottom: 15px;">
                         <label class="config-label">Porta (opcional)</label>
                         <input 
@@ -2505,73 +2555,164 @@
                 const response = await fetch('/api/config');
                 const data = await response.json();
                 
-                const apiKeyInput = document.getElementById('apiKeyInput');
+                const providerSelect = document.getElementById('providerSelect');
                 const portInput = document.getElementById('portInput');
-                const apiKeyStatus = document.getElementById('apiKeyStatus');
+                const openaiApiKeyInput = document.getElementById('openaiApiKeyInput');
+                const openaiApiKeyStatus = document.getElementById('openaiApiKeyStatus');
+                const stackspotClientIdInput = document.getElementById('stackspotClientIdInput');
+                const stackspotClientSecretInput = document.getElementById('stackspotClientSecretInput');
+                const stackspotRealmInput = document.getElementById('stackspotRealmInput');
+                const stackspotClientIdStatus = document.getElementById('stackspotClientIdStatus');
                 
-                if (data.hasApiKey) {
-                    apiKeyInput.value = '';
-                    apiKeyInput.placeholder = data.apiKeyPreview || 'sk-...';
-                    apiKeyStatus.innerHTML = `<span style="color: var(--success);">✅ API Key configurada: ${data.apiKeyPreview}</span>`;
-                    if (data.lastUpdated) {
-                        const date = new Date(data.lastUpdated);
-                        apiKeyStatus.innerHTML += `<br><span style="color: var(--text-secondary); font-size: 0.85em;">Atualizada em: ${date.toLocaleString('pt-BR')}</span>`;
-                    }
-                } else {
-                    apiKeyInput.value = '';
-                    apiKeyInput.placeholder = 'sk-...';
-                    apiKeyStatus.innerHTML = `<span style="color: var(--error);">⚠️ API Key não configurada</span>`;
+                // Define provider selecionado
+                if (providerSelect) {
+                    providerSelect.value = data.llmProvider || 'openai';
+                    onProviderChange(); // Atualiza visibilidade dos campos
                 }
                 
-                portInput.value = data.port || '3000';
+                // Carrega configuração OpenAI
+                if (data.openai?.configured) {
+                    if (openaiApiKeyInput) {
+                        openaiApiKeyInput.value = '';
+                        openaiApiKeyInput.placeholder = data.openai.apiKeyPreview || 'sk-...';
+                    }
+                    if (openaiApiKeyStatus) {
+                        openaiApiKeyStatus.innerHTML = `<span style="color: var(--success);">✅ API Key configurada: ${data.openai.apiKeyPreview}</span>`;
+                    }
+                } else {
+                    if (openaiApiKeyInput) {
+                        openaiApiKeyInput.value = '';
+                        openaiApiKeyInput.placeholder = 'sk-...';
+                    }
+                    if (openaiApiKeyStatus) {
+                        openaiApiKeyStatus.innerHTML = `<span style="color: var(--error);">⚠️ API Key não configurada</span>`;
+                    }
+                }
+                
+                // Carrega configuração StackSpot
+                if (data.stackspot?.configured) {
+                    if (stackspotClientIdInput) {
+                        stackspotClientIdInput.value = '';
+                        stackspotClientIdInput.placeholder = data.stackspot.clientIdPreview || 'Seu Client ID';
+                    }
+                    if (stackspotClientSecretInput) {
+                        stackspotClientSecretInput.value = '';
+                    }
+                    if (stackspotRealmInput) {
+                        stackspotRealmInput.value = data.stackspot.realm || 'stackspot-freemium';
+                    }
+                    if (stackspotClientIdStatus) {
+                        stackspotClientIdStatus.innerHTML = `<span style="color: var(--success);">✅ Client ID configurado: ${data.stackspot.clientIdPreview}</span>`;
+                    }
+                } else {
+                    if (stackspotClientIdInput) {
+                        stackspotClientIdInput.value = '';
+                        stackspotClientIdInput.placeholder = 'Seu Client ID';
+                    }
+                    if (stackspotClientSecretInput) {
+                        stackspotClientSecretInput.value = '';
+                    }
+                    if (stackspotRealmInput) {
+                        stackspotRealmInput.value = 'stackspot-freemium';
+                    }
+                    if (stackspotClientIdStatus) {
+                        stackspotClientIdStatus.innerHTML = `<span style="color: var(--error);">⚠️ Credenciais não configuradas</span>`;
+                    }
+                }
+                
+                if (portInput) {
+                    portInput.value = data.port || '3000';
+                }
             } catch (error) {
                 console.error('Erro ao carregar configuração:', error);
             }
         }
 
+        // Atualiza visibilidade dos campos baseado no provider selecionado
+        function onProviderChange() {
+            const providerSelect = document.getElementById('providerSelect');
+            const openaiConfig = document.getElementById('openaiConfig');
+            const stackspotConfig = document.getElementById('stackspotConfig');
+            
+            if (!providerSelect) return;
+            
+            const provider = providerSelect.value;
+            
+            if (provider === 'openai') {
+                if (openaiConfig) openaiConfig.style.display = 'block';
+                if (stackspotConfig) stackspotConfig.style.display = 'none';
+            } else if (provider === 'stackspot') {
+                if (openaiConfig) openaiConfig.style.display = 'none';
+                if (stackspotConfig) stackspotConfig.style.display = 'block';
+            }
+        }
+
         // Salva configuração
         async function saveConfig() {
-            const apiKeyInput = document.getElementById('apiKeyInput');
+            const providerSelect = document.getElementById('providerSelect');
             const portInput = document.getElementById('portInput');
+            const openaiApiKeyInput = document.getElementById('openaiApiKeyInput');
+            const stackspotClientIdInput = document.getElementById('stackspotClientIdInput');
+            const stackspotClientSecretInput = document.getElementById('stackspotClientSecretInput');
+            const stackspotRealmInput = document.getElementById('stackspotRealmInput');
             const configMessage = document.getElementById('configMessage');
             
-            const apiKey = apiKeyInput.value.trim();
-            const port = parseInt(portInput.value) || null;
+            if (!providerSelect || !configMessage) return;
             
-            if (!apiKey) {
-                configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
-                configMessage.style.color = 'var(--error)';
-                configMessage.style.border = '1px solid var(--error)';
-                configMessage.textContent = '❌ Por favor, insira uma API Key';
-                return;
+            const provider = providerSelect.value;
+            const port = parseInt(portInput?.value || '') || null;
+            
+            // Valida credenciais baseado no provider
+            if (provider === 'openai') {
+                const apiKey = openaiApiKeyInput?.value.trim() || '';
+                if (!apiKey) {
+                    configMessage.style.display = 'block';
+                    configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                    configMessage.style.color = '#dc3545';
+                    configMessage.style.border = '1px solid #dc3545';
+                    configMessage.textContent = 'Por favor, insira uma OpenAI API key válida';
+                    return;
+                }
+            } else if (provider === 'stackspot') {
+                const clientId = stackspotClientIdInput?.value.trim() || '';
+                const clientSecret = stackspotClientSecretInput?.value.trim() || '';
+                if (!clientId || !clientSecret) {
+                    configMessage.style.display = 'block';
+                    configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                    configMessage.style.color = '#dc3545';
+                    configMessage.style.border = '1px solid #dc3545';
+                    configMessage.textContent = 'Por favor, insira Client ID e Client Secret do StackSpot';
+                    return;
+                }
             }
             
-            if (!apiKey.startsWith('sk-')) {
-                configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
-                configMessage.style.color = 'var(--error)';
-                configMessage.style.border = '1px solid var(--error)';
-                configMessage.textContent = '❌ API Key inválida. Deve começar com "sk-"';
-                return;
+            configMessage.style.display = 'block';
+            configMessage.style.background = 'rgba(59, 130, 246, 0.15)';
+            configMessage.style.color = 'var(--info)';
+            configMessage.style.border = '1px solid var(--info)';
+            configMessage.textContent = '⏳ Salvando configuração...';
+            
+            // Prepara body da requisição
+            const body = {
+                llmProvider: provider,
+                port: port
+            };
+            
+            if (provider === 'openai') {
+                body.openaiApiKey = openaiApiKeyInput?.value.trim() || '';
+            } else if (provider === 'stackspot') {
+                body.stackspotClientId = stackspotClientIdInput?.value.trim() || '';
+                body.stackspotClientSecret = stackspotClientSecretInput?.value.trim() || '';
+                body.stackspotRealm = stackspotRealmInput?.value.trim() || 'stackspot-freemium';
             }
             
             try {
-                configMessage.style.display = 'block';
-                configMessage.style.background = 'rgba(59, 130, 246, 0.15)';
-                configMessage.style.color = 'var(--info)';
-                configMessage.style.border = '1px solid var(--info)';
-                configMessage.textContent = '⏳ Salvando configuração...';
-                
                 const response = await fetch('/api/config', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        openaiApiKey: apiKey,
-                        port: port
-                    })
+                    body: JSON.stringify(body)
                 });
                 
                 const data = await response.json();
@@ -2582,9 +2723,10 @@
                     configMessage.style.border = '1px solid var(--success)';
                     configMessage.textContent = `✅ ${data.message}`;
                     
-                    // Limpa o campo de API key por segurança
-                    apiKeyInput.value = '';
-                    apiKeyInput.placeholder = data.apiKeyPreview;
+                    // Limpa os campos por segurança
+                    if (openaiApiKeyInput) openaiApiKeyInput.value = '';
+                    if (stackspotClientIdInput) stackspotClientIdInput.value = '';
+                    if (stackspotClientSecretInput) stackspotClientSecretInput.value = '';
                     
                     // Recarrega status
                     setTimeout(() => {
@@ -2594,14 +2736,14 @@
                     configMessage.style.background = 'rgba(220, 53, 69, 0.1)';
                     configMessage.style.color = '#dc3545';
                     configMessage.style.border = '1px solid #dc3545';
-                    configMessage.textContent = `❌ ${data.error || 'Erro ao salvar configuração'}`;
+                    configMessage.textContent = `❌ Erro: ${data.error || 'Erro desconhecido'}`;
                 }
             } catch (error) {
                 configMessage.style.display = 'block';
                 configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
-                configMessage.style.color = 'var(--error)';
-                configMessage.style.border = '1px solid var(--error)';
-                configMessage.textContent = `❌ Erro ao salvar configuração: ${error.message}`;
+                configMessage.style.color = '#dc3545';
+                configMessage.style.border = '1px solid #dc3545';
+                configMessage.textContent = `❌ Erro: ${error.message || 'Erro desconhecido'}`;
             }
         }
     </script>

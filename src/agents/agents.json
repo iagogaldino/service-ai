@@ -1,6 +1,7 @@
 {
   "mainSelector": {
     "name": "Main Message Router",
+    "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
     "description": "Seletor principal que roteia mensagens para os grupos apropriados",
     "model": "gpt-4-turbo-preview",
     "priority": -1,
@@ -17,6 +18,7 @@
       "description": "Especializado em operações com arquivos, código e terminal",
       "orchestrator": {
         "name": "FileSystem Group Orchestrator",
+        "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
         "description": "Orquestra operações de filesystem e terminal dentro do Grupo A",
         "model": "gpt-4-turbo-preview",
         "priority": 0,
@@ -36,6 +38,7 @@
       "agents": [
         {
           "name": "Code Analyzer",
+          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
           "description": "Agente especializado em analisar e navegar por projetos de código",
           "model": "gpt-4-turbo-preview",
           "priority": 1,
@@ -60,6 +63,7 @@
         },
         {
           "name": "Terminal Executor",
+          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
           "description": "Agente especializado em executar comandos no terminal do Windows",
           "model": "gpt-4-turbo-preview",
           "priority": 2,
@@ -100,6 +104,7 @@
       "description": "Especializado em operações de banco de dados",
       "orchestrator": {
         "name": "Database Group Orchestrator",
+        "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
         "description": "Orquestra operações de banco de dados dentro do Grupo B",
         "model": "gpt-4-turbo-preview",
         "priority": 0,
@@ -119,6 +124,7 @@
       "agents": [
         {
           "name": "Database Reader",
+          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
           "description": "Agente especializado em consultas e leitura de dados",
           "model": "gpt-4-turbo-preview",
           "priority": 1,
@@ -135,6 +141,7 @@
         },
         {
           "name": "Database Writer",
+          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
           "description": "Agente especializado em inserção, atualização e remoção de dados",
           "model": "gpt-4-turbo-preview",
           "priority": 2,
@@ -155,6 +162,7 @@
   ],
   "fallbackAgent": {
     "name": "General Assistant",
+    "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
     "description": "Agente geral para conversas e dúvidas diversas",
     "model": "gpt-4-turbo-preview",
     "priority": 999,

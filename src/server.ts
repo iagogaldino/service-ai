@@ -22,6 +22,9 @@ import { formatActionMessage } from './utils/functionDescriptions';
 import { isRunningUnderNodemon, getShutdownConfig, gracefulShutdown as performGracefulShutdown } from './utils/serverHelpers';
 import { initializeAgents, getAgentsConfig } from './agents/config';
 import { getGroupsInfo, getMainSelector, getFallbackAgent } from './agents/agentLoader';
+import { fileSystemFunctions } from './tools/fileSystemTools';
+import { createLLMAdapter } from './llm/LLMFactory';
+import { LLMAdapter } from './llm/adapters/LLMAdapter';
 
 // ============================================================================
 // CONFIGURAÇÃO DE AMBIENTE
@@ -68,19 +71,50 @@ function initializeOpenAIClient(): void {
 initializeOpenAIClient();
 
 const PORT = getEnvAsNumber('PORT', 3000);
-let agentManager: AgentManager;
+let llmAdapter: LLMAdapter | undefined;
+let agentManager: AgentManager | undefined;
 
-// Inicializa AgentManager se openai estiver disponível
-if (openai) {
-  agentManager = new AgentManager(openai);
+/**
+ * Inicializa o adaptador de LLM baseado na configuração
+ */
+function initializeLLMAdapter(): void {
+  const config = loadConfigFromJson();
+  const provider = config?.llmProvider || 'openai'; // Default para OpenAI para compatibilidade
+
+  try {
+    const llmConfig = {
+      provider: provider as 'openai' | 'stackspot',
+      openai: config?.openaiApiKey ? { apiKey: config.openaiApiKey } : undefined,
+      stackspot: config?.stackspotClientId && config?.stackspotClientSecret
+        ? {
+            clientId: config.stackspotClientId,
+            clientSecret: config.stackspotClientSecret,
+            realm: config.stackspotRealm || 'stackspot-freemium',
+          }
+        : undefined,
+    };
+
+    llmAdapter = createLLMAdapter(llmConfig);
+    console.log(`✅ Adaptador ${provider} inicializado`);
+  } catch (error: any) {
+    console.error(`❌ Erro ao inicializar adaptador ${provider}:`, error.message);
+    llmAdapter = undefined;
+  }
+}
+
+// Inicializa o adaptador de LLM
+initializeLLMAdapter();
+
+// Inicializa AgentManager se llmAdapter estiver disponível
+if (llmAdapter) {
+  agentManager = new AgentManager(llmAdapter);
 } else {
-  // Cria um AgentManager temporário (será atualizado quando a API key for configurada)
-  agentManager = new AgentManager(new OpenAI({ apiKey: 'temp' }));
+  console.warn('⚠️ AgentManager não inicializado - LLM adapter não configurado');
 }
 
 // Inicializa agentes (carrega do JSON e faz cache na inicialização)
-// Só inicializa se tiver API key configurada
-if (openai) {
+// Só inicializa se tiver llmAdapter configurado
+if (llmAdapter) {
   initializeAgents().catch((err: any) => {
     console.error('❌ Erro ao inicializar agentes:', err);
     // Não faz exit(1) para permitir configuração via frontend
@@ -748,8 +782,8 @@ async function waitForRunCompletion(
   runId: string,
   socket: Socket
 ): Promise<{ message: string; tokenUsage: TokenUsage }> {
-  if (!openai) {
-    throw new Error('OpenAI client não está configurado. Configure a API key primeiro.');
+  if (!llmAdapter) {
+    throw new Error('LLM adapter não está configurado. Configure o provider primeiro.');
   }
 
   let iterationCount = 0;
@@ -765,92 +799,44 @@ async function waitForRunCompletion(
     
     console.log(`🔄 Verificando status do run ${runId} (tentativa ${iterationCount})...`);
 
-    const run = await openai.beta.threads.runs.retrieve(threadId, runId);
+    const run = await llmAdapter.retrieveRun(threadId, runId);
     console.log(`📊 Status do run: ${run.status}`);
 
-    // Captura uso de tokens se disponível
-    if (run.usage) {
-      const runPromptTokens = run.usage.prompt_tokens || 0;
-      const runCompletionTokens = run.usage.completion_tokens || 0;
-      const runTotalTokens = run.usage.total_tokens || 0;
-      
-      totalPromptTokens += runPromptTokens;
-      totalCompletionTokens += runCompletionTokens;
-      totalTokens += runTotalTokens;
-      
-      console.log(`💰 Tokens utilizados neste run: ${runTotalTokens} (prompt: ${runPromptTokens}, completion: ${runCompletionTokens})`);
-      
-      // Atualiza tokens acumulados da thread
-      const threadTokens = threadTokensMap.get(threadId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-      threadTokens.promptTokens += runPromptTokens;
-      threadTokens.completionTokens += runCompletionTokens;
-      threadTokens.totalTokens += runTotalTokens;
-      threadTokensMap.set(threadId, threadTokens);
-      
-      // Emite tokens desta mensagem/run para o cliente
-      const tokenUsageData = {
-        type: 'token_usage',
-        runId: run.id,
-        tokens: {
-          promptTokens: runPromptTokens,
-          completionTokens: runCompletionTokens,
-          totalTokens: runTotalTokens
-        },
-        accumulated: {
-          promptTokens: threadTokens.promptTokens,
-          completionTokens: threadTokens.completionTokens,
-          totalTokens: threadTokens.totalTokens
-        },
-        details: {
-          threadId,
-          timestamp: new Date().toISOString()
-        }
-      };
-      socket.emit('token_usage', tokenUsageData);
-      emitToMonitors(socket.id, 'token_usage', tokenUsageData);
-    }
+    // Nota: O uso de tokens é capturado e retornado por waitForRunCompletion dos adaptadores
+    // Não acessamos run.usage aqui pois não existe na interface LLMRun
 
     // Caso 1: Run completado com sucesso
     if (run.status === 'completed') {
       console.log(`✅ Run concluído! Buscando mensagens da thread...`);
 
-      const messages = await openai.beta.threads.messages.list(threadId, {
-        limit: 10,
-      });
+      const messages = await llmAdapter.listMessages(threadId, 10);
 
       // Emite todas as mensagens do assistente para o cliente
-      for (const message of messages.data.reverse()) {
-        if (message.role === 'assistant' && message.content.length > 0) {
-          const content = message.content[0];
-          if (content.type === 'text' && 'text' in content) {
-            // Obtém tokens acumulados da thread para incluir na mensagem
-            const threadTokens = threadTokensMap.get(threadId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-            
-            const messageData = {
-              type: 'assistant',
-              message: content.text.value,
-              messageId: message.id,
-              tokenUsage: threadTokens, // Inclui tokens acumulados na mensagem
-              details: {
-                threadId,
-                role: 'assistant',
-                createdAt: message.created_at,
-                runId: message.run_id
-              }
-            };
-            socket.emit('agent_message', messageData);
-            emitToMonitors(socket.id, 'agent_message', messageData);
-          }
+      for (const message of messages.reverse()) {
+        if (message.role === 'assistant') {
+          // Obtém tokens acumulados da thread para incluir na mensagem
+          const threadTokens = threadTokensMap.get(threadId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+          
+          const messageData = {
+            type: 'assistant',
+            message: message.content,
+            messageId: message.id,
+            tokenUsage: threadTokens, // Inclui tokens acumulados na mensagem
+            details: {
+              threadId,
+              role: 'assistant',
+              createdAt: message.created_at
+            }
+          };
+          socket.emit('agent_message', messageData);
+          emitToMonitors(socket.id, 'agent_message', messageData);
         }
       }
 
       // Retorna a última mensagem do assistente com informações de tokens
-      const lastMessage = messages.data[messages.data.length - 1];
-      if (
-        lastMessage.content[0].type === 'text' &&
-        'text' in lastMessage.content[0]
-      ) {
-        const responseText = lastMessage.content[0].text.value;
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        const responseText = lastMessage.content;
         console.log(`📨 Mensagem recuperada da thread (${responseText.length} caracteres)`);
         console.log(`💰 Total de tokens utilizados: ${totalTokens} (prompt: ${totalPromptTokens}, completion: ${totalCompletionTokens})`);
         
@@ -900,7 +886,9 @@ async function waitForRunCompletion(
     if (run.status === 'requires_action') {
       console.log(`🔧 Run requer ação: agente precisa executar funções`);
 
-      const toolCalls = run.required_action?.submit_tool_outputs?.tool_calls || [];
+      // Type casting para acessar required_action (específico do OpenAI)
+      const runWithAction = run as any;
+      const toolCalls = runWithAction.required_action?.submit_tool_outputs?.tool_calls || [];
       
       if (toolCalls.length === 0) {
         throw new Error('Run requer ação mas nenhuma tool foi especificada');
@@ -908,7 +896,7 @@ async function waitForRunCompletion(
 
       // Prepara informações sobre as tools que serão executadas
       const toolCallsInfo = toolCalls
-        .map(tc => {
+        .map((tc: any) => {
           if (tc.type === 'function') {
             const args = JSON.parse(tc.function.arguments);
             return {
@@ -938,7 +926,7 @@ async function waitForRunCompletion(
 
       // Executa todas as funções solicitadas em paralelo
       const toolOutputs = await Promise.all(
-        toolCalls.map(async (toolCall, index) => {
+        toolCalls.map(async (toolCall: any, index: number) => {
           if (toolCall.type !== 'function') {
             return null;
           }
@@ -1029,7 +1017,7 @@ async function waitForRunCompletion(
 
       // Remove nulls e filtra apenas resultados válidos
       const validOutputs = toolOutputs.filter(
-        (output): output is NonNullable<typeof output> => output !== null
+        (output: any): output is NonNullable<typeof output> => output !== null
       );
 
       console.log(`📦 Preparando ${validOutputs.length} resultado(s) para enviar ao agente...`);
@@ -1045,7 +1033,7 @@ async function waitForRunCompletion(
       // Mostra o que está sendo enviado de volta ao agente
       const functionOutputsData = {
         type: 'function_outputs',
-        outputs: validOutputs.map(output => ({
+        outputs: validOutputs.map((output: any) => ({
           toolCallId: output.tool_call_id,
           output: output.output.substring(0, 1000) + (output.output.length > 1000 ? '...' : ''),
           outputLength: output.output.length
@@ -1061,9 +1049,7 @@ async function waitForRunCompletion(
       // Envia os resultados das funções de volta para o assistente
       console.log(`📤 Enviando ${validOutputs.length} resultado(s) de volta ao agente...`);
 
-      await openai.beta.threads.runs.submitToolOutputs(threadId, runId, {
-        tool_outputs: validOutputs
-      });
+      await llmAdapter.submitToolOutputs(threadId, runId, validOutputs);
 
       console.log(`✅ Resultados enviados. Aguardando processamento do agente...`);
 
@@ -1325,23 +1311,44 @@ app.get('/api/config', async (req, res) => {
   try {
     const config = loadConfigFromJson();
     
-    // Retorna apenas se a API key existe (sem mostrar o valor completo)
+    // Prepara resposta com informações de OpenAI
+    let openaiConfig: any = {
+      configured: false,
+      apiKeyPreview: null
+    };
+    
     if (config?.openaiApiKey) {
       const maskedKey = config.openaiApiKey.substring(0, 7) + '...' + config.openaiApiKey.substring(config.openaiApiKey.length - 4);
-      res.json({
-        hasApiKey: true,
-        apiKeyPreview: maskedKey,
-        port: config.port || 3000,
-        lastUpdated: config.lastUpdated
-      });
-    } else {
-      res.json({
-        hasApiKey: false,
-        apiKeyPreview: null,
-        port: config?.port || 3000,
-        lastUpdated: config?.lastUpdated || null
-      });
+      openaiConfig = {
+        configured: true,
+        apiKeyPreview: maskedKey
+      };
     }
+    
+    // Prepara resposta com informações de StackSpot
+    let stackspotConfig: any = {
+      configured: false,
+      clientIdPreview: null,
+      realm: 'stackspot-freemium'
+    };
+    
+    if (config?.stackspotClientId && config?.stackspotClientSecret) {
+      const maskedClientId = config.stackspotClientId.substring(0, 8) + '...' + config.stackspotClientId.substring(config.stackspotClientId.length - 4);
+      stackspotConfig = {
+        configured: true,
+        clientIdPreview: maskedClientId,
+        realm: config.stackspotRealm || 'stackspot-freemium'
+      };
+    }
+    
+    // Retorna formato completo esperado pelo frontend
+    res.json({
+      llmProvider: config?.llmProvider || 'openai',
+      openai: openaiConfig,
+      stackspot: stackspotConfig,
+      port: config?.port || 3000,
+      lastUpdated: config?.lastUpdated || null
+    });
   } catch (error: any) {
     console.error('Erro ao obter configuração:', error);
     res.status(500).json({ error: 'Erro ao obter configuração' });
@@ -1349,19 +1356,32 @@ app.get('/api/config', async (req, res) => {
 });
 
 /**
- * API: Salva configuração (API key)
+ * API: Salva configuração (suporta OpenAI e StackSpot)
  */
 app.post('/api/config', async (req, res) => {
   try {
-    const { openaiApiKey, port } = req.body;
+    const { llmProvider, openaiApiKey, stackspotClientId, stackspotClientSecret, stackspotRealm, port } = req.body;
     
-    if (!openaiApiKey || typeof openaiApiKey !== 'string' || openaiApiKey.trim() === '') {
-      return res.status(400).json({ error: 'API key é obrigatória' });
+    // Valida provider
+    if (!llmProvider || (llmProvider !== 'openai' && llmProvider !== 'stackspot')) {
+      return res.status(400).json({ error: 'Provider deve ser "openai" ou "stackspot"' });
     }
     
-    // Valida formato básico da API key (deve começar com sk-)
-    if (!openaiApiKey.startsWith('sk-')) {
-      return res.status(400).json({ error: 'API key inválida. Deve começar com "sk-"' });
+    // Valida credenciais baseado no provider
+    if (llmProvider === 'openai') {
+      if (!openaiApiKey || typeof openaiApiKey !== 'string' || openaiApiKey.trim() === '') {
+        return res.status(400).json({ error: 'OpenAI API key é obrigatória' });
+      }
+      if (!openaiApiKey.startsWith('sk-')) {
+        return res.status(400).json({ error: 'OpenAI API key inválida. Deve começar com "sk-"' });
+      }
+    } else if (llmProvider === 'stackspot') {
+      if (!stackspotClientId || typeof stackspotClientId !== 'string' || stackspotClientId.trim() === '') {
+        return res.status(400).json({ error: 'StackSpot Client ID é obrigatório' });
+      }
+      if (!stackspotClientSecret || typeof stackspotClientSecret !== 'string' || stackspotClientSecret.trim() === '') {
+        return res.status(400).json({ error: 'StackSpot Client Secret é obrigatório' });
+      }
     }
     
     // Carrega configuração existente
@@ -1370,46 +1390,67 @@ app.post('/api/config', async (req, res) => {
     // Atualiza configuração
     const newConfig: AppConfig = {
       ...existingConfig,
-      openaiApiKey: openaiApiKey.trim(),
+      llmProvider: llmProvider as 'openai' | 'stackspot',
       port: port || existingConfig.port || 3000
     };
+    
+    // Adiciona credenciais do provider selecionado
+    if (llmProvider === 'openai') {
+      newConfig.openaiApiKey = openaiApiKey.trim();
+      // Remove credenciais do StackSpot se estiver mudando de provider
+      delete newConfig.stackspotClientId;
+      delete newConfig.stackspotClientSecret;
+      delete newConfig.stackspotRealm;
+    } else if (llmProvider === 'stackspot') {
+      newConfig.stackspotClientId = stackspotClientId.trim();
+      newConfig.stackspotClientSecret = stackspotClientSecret.trim();
+      newConfig.stackspotRealm = stackspotRealm?.trim() || 'stackspot-freemium';
+      // Remove credenciais do OpenAI se estiver mudando de provider
+      delete newConfig.openaiApiKey;
+    }
     
     // Salva no config.json
     saveConfigToJson(newConfig);
     
-    // Atualiza variável de ambiente
-    process.env.OPENAI_API_KEY = newConfig.openaiApiKey!;
+    // Atualiza variáveis de ambiente
+    if (llmProvider === 'openai') {
+      process.env.OPENAI_API_KEY = newConfig.openaiApiKey!;
+    } else {
+      delete process.env.OPENAI_API_KEY;
+    }
+    
     if (newConfig.port) {
       process.env.PORT = newConfig.port.toString();
     }
     
-    // Reinicializa cliente OpenAI
-    initializeOpenAIClient();
+    // Reinicializa adaptador LLM
+    initializeLLMAdapter();
     
-    // Recria AgentManager com novo cliente OpenAI
-    if (openai) {
-      agentManager = new AgentManager(openai);
-      // Reinicializa agentes com o novo cliente
+    // Recria AgentManager com novo adaptador LLM
+    if (llmAdapter) {
+      agentManager = new AgentManager(llmAdapter);
+      // Reinicializa agentes com o novo adaptador
       initializeAgents().catch((err: any) => {
         console.error('❌ Erro ao reinicializar agentes:', err);
       });
       
-      // Cria threads para sockets que estavam pendentes (sem API key)
-      const currentOpenai = openai;
-      if (currentOpenai) {
+      // Cria threads para sockets que estavam pendentes (sem credenciais)
+      const currentAdapter = llmAdapter;
+      if (currentAdapter) {
         io.sockets.sockets.forEach(async (socket) => {
           const connInfo = connectionsMap.get(socket.id);
           if (connInfo && connInfo.threadId === 'pending') {
             try {
-              const thread = await currentOpenai.beta.threads.create();
+              const thread = await currentAdapter.createThread();
               threadMap.set(socket.id, thread.id);
               connInfo.threadId = thread.id;
               connectionsMap.set(socket.id, connInfo);
               
               // Emite mensagem de sucesso
+              const providerName = llmProvider === 'openai' ? 'OpenAI' : 'StackSpot';
               socket.emit('config_saved', {
                 type: 'config_saved',
-                message: '✅ API Key configurada com sucesso!',
+                message: `✅ ${providerName} configurado com sucesso!`,
                 details: 'Agora você pode usar o DelsucIA normalmente.',
                 timestamp: new Date().toISOString()
               });
@@ -1423,10 +1464,18 @@ app.post('/api/config', async (req, res) => {
       }
     }
     
+    // Prepara resposta com preview das credenciais
+    let credentialPreview = '';
+    if (llmProvider === 'openai') {
+      credentialPreview = openaiApiKey.substring(0, 7) + '...' + openaiApiKey.substring(openaiApiKey.length - 4);
+    } else {
+      credentialPreview = stackspotClientId.substring(0, 8) + '...' + stackspotClientId.substring(stackspotClientId.length - 4);
+    }
+    
     res.json({
       success: true,
       message: 'Configuração salva com sucesso',
-      apiKeyPreview: openaiApiKey.substring(0, 7) + '...' + openaiApiKey.substring(openaiApiKey.length - 4),
+      credentialPreview: credentialPreview,
       lastUpdated: newConfig.lastUpdated
     });
   } catch (error: any) {
@@ -1477,18 +1526,22 @@ io.on('connection', async (socket: Socket) => {
   console.log('Cliente conectado:', socket.id);
 
   try {
-    // Verifica se openai está configurado
-    if (!openai) {
-      // Emite mensagem especial para o chat quando API key não está configurada
+    // Verifica se llmAdapter está configurado
+    if (!llmAdapter) {
+      const config = loadConfigFromJson();
+      const provider = config?.llmProvider || 'openai';
+      const providerName = provider === 'openai' ? 'OpenAI' : 'StackSpot';
+      
+      // Emite mensagem especial para o chat quando provider não está configurado
       socket.emit('config_required', {
         type: 'config_required',
-        message: '⚠️ API Key não configurada',
-        details: 'Para usar o DelsucIA, você precisa configurar sua OpenAI API Key.',
+        message: `⚠️ ${providerName} não configurado`,
+        details: `Para usar o DelsucIA, você precisa configurar suas credenciais do ${providerName}.`,
         action: 'Clique no botão "⚙️ Config" no topo da página para configurar.',
         timestamp: new Date().toISOString()
       });
       
-      // Salva conexão sem thread (será criada quando API key for configurada)
+      // Salva conexão sem thread (será criada quando provider for configurado)
       const connectionInfo: ConnectionInfo = {
         socketId: socket.id,
         threadId: 'pending',
@@ -1531,7 +1584,7 @@ io.on('connection', async (socket: Socket) => {
         console.log(`🚫 Cancelando setTimeout de criação de thread para socket ${socket.id}`);
       }
       
-      if (data.threadId && openai) {
+      if (data.threadId && llmAdapter) {
         const existingThreadId = threadMap.get(socket.id);
         
         // Se já existe a mesma thread, apenas reenvia as mensagens salvas
@@ -1554,8 +1607,11 @@ io.on('connection', async (socket: Socket) => {
         }
 
         try {
-          // Verifica se a thread ainda existe na OpenAI
-          await openai.beta.threads.retrieve(data.threadId);
+          // Verifica se a thread ainda existe
+          if (!llmAdapter) {
+            throw new Error('LLM adapter não configurado');
+          }
+          await llmAdapter.retrieveThread(data.threadId);
           threadId = data.threadId;
           
           // IMPORTANTE: Adiciona ao threadMap ANTES de qualquer outra coisa
@@ -1614,9 +1670,9 @@ io.on('connection', async (socket: Socket) => {
     
     // Função auxiliar para criar nova thread
     async function createNewThread() {
-      if (!openai) return;
+      if (!llmAdapter) return;
       
-      const thread = await openai.beta.threads.create();
+      const thread = await llmAdapter.createThread();
       threadId = thread.id;
       threadMap.set(socket.id, threadId);
       console.log('Thread criada para socket', socket.id, ':', threadId);
@@ -1682,7 +1738,7 @@ io.on('connection', async (socket: Socket) => {
         console.log(`⏳ Ainda aguardando restore_thread para socket ${socket.id}, aguardando mais 200ms...`);
         setTimeout(async () => {
           const finalThreadId = threadMap.get(socket.id);
-          if (!finalThreadId && openai) {
+          if (!finalThreadId && llmAdapter) {
             console.log(`⚠️ Nenhuma thread encontrada para socket ${socket.id} após aguardar restore_thread, criando nova...`);
             await createNewThread();
             
@@ -1711,7 +1767,7 @@ io.on('connection', async (socket: Socket) => {
       // IMPORTANTE: Verifica novamente o threadMap aqui porque pode ter sido atualizado após o restore_thread
       const finalCheckThreadId = threadMap.get(socket.id);
       
-      if (!finalCheckThreadId && openai && !awaitingRestore) {
+      if (!finalCheckThreadId && llmAdapter && !awaitingRestore) {
         console.log(`⚠️ Nenhuma thread encontrada para socket ${socket.id} após restore_thread, criando nova...`);
         await createNewThread();
         
@@ -1812,7 +1868,10 @@ io.on('connection', async (socket: Socket) => {
         }
 
         // Cria uma nova thread
-        const newThread = await openai.beta.threads.create();
+        if (!llmAdapter) {
+          throw new Error('LLM adapter não configurado');
+        }
+        const newThread = await llmAdapter.createThread();
         const newThreadId = newThread.id;
         
         // Atualiza o threadMap com a nova thread
@@ -1871,25 +1930,59 @@ io.on('connection', async (socket: Socket) => {
     socket.on('message', async (data: { message: string }) => {
       console.log('Mensagem recebida:', data.message);
 
-      // Verifica se openai está configurado
-      if (!openai) {
+      // Verifica se llmAdapter está configurado
+      if (!llmAdapter) {
         // Emite mensagem especial para o chat
         socket.emit('config_required', {
           type: 'config_required',
-          message: '⚠️ API Key não configurada',
-          details: 'Para usar o DelsucIA, você precisa configurar sua OpenAI API Key.',
+          message: '⚠️ LLM Provider não configurado',
+          details: 'Para usar o DelsucIA, você precisa configurar um LLM Provider (OpenAI ou StackSpot).',
           action: 'Clique no botão "⚙️ Config" no topo da página para configurar.',
           timestamp: new Date().toISOString()
         });
         return;
       }
 
-      const threadId = threadMap.get(socket.id);
+      let threadId = threadMap.get(socket.id);
+      
+      // Se não há thread, cria uma nova automaticamente
       if (!threadId) {
-        socket.emit('error', {
-          message: 'Thread não encontrada. Reconecte-se.'
-        });
-        return;
+        if (!llmAdapter) {
+          socket.emit('error', {
+            message: 'LLM adapter não configurado. Configure o provider primeiro.'
+          });
+          return;
+        }
+        
+        console.log(`⚠️ Thread não encontrada para socket ${socket.id}, criando nova automaticamente...`);
+        try {
+          const newThread = await llmAdapter.createThread();
+          threadId = newThread.id;
+          threadMap.set(socket.id, threadId);
+          
+          // Registra informações da conexão
+          const connectionInfo: ConnectionInfo = {
+            socketId: socket.id,
+            threadId: threadId,
+            connectedAt: new Date(),
+            lastActivity: new Date(),
+            messageCount: 0,
+            userAgent: socket.handshake.headers['user-agent'],
+            ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+          };
+          connectionsMap.set(socket.id, connectionInfo);
+          
+          // Emite threadId para o frontend salvar no localStorage
+          socket.emit('thread_created', { threadId: threadId });
+          
+          console.log(`✅ Thread criada automaticamente para socket ${socket.id}: ${threadId}`);
+        } catch (error: any) {
+          console.error(`❌ Erro ao criar thread automaticamente:`, error);
+          socket.emit('error', {
+            message: `Erro ao criar thread: ${error.message}`
+          });
+          return;
+        }
       }
 
       // Atualiza atividade da conexão
@@ -1902,9 +1995,38 @@ io.on('connection', async (socket: Socket) => {
 
       try {
         console.log(`📤 Mensagem recebida: "${data.message}"`);
+        
+        // Detecta se o usuário está pedindo para ler um arquivo
+        // Padrões: "ler arquivo X", "leia X", "o que tem em X", "conteúdo de X", "dados de X", "quais dados tem em X", etc.
+        const filePathPattern = /(?:ler|leia|read|conteúdo|conteudo|dados|o que tem|quais dados|mostre|mostrar|exiba|exibir|abrir|abre)\s+(?:o\s+)?(?:arquivo\s+)?([A-Za-z]:[\\\/][^\s]+|\.\.?[\\\/][^\s]+|[^\s]+\.[a-zA-Z0-9]+)/i;
+        const filePathMatch = data.message.match(filePathPattern);
+        
+        let enhancedMessage = data.message;
+        let fileContent = '';
+        
+        // Se detectou um caminho de arquivo, tenta ler automaticamente
+        if (filePathMatch && filePathMatch[1]) {
+          const detectedFilePath = filePathMatch[1].trim();
+          console.log(`📂 Detectado pedido de leitura de arquivo: ${detectedFilePath}`);
+          
+          try {
+            fileContent = await fileSystemFunctions.readFile(detectedFilePath);
+            console.log(`✅ Arquivo lido com sucesso (${fileContent.length} caracteres)`);
+            
+            // Adiciona o conteúdo do arquivo à mensagem para o agente
+            enhancedMessage = `${data.message}\n\n[Conteúdo do arquivo ${detectedFilePath}]:\n${fileContent}`;
+          } catch (error: any) {
+            console.log(`⚠️ Erro ao ler arquivo automaticamente: ${error.message}`);
+            // Continua com a mensagem original se não conseguir ler
+          }
+        }
+        
         console.log(`🔍 Analisando mensagem para selecionar agente...`);
 
         // Seleciona o agente apropriado para a mensagem
+        if (!agentManager) {
+          throw new Error('AgentManager não está configurado');
+        }
         const { agentId, config } = await agentManager.getAgentForMessage(data.message);
         
         // Notifica o cliente sobre qual agente está sendo usado
@@ -1927,13 +2049,13 @@ io.on('connection', async (socket: Socket) => {
           message: data.message
         });
 
-        // Adiciona mensagem do usuário à thread
+        // Adiciona mensagem do usuário à thread (usa enhancedMessage se arquivo foi lido)
         console.log(`📝 Adicionando mensagem à thread...`);
 
-        const userMessage = await openai.beta.threads.messages.create(threadId, {
-          role: 'user',
-          content: data.message,
-        });
+        if (!llmAdapter) {
+          throw new Error('LLM adapter não configurado');
+        }
+        const userMessage = await llmAdapter.addMessage(threadId, 'user', enhancedMessage);
 
         // Emite a mensagem do usuário de volta para o cliente
         const userMessageData = {
@@ -1948,6 +2070,15 @@ io.on('connection', async (socket: Socket) => {
         };
         socket.emit('agent_message', userMessageData);
         emitToMonitors(socket.id, 'agent_message', userMessageData);
+        
+        // Se um arquivo foi lido, notifica o cliente
+        if (fileContent && filePathMatch) {
+          socket.emit('file_read', {
+            filePath: filePathMatch[1],
+            content: fileContent.substring(0, 500) + (fileContent.length > 500 ? '...' : ''),
+            fullLength: fileContent.length
+          });
+        }
 
         // Salva mensagem do usuário na conversa
         saveConversationMessage(threadId, socket.id, 'user', data.message);
@@ -1970,9 +2101,10 @@ io.on('connection', async (socket: Socket) => {
         // Cria um run para processar a mensagem com o agente selecionado
         console.log(`🚀 Criando run para processar mensagem...`);
 
-        const run = await openai.beta.threads.runs.create(threadId, {
-          assistant_id: agentId,
-        });
+        if (!llmAdapter) {
+          throw new Error('LLM adapter não configurado');
+        }
+        const run = await llmAdapter.createRun(threadId, agentId);
 
         console.log(`✅ Run criado: ${run.id} (Status: ${run.status})`);
 
@@ -1990,7 +2122,7 @@ io.on('connection', async (socket: Socket) => {
         });
 
         // Aguarda a conclusão do run e processa ações necessárias
-        const { message: responseMessage, tokenUsage } = await waitForRunCompletion(threadId, run.id, socket);
+        const { message: responseMessage, tokenUsage } = await llmAdapter.waitForRunCompletion(threadId, run.id, socket);
 
         console.log(`✅ Run concluído com sucesso`);
 
