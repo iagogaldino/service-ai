@@ -62,6 +62,20 @@ initializeAgents().catch((err: any) => {
 // Armazena threads por socket ID (mapeia socket.id -> thread.id)
 const threadMap = new Map<string, string>();
 
+// Armazena informações sobre conexões ativas para monitoramento
+interface ConnectionInfo {
+  socketId: string;
+  threadId: string;
+  connectedAt: Date;
+  lastActivity: Date;
+  messageCount: number;
+  userAgent?: string;
+  ipAddress?: string;
+}
+
+const connectionsMap = new Map<string, ConnectionInfo>();
+const monitoringSockets = new Map<string, string>(); // Map: monitorSocketId -> targetSocketId
+
 // ============================================================================
 // FUNÇÕES AUXILIARES
 // ============================================================================
@@ -108,7 +122,7 @@ async function waitForRunCompletion(
         if (message.role === 'assistant' && message.content.length > 0) {
           const content = message.content[0];
           if (content.type === 'text' && 'text' in content) {
-            socket.emit('agent_message', {
+            const messageData = {
               type: 'assistant',
               message: content.text.value,
               messageId: message.id,
@@ -118,7 +132,9 @@ async function waitForRunCompletion(
                 createdAt: message.created_at,
                 runId: message.run_id
               }
-            });
+            };
+            socket.emit('agent_message', messageData);
+            emitToMonitors(socket.id, 'agent_message', messageData);
           }
         }
       }
@@ -170,14 +186,16 @@ async function waitForRunCompletion(
         .filter(Boolean);
 
       // Notifica o cliente sobre as funções que serão executadas
-      socket.emit('agent_message', {
+      const functionCallsData = {
         type: 'function_calls',
         toolCalls: toolCallsInfo,
         details: {
           runId,
           toolCallsCount: toolCalls.length
         }
-      });
+      };
+      socket.emit('agent_message', functionCallsData);
+      emitToMonitors(socket.id, 'agent_message', functionCallsData);
 
       console.log(`🔨 ${toolCalls.length} função(ões) solicitada(s) pelo agente`);
 
@@ -195,11 +213,13 @@ async function waitForRunCompletion(
           
           // Emite evento de ação para o cliente
           const actionMessage = formatActionMessage(functionName, args);
-          socket.emit('agent_action', {
+          const agentActionData = {
             action: actionMessage,
             functionName: functionName,
             args: args
-          });
+          };
+          socket.emit('agent_action', agentActionData);
+          emitToMonitors(socket.id, 'agent_action', agentActionData);
           
           // Executa a função
           const startTime = Date.now();
@@ -209,7 +229,7 @@ async function waitForRunCompletion(
           console.log(`✅ [${index + 1}/${toolCalls.length}] Função ${functionName} executada (${executionTime}ms) - Resultado: ${result.length} caracteres`);
 
           // Emite resultado da função para o cliente
-          socket.emit('agent_message', {
+          const functionResultData = {
             type: 'function_result',
             functionName: functionName,
             arguments: args,
@@ -219,14 +239,18 @@ async function waitForRunCompletion(
               toolCallId: toolCall.id,
               success: !result.startsWith('Erro:')
             }
-          });
+          };
+          socket.emit('agent_message', functionResultData);
+          emitToMonitors(socket.id, 'agent_message', functionResultData);
           
           // Emite evento de conclusão da ação
-          socket.emit('agent_action_complete', {
+          const actionCompleteData = {
             action: actionMessage,
             success: !result.startsWith('Erro:'),
             result: result.substring(0, 500) // Preview do resultado
-          });
+          };
+          socket.emit('agent_action_complete', actionCompleteData);
+          emitToMonitors(socket.id, 'agent_action_complete', actionCompleteData);
           
           return {
             tool_call_id: toolCall.id,
@@ -243,13 +267,15 @@ async function waitForRunCompletion(
       console.log(`📦 Preparando ${validOutputs.length} resultado(s) para enviar ao agente...`);
 
       // Notifica o cliente sobre o processamento
-      socket.emit('agent_action', {
+      const processingData = {
         action: '⚙️ Processando resultados...',
         functionName: 'processing'
-      });
+      };
+      socket.emit('agent_action', processingData);
+      emitToMonitors(socket.id, 'agent_action', processingData);
 
       // Mostra o que está sendo enviado de volta ao agente
-      socket.emit('agent_message', {
+      const functionOutputsData = {
         type: 'function_outputs',
         outputs: validOutputs.map(output => ({
           toolCallId: output.tool_call_id,
@@ -260,7 +286,9 @@ async function waitForRunCompletion(
           runId,
           outputsCount: validOutputs.length
         }
-      });
+      };
+      socket.emit('agent_message', functionOutputsData);
+      emitToMonitors(socket.id, 'agent_message', functionOutputsData);
 
       // Envia os resultados das funções de volta para o assistente
       console.log(`📤 Enviando ${validOutputs.length} resultado(s) de volta ao agente...`);
@@ -299,6 +327,49 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
+/**
+ * Rota para página de monitoramento
+ */
+app.get('/monitor', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/monitor.html'));
+});
+
+/**
+ * API: Lista todas as conexões ativas
+ */
+app.get('/api/connections', (req, res) => {
+  const connections = Array.from(connectionsMap.values()).map(conn => ({
+    socketId: conn.socketId,
+    threadId: conn.threadId,
+    connectedAt: conn.connectedAt.toISOString(),
+    lastActivity: conn.lastActivity.toISOString(),
+    messageCount: conn.messageCount,
+    userAgent: conn.userAgent,
+    ipAddress: conn.ipAddress
+  }));
+  res.json({ connections });
+});
+
+/**
+ * API: Obtém informações de uma conexão específica
+ */
+app.get('/api/connections/:socketId', (req, res) => {
+  const { socketId } = req.params;
+  const connection = connectionsMap.get(socketId);
+  if (!connection) {
+    return res.status(404).json({ error: 'Conexão não encontrada' });
+  }
+  res.json({
+    socketId: connection.socketId,
+    threadId: connection.threadId,
+    connectedAt: connection.connectedAt.toISOString(),
+    lastActivity: connection.lastActivity.toISOString(),
+    messageCount: connection.messageCount,
+    userAgent: connection.userAgent,
+    ipAddress: connection.ipAddress
+  });
+});
+
 // ============================================================================
 // CONFIGURAÇÃO DO SOCKET.IO
 // ============================================================================
@@ -311,6 +382,32 @@ app.get('/', (req, res) => {
  * - Capacidade de enviar mensagens e receber respostas
  * - Feedback em tempo real sobre ações do agente
  */
+/**
+ * Função helper para emitir eventos para monitores de uma conexão específica
+ */
+function emitToMonitors(targetSocketId: string, event: string, data: any) {
+  // Emite apenas para sockets que estão monitorando esta conexão específica
+  let emittedCount = 0;
+  monitoringSockets.forEach((monitoredSocketId, monitorSocketId) => {
+    if (monitoredSocketId === targetSocketId) {
+      const monitorSocket = io.sockets.sockets.get(monitorSocketId);
+      if (monitorSocket) {
+        monitorSocket.emit('monitored_event', {
+          targetSocketId,
+          event,
+          data,
+          timestamp: new Date().toISOString()
+        });
+        emittedCount++;
+        console.log(`📡 Evento '${event}' emitido para monitor ${monitorSocketId} (monitorando ${targetSocketId})`);
+      }
+    }
+  });
+  if (emittedCount === 0 && monitoringSockets.size > 0) {
+    console.log(`⚠️ Evento '${event}' não foi emitido para nenhum monitor (target: ${targetSocketId}, monitores ativos: ${monitoringSockets.size})`);
+  }
+}
+
 io.on('connection', async (socket: Socket) => {
   console.log('Cliente conectado:', socket.id);
 
@@ -319,6 +416,74 @@ io.on('connection', async (socket: Socket) => {
     const thread = await openai.beta.threads.create();
     threadMap.set(socket.id, thread.id);
     console.log('Thread criada para socket', socket.id, ':', thread.id);
+
+    // Registra informações da conexão
+    const connectionInfo: ConnectionInfo = {
+      socketId: socket.id,
+      threadId: thread.id,
+      connectedAt: new Date(),
+      lastActivity: new Date(),
+      messageCount: 0,
+      userAgent: socket.handshake.headers['user-agent'],
+      ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+    };
+    connectionsMap.set(socket.id, connectionInfo);
+
+    // Notifica todos os monitores sobre nova conexão
+    emitToMonitors(socket.id, 'connection', {
+      socketId: connectionInfo.socketId,
+      threadId: connectionInfo.threadId,
+      connectedAt: connectionInfo.connectedAt.toISOString(),
+      lastActivity: connectionInfo.lastActivity.toISOString(),
+      messageCount: connectionInfo.messageCount,
+      userAgent: connectionInfo.userAgent,
+      ipAddress: connectionInfo.ipAddress
+    });
+
+    // Handler para iniciar monitoramento de uma conexão
+    socket.on('start_monitoring', (data: { targetSocketId: string }) => {
+      const targetSocket = io.sockets.sockets.get(data.targetSocketId);
+      if (targetSocket) {
+        monitoringSockets.set(socket.id, data.targetSocketId);
+        socket.emit('monitoring_started', {
+          targetSocketId: data.targetSocketId,
+          message: 'Monitoramento iniciado'
+        });
+        console.log(`Socket ${socket.id} começou a monitorar ${data.targetSocketId}`);
+        
+        // Envia informações da conexão atual
+        const connInfo = connectionsMap.get(data.targetSocketId);
+        if (connInfo) {
+          socket.emit('monitored_event', {
+            targetSocketId: data.targetSocketId,
+            event: 'connection_info',
+            data: {
+              socketId: connInfo.socketId,
+              threadId: connInfo.threadId,
+              connectedAt: connInfo.connectedAt.toISOString(),
+              lastActivity: connInfo.lastActivity.toISOString(),
+              messageCount: connInfo.messageCount,
+              userAgent: connInfo.userAgent,
+              ipAddress: connInfo.ipAddress
+            },
+            timestamp: new Date().toISOString()
+          });
+        }
+      } else {
+        socket.emit('monitoring_error', {
+          message: 'Conexão alvo não encontrada'
+        });
+      }
+    });
+
+    // Handler para parar monitoramento
+    socket.on('stop_monitoring', () => {
+      monitoringSockets.delete(socket.id);
+      socket.emit('monitoring_stopped', {
+        message: 'Monitoramento parado'
+      });
+      console.log(`Socket ${socket.id} parou de monitorar`);
+    });
 
     /**
      * Handler para mensagens do cliente
@@ -340,6 +505,14 @@ io.on('connection', async (socket: Socket) => {
         return;
       }
 
+      // Atualiza atividade da conexão
+      const connInfo = connectionsMap.get(socket.id);
+      if (connInfo) {
+        connInfo.lastActivity = new Date();
+        connInfo.messageCount++;
+        connectionsMap.set(socket.id, connInfo);
+      }
+
       try {
         console.log(`📤 Mensagem recebida: "${data.message}"`);
         console.log(`🔍 Analisando mensagem para selecionar agente...`);
@@ -348,10 +521,12 @@ io.on('connection', async (socket: Socket) => {
         const { agentId, config } = await agentManager.getAgentForMessage(data.message);
         
         // Notifica o cliente sobre qual agente está sendo usado
-        socket.emit('agent_selected', {
+        const agentSelectedData = {
           agentName: config.name,
           description: config.description
-        });
+        };
+        socket.emit('agent_selected', agentSelectedData);
+        emitToMonitors(socket.id, 'agent_selected', agentSelectedData);
 
         console.log(`✅ Agente selecionado: "${config.name}" (ID: ${agentId})`);
 
@@ -364,7 +539,7 @@ io.on('connection', async (socket: Socket) => {
         });
 
         // Emite a mensagem do usuário de volta para o cliente
-        socket.emit('agent_message', {
+        const userMessageData = {
           type: 'user',
           message: data.message,
           messageId: userMessage.id,
@@ -373,7 +548,9 @@ io.on('connection', async (socket: Socket) => {
             role: 'user',
             createdAt: userMessage.created_at
           }
-        });
+        };
+        socket.emit('agent_message', userMessageData);
+        emitToMonitors(socket.id, 'agent_message', userMessageData);
 
         console.log(`✅ Mensagem adicionada à thread com sucesso (ID: ${userMessage.id})`);
 
@@ -392,11 +569,13 @@ io.on('connection', async (socket: Socket) => {
         console.log(`✅ Run concluído com sucesso`);
 
         // Envia resposta final de volta para o cliente
-        socket.emit('response', {
+        const responseData = {
           message: responseMessage,
           originalMessage: data.message,
           agentName: config.name
-        });
+        };
+        socket.emit('response', responseData);
+        emitToMonitors(socket.id, 'response', responseData);
 
         console.log(`Resposta enviada pelo agente "${config.name}":`, responseMessage);
       } catch (error: any) {
@@ -414,6 +593,33 @@ io.on('connection', async (socket: Socket) => {
      */
     socket.on('disconnect', async () => {
       console.log('Cliente desconectado:', socket.id);
+      
+      // Notifica monitores sobre desconexão
+      emitToMonitors(socket.id, 'disconnect', { socketId: socket.id });
+      
+      // Remove dos monitores se estava monitorando
+      monitoringSockets.delete(socket.id);
+      
+      // Remove monitores que estavam monitorando este socket
+      const monitorsToRemove: string[] = [];
+      monitoringSockets.forEach((targetId, monitorId) => {
+        if (targetId === socket.id) {
+          monitorsToRemove.push(monitorId);
+        }
+      });
+      monitorsToRemove.forEach(monitorId => {
+        const monitorSocket = io.sockets.sockets.get(monitorId);
+        if (monitorSocket) {
+          monitorSocket.emit('monitored_event', {
+            targetSocketId: socket.id,
+            event: 'disconnect',
+            data: { socketId: socket.id },
+            timestamp: new Date().toISOString()
+          });
+        }
+        monitoringSockets.delete(monitorId);
+      });
+      
       const threadId = threadMap.get(socket.id);
       if (threadId) {
         threadMap.delete(socket.id);
@@ -421,6 +627,9 @@ io.on('connection', async (socket: Socket) => {
         // await openai.beta.threads.del(threadId);
         console.log('Thread removida para socket:', socket.id);
       }
+      
+      // Remove da lista de conexões
+      connectionsMap.delete(socket.id);
     });
   } catch (error) {
     console.error('Erro ao configurar conexão:', error);

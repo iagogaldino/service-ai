@@ -229,7 +229,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>🤖 ServiceIA</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h1 style="margin: 0;">🤖 ServiceIA</h1>
+            <a href="/monitor" style="color: #667eea; text-decoration: none; font-size: 0.9em; padding: 8px 15px; border: 2px solid #667eea; border-radius: 8px; transition: all 0.3s;" onmouseover="this.style.background='#667eea'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#667eea';">🔍 Monitor de Conexões</a>
+        </div>
         <p class="subtitle">Comunicação via Socket.IO com OpenAI</p>
         
         <div id="status" class="status disconnected">
