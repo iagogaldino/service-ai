@@ -5,18 +5,24 @@
 import { Socket } from 'socket.io';
 import { AgentConfig } from '../../agents/config';
 import { LLMAdapter, LLMThread, LLMMessage, LLMRun, TokenUsage } from './LLMAdapter';
+import { executeTool } from '../../agents/agentManager';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 // Importação dinâmica do StackSpot SDK
-// Nota: Ajuste o caminho conforme necessário
+// O SDK está na raiz do projeto: sdk-stackspot/
+// __dirname aqui é: src/llm/adapters, então precisamos subir 3 níveis
 let StackSpotClass: any;
 try {
-  StackSpotClass = require('../../sdk-stackspot/src/index').default;
-} catch (error) {
-  // Se não encontrar, tenta caminho alternativo
-  try {
-    StackSpotClass = require('../../../sdk-stackspot/src/index').default;
-  } catch (e) {
-    throw new Error('StackSpot SDK não encontrado. Certifique-se de que o SDK está compilado.');
-  }
+  // Caminho correto: de src/llm/adapters para raiz do projeto (3 níveis acima)
+  const projectRoot = path.resolve(__dirname, '../../../');
+  const sdkPath = path.join(projectRoot, 'sdk-stackspot', 'src', 'index');
+  StackSpotClass = require(sdkPath).default;
+  console.log(`✅ StackSpot SDK carregado de: ${sdkPath}`);
+} catch (error: any) {
+  console.error('❌ Erro ao carregar StackSpot SDK:', error.message);
+  console.error('📁 Tentou carregar de:', path.resolve(__dirname, '../../../sdk-stackspot/src/index'));
+  throw new Error('StackSpot SDK não encontrado. Certifique-se de que o SDK está na raiz do projeto em sdk-stackspot/');
 }
 
 export interface StackSpotConfig {
@@ -34,10 +40,18 @@ export class StackSpotAdapter implements LLMAdapter {
     if (!config.clientId || !config.clientSecret) {
       throw new Error('StackSpot clientId e clientSecret são obrigatórios');
     }
+    
+    // Cria tool executor que conecta ao executeTool do servidor
+    const toolExecutor = async (functionName: string, args: Record<string, any>): Promise<string> => {
+      return await executeTool(functionName, args);
+    };
+    
     this.stackspot = new StackSpotClass({
       clientId: config.clientId,
       clientSecret: config.clientSecret,
       realm: config.realm || 'stackspot-freemium',
+      toolExecutor: toolExecutor, // Passa o executor para o SDK
+      enableFunctionCalling: true, // Habilita function calling automático
     });
   }
 
@@ -150,7 +164,7 @@ export class StackSpotAdapter implements LLMAdapter {
     socket?: Socket
   ): Promise<{ message: string; tokenUsage: TokenUsage }> {
     let iterationCount = 0;
-    const MAX_ITERATIONS = 30;
+    const MAX_ITERATIONS = 60; // Aumentado para 60 para dar tempo ao follow-up run
 
     while (iterationCount < MAX_ITERATIONS) {
       iterationCount++;

@@ -3,6 +3,12 @@
  */
 
 /**
+ * Callback para executar uma função/tool
+ * Usado para function calling simulado (StackSpot não suporta nativo)
+ */
+export type ToolExecutor = (functionName: string, args: Record<string, any>) => Promise<string>;
+
+/**
  * Configuração do cliente StackSpot
  */
 export interface StackSpotConfig {
@@ -12,6 +18,15 @@ export interface StackSpotConfig {
   baseURL?: string;
   inferenceBaseURL?: string;
   timeout?: number;
+  /**
+   * Callback opcional para executar tools/funções
+   * Se fornecido, o SDK detectará e executará function calls automaticamente
+   */
+  toolExecutor?: ToolExecutor;
+  /**
+   * Habilita detecção automática de function calling (padrão: true se toolExecutor fornecido)
+   */
+  enableFunctionCalling?: boolean;
 }
 
 /**
@@ -110,6 +125,7 @@ export interface Run {
   instructions?: string;
   tools?: Tool[];
   metadata?: Record<string, any>;
+  usage?: TokenUsage;
 }
 
 /**

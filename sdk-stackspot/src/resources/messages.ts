@@ -11,12 +11,18 @@ import {
   CreateMessageParams,
   PaginatedList,
 } from '../types';
+import { StorageAdapter } from '../storage/FileStorage';
 
 export class Messages {
+  private storage?: StorageAdapter;
+
   constructor(
     private client: StackSpotClient,
-    private threads: Threads
-  ) {}
+    private threads: Threads,
+    storage?: StorageAdapter
+  ) {
+    this.storage = storage;
+  }
 
   /**
    * Cria uma nova mensagem em uma thread
@@ -44,8 +50,8 @@ export class Messages {
       metadata: params.metadata,
     };
 
-    // Adiciona a mensagem à thread
-    this.threads.addThreadMessage(threadId, message);
+    // Adiciona a mensagem à thread (agora é async)
+    await this.threads.addThreadMessage(threadId, message);
 
     return message;
   }

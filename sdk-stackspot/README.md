@@ -149,6 +149,42 @@ async function exemplo() {
 exemplo();
 ```
 
+## Exemplos
+
+O SDK inclui vários exemplos na pasta `examples/`:
+
+### Exemplo Básico
+```bash
+npm run example:basic
+```
+
+### Exemplo de Acesso a Arquivos
+Testa se o agente consegue acessar diretórios e arquivos do projeto:
+
+```bash
+# Teste rápido (lê um arquivo)
+npm run test:file-access
+
+# Exemplo completo (múltiplas operações)
+npm run example:file-access
+```
+
+O exemplo de acesso a arquivos demonstra:
+- Listar arquivos de um diretório
+- Ler conteúdo de arquivos específicos
+- Analisar estrutura de diretórios
+- Buscar arquivos por nome
+
+**Requisitos**: O agente deve estar configurado com ferramentas de filesystem (`listDirectory`, `readFile`, `findFile`).
+
+Veja `examples/README_FILE_ACCESS.md` para mais detalhes.
+
+### Outros Exemplos
+```bash
+npm run example:thread-id      # Exemplo de uso de thread_id
+npm run example:comparison     # Comparação com OpenAI SDK
+```
+
 ## Diferenças em relação ao OpenAI SDK
 
 1. **Agentes**: StackSpot não permite criar agentes via API. Use o ID do agente criado no painel.

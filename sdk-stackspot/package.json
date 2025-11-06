@@ -9,7 +9,12 @@
     "prepublishOnly": "npm run build",
     "example:basic": "ts-node examples/basic-usage.ts",
     "example:thread-id": "ts-node examples/thread-id-usage.ts",
-    "example:comparison": "ts-node examples/comparison-openai.ts"
+    "example:comparison": "ts-node examples/comparison-openai.ts",
+    "example:file-access": "ts-node examples/file-access-example.ts",
+    "test:file-access": "ts-node examples/quick-file-test.ts",
+    "test:create-server": "ts-node examples/create-express-server-test.ts",
+    "test:create-jest": "ts-node examples/create-jest-test.ts",
+    "test:create-and-run-jest": "ts-node examples/create-and-run-jest-test.ts"
   },
   "keywords": [
     "stackspot",
@@ -22,8 +27,9 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^20.10.5",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "socket.io-client": "^4.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

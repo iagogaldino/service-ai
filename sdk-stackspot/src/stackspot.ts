@@ -11,18 +11,20 @@ import { Threads } from './resources/threads';
 
 export class StackSpot {
   private client: StackSpotClient;
+  private config: StackSpotConfig;
   public beta: {
     assistants: Assistants;
     threads: Threads;
   };
 
   constructor(config: StackSpotConfig) {
+    this.config = config;
     this.client = new StackSpotClient(config);
     
-    // Inicializa namespaces
+    // Inicializa namespaces com tool executor se fornecido
     this.beta = {
       assistants: new Assistants(this.client),
-      threads: new Threads(this.client),
+      threads: new Threads(this.client, undefined, config.toolExecutor, config.enableFunctionCalling),
     };
   }
 

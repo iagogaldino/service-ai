@@ -2122,6 +2122,7 @@ io.on('connection', async (socket: Socket) => {
         });
 
         // Aguarda a conclusão do run e processa ações necessárias
+        // Nota: Function calling é tratado automaticamente pelo SDK StackSpot
         const { message: responseMessage, tokenUsage } = await llmAdapter.waitForRunCompletion(threadId, run.id, socket);
 
         console.log(`✅ Run concluído com sucesso`);

@@ -15,21 +15,51 @@ import {
   CreateMessageParams,
   CreateRunParams,
   Run,
+  ToolExecutor,
 } from '../types';
 import { Messages } from './messages';
 import { Runs } from './runs';
+import { StorageAdapter, FileStorage } from '../storage/FileStorage';
 
 export class Threads {
   public messages: Messages;
   public runs: Runs;
 
-  // Armazena threads em memória (em produção, use um banco de dados)
+  // Armazena threads em memória (também persiste em arquivo)
   private threads: Map<string, Thread> = new Map();
   private threadMessages: Map<string, Message[]> = new Map();
+  private storage?: StorageAdapter;
 
-  constructor(private client: StackSpotClient) {
-    this.messages = new Messages(client, this);
-    this.runs = new Runs(client, this);
+  constructor(
+    private client: StackSpotClient, 
+    storage?: StorageAdapter,
+    toolExecutor?: ToolExecutor,
+    enableFunctionCalling?: boolean
+  ) {
+    this.storage = storage || new FileStorage();
+    this.messages = new Messages(client, this, this.storage);
+    this.runs = new Runs(client, this, this.storage, toolExecutor, enableFunctionCalling);
+    
+    // Carrega threads do storage ao iniciar
+    this.loadFromStorage().catch(err => {
+      console.warn('⚠️ Erro ao carregar threads do storage:', err.message);
+    });
+  }
+
+  private async loadFromStorage(): Promise<void> {
+    if (!this.storage) return;
+    
+    try {
+      const threads = await this.storage.listThreads();
+      for (const thread of threads) {
+        this.threads.set(thread.id, thread);
+        const messages = await this.storage.loadMessages(thread.id);
+        this.threadMessages.set(thread.id, messages);
+      }
+      console.log(`✅ ${threads.length} thread(s) carregada(s) do storage`);
+    } catch (error: any) {
+      console.warn('⚠️ Erro ao carregar threads:', error.message);
+    }
   }
 
   /**
@@ -47,6 +77,11 @@ export class Threads {
 
     this.threads.set(threadId, thread);
     this.threadMessages.set(threadId, []);
+    
+    // Salva no storage se disponível
+    if (this.storage) {
+      await this.storage.saveThread(thread);
+    }
 
     // Se houver mensagens iniciais, adiciona elas
     if (params?.messages && params.messages.length > 0) {
@@ -80,6 +115,11 @@ export class Threads {
 
     thread.metadata = { ...thread.metadata, ...metadata };
     this.threads.set(threadId, thread);
+    
+    // Salva no storage se disponível
+    if (this.storage) {
+      await this.storage.saveThread(thread);
+    }
 
     return thread;
   }
@@ -90,6 +130,11 @@ export class Threads {
   async del(threadId: string): Promise<{ id: string; object: string; deleted: boolean }> {
     this.threads.delete(threadId);
     this.threadMessages.delete(threadId);
+    
+    // Remove do storage se disponível
+    if (this.storage) {
+      await this.storage.deleteThread(threadId);
+    }
 
     return {
       id: threadId,
@@ -108,9 +153,14 @@ export class Threads {
   /**
    * Adiciona mensagem a uma thread (método interno)
    */
-  addThreadMessage(threadId: string, message: Message): void {
+  async addThreadMessage(threadId: string, message: Message): Promise<void> {
     const messages = this.threadMessages.get(threadId) || [];
     messages.push(message);
     this.threadMessages.set(threadId, messages);
+    
+    // Salva no storage se disponível
+    if (this.storage) {
+      await this.storage.saveMessage(threadId, message);
+    }
   }
 }

@@ -20,5 +20,10 @@ export * from './resources/threads';
 export * from './resources/messages';
 export * from './resources/runs';
 
+// Exporta utilitários
+export * from './utils/functionCallParser';
+export * from './utils/tokenNormalizer';
+export * from './storage/FileStorage';
+
 // Exporta por padrão
 export default StackSpot;

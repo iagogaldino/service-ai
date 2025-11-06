@@ -1,0 +1,4 @@
+# Ignora arquivos de dados do storage
+*.json
+!README.md
+

@@ -16,15 +16,53 @@ import {
   ChatResponse,
   ToolCall,
   Message,
+  ToolExecutor,
 } from '../types';
+import { normalizeTokens } from '../utils/tokenNormalizer';
+import { StorageAdapter } from '../storage/FileStorage';
+import { detectFunctionCalls, executeDetectedFunctions, formatFunctionResults } from '../utils/functionCallParser';
 
 export class Runs {
   private runs: Map<string, Run> = new Map();
+  private storage?: StorageAdapter;
+  private toolExecutor?: ToolExecutor;
+  private enableFunctionCalling: boolean;
 
   constructor(
     private client: StackSpotClient,
-    private threads: Threads
-  ) {}
+    private threads: Threads,
+    storage?: StorageAdapter,
+    toolExecutor?: ToolExecutor,
+    enableFunctionCalling?: boolean
+  ) {
+    this.storage = storage;
+    this.toolExecutor = toolExecutor;
+    this.enableFunctionCalling = enableFunctionCalling !== false && !!toolExecutor;
+    
+    // Carrega runs do storage ao iniciar
+    if (this.storage) {
+      this.loadRunsFromStorage().catch(err => {
+        console.warn('⚠️ Erro ao carregar runs do storage:', err.message);
+      });
+    }
+  }
+
+  private async loadRunsFromStorage(): Promise<void> {
+    if (!this.storage) return;
+    
+    try {
+      const threads = await this.storage.listThreads();
+      for (const thread of threads) {
+        const runs = await this.storage.listRuns(thread.id);
+        for (const run of runs) {
+          this.runs.set(run.id, run);
+        }
+      }
+      console.log(`✅ ${this.runs.size} run(s) carregado(s) do storage`);
+    } catch (error: any) {
+      console.warn('⚠️ Erro ao carregar runs:', error.message);
+    }
+  }
 
   /**
    * Cria e executa um run
@@ -59,6 +97,11 @@ export class Runs {
     };
 
     this.runs.set(runId, run);
+    
+    // Salva no storage se disponível
+    if (this.storage) {
+      await this.storage.saveRun(threadId, run);
+    }
 
     // Executa o run (não bloqueia)
     this.executeRun(runId, threadId, params, lastUserMessage.content[0].text.value).catch(
@@ -189,6 +232,94 @@ export class Runs {
       // Log básico do texto extraído (opcional - pode ser removido em produção)
       // console.log(`✅ Resposta extraída: ${responseText.substring(0, 100)}${responseText.length > 100 ? '...' : ''}\n`);
 
+      // Detecta e executa function calls se habilitado
+      if (this.enableFunctionCalling && this.toolExecutor) {
+        const functionCalls = detectFunctionCalls(responseText);
+        
+        if (functionCalls.length > 0) {
+          console.log(`🔧 [SDK] Detectadas ${functionCalls.length} chamada(s) de função na resposta do StackSpot`);
+          
+          // Executa as funções detectadas
+          const functionResults = await executeDetectedFunctions(functionCalls, this.toolExecutor);
+          
+          // Se alguma função foi executada com sucesso, envia resultados de volta ao agente
+          const successfulResults = functionResults.filter(r => r.success);
+          if (successfulResults.length > 0) {
+            console.log(`📤 [SDK] Enviando ${successfulResults.length} resultado(s) de volta ao agente StackSpot...`);
+            
+            const resultsText = formatFunctionResults(functionResults);
+            
+            // Adiciona mensagem com resultados
+            await this.threads.messages.create(threadId, {
+              role: 'user',
+              content: `Resultados das funções executadas:${resultsText}`,
+            });
+            
+            // Cria novo run para processar os resultados
+            const followUpRunId = `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const followUpRun: Run = {
+              id: followUpRunId,
+              object: 'thread.run',
+              created_at: Math.floor(Date.now() / 1000),
+              thread_id: threadId,
+              assistant_id: params.assistant_id,
+              status: 'queued',
+              model: params.model,
+              instructions: params.instructions,
+              tools: params.tools,
+              metadata: params.metadata,
+            };
+            
+            this.runs.set(followUpRunId, followUpRun);
+            if (this.storage) {
+              await this.storage.saveRun(threadId, followUpRun);
+            }
+            
+            // Executa o follow-up run (usa o mesmo userPrompt original para contexto)
+            // O prompt com resultados já foi adicionado como mensagem acima
+            const messagesBeforeRun = await this.threads.messages.list(threadId, { order: 'asc' });
+            const lastUserMsg = messagesBeforeRun.data[messagesBeforeRun.data.length - 1];
+            const followUpPrompt = lastUserMsg?.role === 'user' ? lastUserMsg.content[0].text.value : `Resultados das funções executadas:${resultsText}`;
+            
+            // Executa o follow-up run e aguarda conclusão
+            await this.executeRun(followUpRunId, threadId, params, followUpPrompt);
+            
+            // Aguarda o follow-up run completar
+            let followUpCompleted = false;
+            let attempts = 0;
+            const maxAttempts = 60; // 60 segundos
+            
+            while (!followUpCompleted && attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              const followUpRunCheck = this.runs.get(followUpRunId);
+              if (followUpRunCheck?.status === 'completed' || followUpRunCheck?.status === 'failed') {
+                followUpCompleted = true;
+              }
+              attempts++;
+            }
+            
+            // Obtém a resposta final do follow-up
+            const followUpMessages = await this.threads.messages.list(threadId, { order: 'asc' });
+            const finalMessage = followUpMessages.data[followUpMessages.data.length - 1];
+            if (finalMessage && finalMessage.role === 'assistant') {
+              responseText = finalMessage.content[0].text.value;
+              
+              // Atualiza tokens com os do follow-up também
+              const followUpRunFinal = this.runs.get(followUpRunId);
+              if (followUpRunFinal?.usage) {
+                run.usage = {
+                  prompt_tokens: (run.usage?.prompt_tokens || 0) + (followUpRunFinal.usage.prompt_tokens || 0),
+                  completion_tokens: (run.usage?.completion_tokens || 0) + (followUpRunFinal.usage.completion_tokens || 0),
+                  total_tokens: (run.usage?.total_tokens || 0) + (followUpRunFinal.usage.total_tokens || 0),
+                };
+              }
+            }
+            
+            console.log(`✅ [SDK] Funções executadas e resposta final recebida`);
+          }
+        }
+      }
+
       // Cria mensagem do assistente
       const assistantMessage: Message = {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -215,13 +346,23 @@ export class Runs {
         },
       };
 
-      // Adiciona mensagem à thread
-      this.threads.addThreadMessage(threadId, assistantMessage);
+      // Adiciona mensagem à thread (agora é async)
+      await this.threads.addThreadMessage(threadId, assistantMessage);
+
+      // Normaliza tokens e adiciona ao run
+      if (response.tokens) {
+        run.usage = normalizeTokens(response);
+      }
 
       // Atualiza run para completed
       run.status = 'completed';
       run.completed_at = Math.floor(Date.now() / 1000);
       this.runs.set(runId, run);
+      
+      // Salva no storage se disponível
+      if (this.storage) {
+        await this.storage.saveRun(threadId, run);
+      }
     } catch (error: any) {
       run.status = 'failed';
       run.last_error = {
@@ -230,6 +371,12 @@ export class Runs {
       };
       run.failed_at = Math.floor(Date.now() / 1000);
       this.runs.set(runId, run);
+      
+      // Salva no storage se disponível
+      if (this.storage) {
+        await this.storage.saveRun(threadId, run);
+      }
+      
       throw error;
     }
   }

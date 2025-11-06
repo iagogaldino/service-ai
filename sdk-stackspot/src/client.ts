@@ -6,8 +6,19 @@
 
 import { StackSpotConfig, TokenResponse } from './types';
 
+interface InternalConfig {
+  clientId: string;
+  clientSecret: string;
+  realm: string;
+  baseURL: string;
+  inferenceBaseURL: string;
+  timeout: number;
+  toolExecutor?: StackSpotConfig['toolExecutor'];
+  enableFunctionCalling?: boolean;
+}
+
 export class StackSpotClient {
-  private config: Required<StackSpotConfig>;
+  private config: InternalConfig;
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
 
@@ -19,6 +30,8 @@ export class StackSpotClient {
       baseURL: config.baseURL || 'https://idm.stackspot.com',
       inferenceBaseURL: config.inferenceBaseURL || 'https://genai-inference-app.stackspot.com',
       timeout: config.timeout || 30000,
+      toolExecutor: config.toolExecutor,
+      enableFunctionCalling: config.enableFunctionCalling,
     };
 
     if (!this.config.clientId || !this.config.clientSecret) {
