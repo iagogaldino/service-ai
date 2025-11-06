@@ -832,11 +832,14 @@
             }
             
             // Tenta restaurar thread anterior do localStorage
-            const savedThreadId = localStorage.getItem('delsucia_threadId');
-            if (savedThreadId) {
-                console.log('Tentando restaurar thread:', savedThreadId);
-                socket.emit('restore_thread', { threadId: savedThreadId });
-            }
+            // Usa um pequeno delay para garantir que o servidor está pronto
+            setTimeout(() => {
+                const savedThreadId = localStorage.getItem('delsucia_threadId');
+                if (savedThreadId) {
+                    console.log('Tentando restaurar thread:', savedThreadId);
+                    socket.emit('restore_thread', { threadId: savedThreadId });
+                }
+            }, 10);
         });
 
         socket.on('disconnect', () => {
@@ -1014,24 +1017,45 @@
 
         // Carrega conversa salva quando conectar
         socket.on('load_conversation', (data) => {
+            console.log('📚 Evento load_conversation recebido:', data);
             const chatContainer = document.getElementById('chat');
-            if (!chatContainer || !data.messages || data.messages.length === 0) return;
+            if (!chatContainer) {
+                console.error('❌ chatContainer não encontrado');
+                return;
+            }
+            
+            if (!data || !data.messages) {
+                console.log('⚠️ Nenhuma mensagem recebida ou dados inválidos');
+                return;
+            }
+            
+            if (data.messages.length === 0) {
+                console.log('⚠️ Array de mensagens vazio');
+                return;
+            }
 
+            console.log(`📚 Carregando ${data.messages.length} mensagem(ns) salva(s)...`);
+            
             // Limpa o chat antes de carregar
             chatContainer.innerHTML = '';
 
             // Carrega cada mensagem salva
-            data.messages.forEach(msg => {
+            data.messages.forEach((msg, index) => {
                 if (msg.role === 'user') {
                     addMessage('Você', msg.content, 'user');
                 } else if (msg.role === 'assistant') {
                     const senderLabel = msg.agentName ? `IA (${msg.agentName})` : 'IA';
                     addMessage(senderLabel, msg.content, 'bot');
                 }
+                console.log(`✅ Mensagem ${index + 1}/${data.messages.length} carregada: ${msg.role}`);
             });
 
             // Scroll para o final
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            setTimeout(() => {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }, 100);
+            
+            console.log('✅ Todas as mensagens foram carregadas');
         });
 
         // Handler quando conversa é limpa
