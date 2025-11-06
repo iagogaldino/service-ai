@@ -76,30 +76,47 @@ interface ConnectionInfo {
 const connectionsMap = new Map<string, ConnectionInfo>();
 const monitoringSockets = new Map<string, string>(); // Map: monitorSocketId -> targetSocketId
 
+// Armazena tokens acumulados por thread (para mostrar total acumulado)
+const threadTokensMap = new Map<string, TokenUsage>();
+
 // ============================================================================
 // FUNÇÕES AUXILIARES
 // ============================================================================
 
 /**
+ * Interface para informações de uso de tokens
+ */
+interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/**
  * Aguarda a conclusão de um run do Assistants API e processa as ações necessárias
  * 
  * Esta função monitora o status de um run, executa tools quando necessário,
- * e retorna a resposta final do assistente. Envia eventos em tempo real
- * para o cliente através do Socket.IO.
+ * e retorna a resposta final do assistente com informações de uso de tokens.
+ * Envia eventos em tempo real para o cliente através do Socket.IO.
  * 
  * @param {string} threadId - ID da thread do Assistants API
  * @param {string} runId - ID do run que está sendo executado
  * @param {Socket} socket - Socket.IO para emitir eventos em tempo real
- * @returns {Promise<string>} Resposta final do assistente
+ * @returns {Promise<{message: string, tokenUsage: TokenUsage}>} Resposta final e uso de tokens
  * @throws {Error} Se o run falhar ou ocorrer algum erro
  */
 async function waitForRunCompletion(
   threadId: string,
   runId: string,
   socket: Socket
-): Promise<string> {
+): Promise<{ message: string; tokenUsage: TokenUsage }> {
   let iterationCount = 0;
   const MAX_ITERATIONS = 100; // Previne loops infinitos
+  
+  // Acumula tokens de todas as iterações
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+  let totalTokens = 0;
   
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
@@ -108,6 +125,48 @@ async function waitForRunCompletion(
 
     const run = await openai.beta.threads.runs.retrieve(threadId, runId);
     console.log(`📊 Status do run: ${run.status}`);
+
+    // Captura uso de tokens se disponível
+    if (run.usage) {
+      const runPromptTokens = run.usage.prompt_tokens || 0;
+      const runCompletionTokens = run.usage.completion_tokens || 0;
+      const runTotalTokens = run.usage.total_tokens || 0;
+      
+      totalPromptTokens += runPromptTokens;
+      totalCompletionTokens += runCompletionTokens;
+      totalTokens += runTotalTokens;
+      
+      console.log(`💰 Tokens utilizados neste run: ${runTotalTokens} (prompt: ${runPromptTokens}, completion: ${runCompletionTokens})`);
+      
+      // Atualiza tokens acumulados da thread
+      const threadTokens = threadTokensMap.get(threadId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      threadTokens.promptTokens += runPromptTokens;
+      threadTokens.completionTokens += runCompletionTokens;
+      threadTokens.totalTokens += runTotalTokens;
+      threadTokensMap.set(threadId, threadTokens);
+      
+      // Emite tokens desta mensagem/run para o cliente
+      const tokenUsageData = {
+        type: 'token_usage',
+        runId: run.id,
+        tokens: {
+          promptTokens: runPromptTokens,
+          completionTokens: runCompletionTokens,
+          totalTokens: runTotalTokens
+        },
+        accumulated: {
+          promptTokens: threadTokens.promptTokens,
+          completionTokens: threadTokens.completionTokens,
+          totalTokens: threadTokens.totalTokens
+        },
+        details: {
+          threadId,
+          timestamp: new Date().toISOString()
+        }
+      };
+      socket.emit('token_usage', tokenUsageData);
+      emitToMonitors(socket.id, 'token_usage', tokenUsageData);
+    }
 
     // Caso 1: Run completado com sucesso
     if (run.status === 'completed') {
@@ -122,10 +181,14 @@ async function waitForRunCompletion(
         if (message.role === 'assistant' && message.content.length > 0) {
           const content = message.content[0];
           if (content.type === 'text' && 'text' in content) {
+            // Obtém tokens acumulados da thread para incluir na mensagem
+            const threadTokens = threadTokensMap.get(threadId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+            
             const messageData = {
               type: 'assistant',
               message: content.text.value,
               messageId: message.id,
+              tokenUsage: threadTokens, // Inclui tokens acumulados na mensagem
               details: {
                 threadId,
                 role: 'assistant',
@@ -139,7 +202,7 @@ async function waitForRunCompletion(
         }
       }
 
-      // Retorna a última mensagem do assistente
+      // Retorna a última mensagem do assistente com informações de tokens
       const lastMessage = messages.data[messages.data.length - 1];
       if (
         lastMessage.content[0].type === 'text' &&
@@ -147,9 +210,25 @@ async function waitForRunCompletion(
       ) {
         const responseText = lastMessage.content[0].text.value;
         console.log(`📨 Mensagem recuperada da thread (${responseText.length} caracteres)`);
-        return responseText;
+        console.log(`💰 Total de tokens utilizados: ${totalTokens} (prompt: ${totalPromptTokens}, completion: ${totalCompletionTokens})`);
+        
+        return {
+          message: responseText,
+          tokenUsage: {
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+            totalTokens: totalTokens
+          }
+        };
       }
-      return 'Resposta não disponível.';
+      return {
+        message: 'Resposta não disponível.',
+        tokenUsage: {
+          promptTokens: totalPromptTokens,
+          completionTokens: totalCompletionTokens,
+          totalTokens: totalTokens
+        }
+      };
     }
 
     // Caso 2: Run falhou
@@ -564,20 +643,37 @@ io.on('connection', async (socket: Socket) => {
         console.log(`✅ Run criado: ${run.id} (Status: ${run.status})`);
 
         // Aguarda a conclusão do run e processa ações necessárias
-        const responseMessage = await waitForRunCompletion(threadId, run.id, socket);
+        const { message: responseMessage, tokenUsage } = await waitForRunCompletion(threadId, run.id, socket);
 
         console.log(`✅ Run concluído com sucesso`);
 
-        // Envia resposta final de volta para o cliente
+        // Obtém tokens acumulados totais da thread (todas as mensagens)
+        const threadTokens = threadTokensMap.get(threadId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+        // Envia resposta final de volta para o cliente com informações de tokens
         const responseData = {
           message: responseMessage,
           originalMessage: data.message,
-          agentName: config.name
+          agentName: config.name,
+          tokenUsage: {
+            // Tokens desta mensagem específica
+            promptTokens: tokenUsage.promptTokens,
+            completionTokens: tokenUsage.completionTokens,
+            totalTokens: tokenUsage.totalTokens
+          },
+          accumulatedTokenUsage: {
+            // Total acumulado de todas as mensagens na thread
+            promptTokens: threadTokens.promptTokens,
+            completionTokens: threadTokens.completionTokens,
+            totalTokens: threadTokens.totalTokens
+          }
         };
         socket.emit('response', responseData);
         emitToMonitors(socket.id, 'response', responseData);
 
         console.log(`Resposta enviada pelo agente "${config.name}":`, responseMessage);
+        console.log(`💰 Tokens desta mensagem: ${tokenUsage.totalTokens} (prompt: ${tokenUsage.promptTokens}, completion: ${tokenUsage.completionTokens})`);
+        console.log(`💰 Total acumulado na thread: ${threadTokens.totalTokens} (prompt: ${threadTokens.promptTokens}, completion: ${threadTokens.completionTokens})`);
       } catch (error: any) {
         console.error('Erro ao processar mensagem:', error);
         socket.emit('error', {
@@ -623,6 +719,8 @@ io.on('connection', async (socket: Socket) => {
       const threadId = threadMap.get(socket.id);
       if (threadId) {
         threadMap.delete(socket.id);
+        // Limpa tokens acumulados da thread
+        threadTokensMap.delete(threadId);
         // Opcionalmente, você pode deletar a thread aqui
         // await openai.beta.threads.del(threadId);
         console.log('Thread removida para socket:', socket.id);

@@ -287,7 +287,36 @@
             removeLoading();
             removeAgentActions();
             const senderLabel = data.agentName ? `IA (${data.agentName})` : 'IA';
+            
+            // Adiciona mensagem principal
             addMessage(senderLabel, data.message, 'bot');
+            
+            // Adiciona informações de tokens de forma compacta se disponíveis
+            if (data.tokenUsage || data.accumulatedTokenUsage) {
+                const tokenDiv = document.createElement('div');
+                tokenDiv.className = 'message';
+                tokenDiv.style.background = 'rgba(40, 167, 69, 0.05)';
+                tokenDiv.style.border = '1px solid rgba(40, 167, 69, 0.2)';
+                tokenDiv.style.marginTop = '5px';
+                tokenDiv.style.padding = '6px 10px';
+                tokenDiv.style.fontSize = '0.75em';
+                
+                let tokenContent = '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                tokenContent += '<span>💰 Tokens:</span>';
+                
+                if (data.tokenUsage) {
+                    tokenContent += `<span style="margin-left: 10px;">Esta: ${data.tokenUsage.totalTokens}</span>`;
+                }
+                
+                if (data.accumulatedTokenUsage) {
+                    tokenContent += `<span style="margin-left: 10px; font-weight: 600; color: #28a745;">Total: ${data.accumulatedTokenUsage.totalTokens}</span>`;
+                }
+                
+                tokenContent += '</div>';
+                tokenDiv.innerHTML = tokenContent;
+                chatContainer.appendChild(tokenDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
         });
 
         // Recebe erros
@@ -312,6 +341,33 @@
         // Recebe mensagens trocadas pelos agentes
         socket.on('agent_message', (data) => {
             addAgentMessage(data);
+        });
+
+        // Recebe informações de tokens em tempo real
+        socket.on('token_usage', (data) => {
+            // Adiciona uma mensagem de token usage na interface
+            const tokenDiv = document.createElement('div');
+            tokenDiv.className = 'message token-usage';
+            tokenDiv.style.background = 'rgba(102, 126, 234, 0.05)';
+            tokenDiv.style.border = '1px solid rgba(102, 126, 234, 0.2)';
+            tokenDiv.style.fontSize = '0.75em';
+            tokenDiv.style.padding = '6px 10px';
+            tokenDiv.style.marginBottom = '5px';
+            tokenDiv.innerHTML = `
+                <div class="message-label" style="font-size: 0.85em;">💰 Tokens</div>
+                <div style="font-size: 0.85em;">
+                    Mensagem: ${data.tokens.totalTokens} | Total: ${data.accumulated.totalTokens}
+                </div>
+            `;
+            chatContainer.appendChild(tokenDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Remove após 5 segundos para não poluir a interface
+            setTimeout(() => {
+                if (tokenDiv && tokenDiv.parentNode) {
+                    tokenDiv.remove();
+                }
+            }, 5000);
         });
 
         // Recebe saída do terminal em tempo real
@@ -485,8 +541,18 @@
             } else if (data.type === 'assistant') {
                 icon = '🤖';
                 title = 'Resposta do Agente';
+                
+                // Adiciona informações de tokens se disponíveis (compacto)
+                let tokenInfo = '';
+                if (data.tokenUsage) {
+                    tokenInfo = `<div style="margin-top: 5px; padding: 4px 6px; background: rgba(40, 167, 69, 0.08); border-radius: 3px; font-size: 0.7em; color: #666;">
+                        💰 ${data.tokenUsage.totalTokens} tokens
+                    </div>`;
+                }
+                
                 content = `<div style="font-weight: 600; margin-bottom: 5px;">💬 Resposta:</div>
-                    <div style="background: rgba(102, 126, 234, 0.1); padding: 8px; border-radius: 5px; margin-bottom: 5px; white-space: pre-wrap;">${escapeHtml(data.message)}</div>`;
+                    <div style="background: rgba(102, 126, 234, 0.1); padding: 8px; border-radius: 5px; margin-bottom: 5px; white-space: pre-wrap;">${escapeHtml(data.message)}</div>
+                    ${tokenInfo}`;
             } else if (data.type === 'function_calls') {
                 icon = '🔧';
                 title = 'Funções que o Agente quer Executar';

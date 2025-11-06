@@ -168,6 +168,11 @@ export async function selectAgent(
  * 
  * OTIMIZADA: Usa caches pré-construídos para evitar ordenação e busca repetidas
  * 
+ * LÓGICA DE SELEÇÃO:
+ * 1. Ignora Main Selector se houver outros agentes que correspondem
+ * 2. Prioriza agentes especializados (orquestradores, agentes) sobre Main Selector
+ * 3. Só usa Main Selector se nenhum outro agente corresponder
+ * 
  * @param {string} message - Mensagem do usuário
  * @returns {AgentConfig} Configuração do agente selecionado
  */
@@ -195,8 +200,23 @@ export function selectAgentSync(message: string): AgentConfig {
   // Usa cache de agentes ordenados (evita ordenação a cada chamada)
   const sortedAgents = sortedAgentsCache || agentsConfig;
 
-  // Procura o primeiro agente que corresponde à mensagem
+  // Primeiro, procura por agentes que correspondem (ignorando Main Selector)
+  // Main Selector deve ser usado apenas como último recurso
+  let mainSelector: AgentConfig | null = null;
+  const otherAgents: AgentConfig[] = [];
+
+  // Separa Main Selector dos outros agentes
   for (const agent of sortedAgents) {
+    const agentAny = agent as any;
+    if (agentAny.role === 'mainSelector') {
+      mainSelector = agent;
+    } else {
+      otherAgents.push(agent);
+    }
+  }
+
+  // Procura primeiro em outros agentes (orquestradores, agentes especializados)
+  for (const agent of otherAgents) {
     // Pula Code Analyzer se já foi verificado acima
     if (hasCreateKeyword && agent.name === 'Code Analyzer') {
       continue;
@@ -207,11 +227,37 @@ export function selectAgentSync(message: string): AgentConfig {
     }
   }
 
-  // Usa cache do agente padrão
+  // Se nenhum agente especializado correspondeu, verifica se há palavras-chave
+  // que indicam que deveria ir para um grupo específico
+  const hasFileKeywords = ['arquivo', 'file', 'código', 'code', 'ler', 'read', 'verificar', 'verifique', '.env'].some(
+    keyword => lowerMessage.includes(keyword)
+  );
+  const hasDbKeywords = ['banco', 'database', 'db', 'sql', 'query', 'tabela', 'table'].some(
+    keyword => lowerMessage.includes(keyword)
+  );
+
+  // Se há palavras-chave específicas mas nenhum agente correspondeu,
+  // tenta encontrar um orquestrador ou agente do grupo apropriado diretamente
+  if (hasFileKeywords || hasDbKeywords) {
+    for (const agent of otherAgents) {
+      const agentAny = agent as any;
+      // Se for orquestrador ou agente de grupo, tenta usar mesmo sem shouldUse perfeito
+      if ((agentAny.role === 'orchestrator' || agentAny.role === 'agent') && agent.shouldUse(message)) {
+        return agent;
+      }
+    }
+  }
+
+  // Usa cache do agente padrão (fallback)
   if (generalAssistantCache) {
     return generalAssistantCache;
   }
 
-  // Fallback: retorna o último agente ordenado (menor prioridade = padrão)
+  // Último recurso: Main Selector (só se realmente não houver nada melhor)
+  if (mainSelector) {
+    return mainSelector;
+  }
+
+  // Fallback final: retorna o último agente ordenado (menor prioridade = padrão)
   return sortedAgents[sortedAgents.length - 1];
 }

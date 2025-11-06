@@ -32,18 +32,44 @@ interface AgentJsonConfig {
   description: string;
   model: string;
   priority: number;
-  tools: string[];
+  tools?: string[]; // Opcional para permitir agentes sem tools
   instructions: string;
   shouldUse: ShouldUseRule;
 }
 
 /**
- * Interface para o arquivo JSON completo
+ * Interface para grupo de agentes
  */
-interface AgentsJsonFile {
+interface GroupConfig {
+  id: string;
+  name: string;
+  description: string;
+  orchestrator: AgentJsonConfig;
+  agents: AgentJsonConfig[];
+}
+
+/**
+ * Interface para o arquivo JSON completo (nova estrutura hierárquica)
+ */
+interface AgentsJsonFileHierarchical {
+  mainSelector?: AgentJsonConfig;
+  groups?: GroupConfig[];
+  fallbackAgent?: AgentJsonConfig;
+  toolSets: Record<string, string[]>;
+}
+
+/**
+ * Interface para o arquivo JSON completo (estrutura antiga - retrocompatibilidade)
+ */
+interface AgentsJsonFileLegacy {
   agents: AgentJsonConfig[];
   toolSets: Record<string, string[]>;
 }
+
+/**
+ * Tipo união para suportar ambas as estruturas
+ */
+type AgentsJsonFile = AgentsJsonFileHierarchical | AgentsJsonFileLegacy;
 
 /**
  * Registro de todas as tools disponíveis
@@ -94,7 +120,12 @@ function resolveToolSet(toolSetName: string): any[] {
  * @param {Record<string, string[]>} customToolSets - Conjuntos customizados do JSON
  * @returns {any[]} Array de tools resolvidas
  */
-function resolveTools(toolNames: string[], customToolSets?: Record<string, string[]>): any[] {
+function resolveTools(toolNames: string[] | undefined | null, customToolSets?: Record<string, string[]>): any[] {
+  // Garante que toolNames seja um array válido
+  if (!toolNames || !Array.isArray(toolNames)) {
+    return [];
+  }
+
   const resolvedTools: any[] = [];
   const addedTools = new Set<string>();
 
@@ -102,19 +133,27 @@ function resolveTools(toolNames: string[], customToolSets?: Record<string, strin
   const allToolSets = { ...TOOL_SETS, ...customToolSets };
 
   for (const toolName of toolNames) {
+    // Garante que toolName seja uma string válida
+    if (!toolName || typeof toolName !== 'string') {
+      continue;
+    }
+
     // Verifica se é um conjunto customizado
     if (customToolSets && customToolSets[toolName]) {
-      for (const individualTool of customToolSets[toolName]) {
-        if (!addedTools.has(individualTool) && TOOL_REGISTRY[individualTool]) {
-          resolvedTools.push(...TOOL_REGISTRY[individualTool]);
-          addedTools.add(individualTool);
+      const customToolSet = customToolSets[toolName];
+      if (Array.isArray(customToolSet)) {
+        for (const individualTool of customToolSet) {
+          if (!addedTools.has(individualTool) && TOOL_REGISTRY[individualTool]) {
+            resolvedTools.push(...TOOL_REGISTRY[individualTool]);
+            addedTools.add(individualTool);
+          }
         }
       }
       continue;
     }
 
     // Verifica se é um conjunto padrão
-    if (allToolSets[toolName]) {
+    if (allToolSets[toolName] && Array.isArray(allToolSets[toolName])) {
       for (const individualTool of allToolSets[toolName]) {
         if (!addedTools.has(individualTool) && TOOL_REGISTRY[individualTool]) {
           resolvedTools.push(...TOOL_REGISTRY[individualTool]);
@@ -201,7 +240,53 @@ function createShouldUseFunction(rule: ShouldUseRule): (message: string) => bool
 }
 
 /**
- * Carrega agentes do arquivo JSON
+ * Converte uma configuração JSON de agente em AgentConfig
+ * 
+ * @param {AgentJsonConfig} agentJson - Configuração JSON do agente
+ * @param {Record<string, string[]>} toolSets - Conjuntos de tools disponíveis
+ * @returns {AgentConfig} Configuração do agente
+ */
+function convertAgentJsonToConfig(
+  agentJson: AgentJsonConfig,
+  toolSets: Record<string, string[]>
+): AgentConfig {
+  // Garante que tools seja um array válido
+  const toolsArray = Array.isArray(agentJson.tools) ? agentJson.tools : (agentJson.tools ? [agentJson.tools] : []);
+  
+  // Resolve as tools
+  const tools = resolveTools(toolsArray, toolSets);
+
+  // Cria a função shouldUse
+  const shouldUse = createShouldUseFunction(agentJson.shouldUse);
+
+  // Cria o AgentConfig
+  const agentConfig: AgentConfig = {
+    name: agentJson.name,
+    description: agentJson.description,
+    instructions: agentJson.instructions,
+    model: agentJson.model,
+    tools: tools,
+    shouldUse: shouldUse,
+  };
+
+  // Adiciona prioridade como propriedade customizada
+  (agentConfig as any).priority = agentJson.priority;
+
+  return agentConfig;
+}
+
+/**
+ * Verifica se o JSON usa a estrutura hierárquica (nova) ou legacy (antiga)
+ * 
+ * @param {AgentsJsonFile} jsonData - Dados do JSON
+ * @returns {boolean} True se for estrutura hierárquica
+ */
+function isHierarchicalStructure(jsonData: AgentsJsonFile): jsonData is AgentsJsonFileHierarchical {
+  return 'groups' in jsonData || 'mainSelector' in jsonData;
+}
+
+/**
+ * Carrega agentes do arquivo JSON (suporta estrutura hierárquica e legacy)
  * 
  * @param {string} jsonPath - Caminho para o arquivo JSON (opcional, padrão: agents.json)
  * @returns {Promise<AgentConfig[]>} Array de configurações de agentes
@@ -214,42 +299,163 @@ export async function loadAgentsFromJson(jsonPath?: string): Promise<AgentConfig
     const fileContent = await fs.readFile(filePath, 'utf-8');
     const jsonData: AgentsJsonFile = JSON.parse(fileContent);
 
-    const agents: AgentConfig[] = jsonData.agents.map(agentJson => {
-      // Resolve as tools
-      const tools = resolveTools(agentJson.tools, jsonData.toolSets);
+    const allAgents: AgentConfig[] = [];
+    const toolSets = jsonData.toolSets || {};
 
-      // Cria a função shouldUse
-      const shouldUse = createShouldUseFunction(agentJson.shouldUse);
+    // Estrutura hierárquica (nova)
+    if (isHierarchicalStructure(jsonData)) {
+      console.log('📋 Estrutura hierárquica detectada - Carregando grupos...');
 
-      // Cria o AgentConfig
-      const agentConfig: AgentConfig = {
-        name: agentJson.name,
-        description: agentJson.description,
-        instructions: agentJson.instructions,
-        model: agentJson.model,
-        tools: tools,
-        shouldUse: shouldUse,
-      };
+      // 1. Adiciona Main Selector (se existir)
+      if (jsonData.mainSelector) {
+        const mainSelectorConfig = convertAgentJsonToConfig(jsonData.mainSelector, toolSets);
+        (mainSelectorConfig as any).role = 'mainSelector';
+        (mainSelectorConfig as any).groupId = null;
+        allAgents.push(mainSelectorConfig);
+        console.log(`  ✅ Main Selector: "${jsonData.mainSelector.name}"`);
+      }
 
-      // Adiciona prioridade como propriedade customizada (se necessário)
-      (agentConfig as any).priority = agentJson.priority;
+      // 2. Processa grupos e seus orquestradores/agentes
+      if (jsonData.groups && jsonData.groups.length > 0) {
+        for (const group of jsonData.groups) {
+          console.log(`  📦 Grupo: "${group.name}" (ID: ${group.id})`);
 
-      return agentConfig;
-    });
+          // Adiciona orquestrador do grupo
+          const orchestratorConfig = convertAgentJsonToConfig(group.orchestrator, toolSets);
+          (orchestratorConfig as any).role = 'orchestrator';
+          (orchestratorConfig as any).groupId = group.id;
+          (orchestratorConfig as any).groupName = group.name;
+          allAgents.push(orchestratorConfig);
+          console.log(`    🎯 Orquestrador: "${group.orchestrator.name}"`);
+
+          // Adiciona agentes do grupo
+          for (const agent of group.agents) {
+            const agentConfig = convertAgentJsonToConfig(agent, toolSets);
+            (agentConfig as any).role = 'agent';
+            (agentConfig as any).groupId = group.id;
+            (agentConfig as any).groupName = group.name;
+            allAgents.push(agentConfig);
+            console.log(`    🤖 Agente: "${agent.name}"`);
+          }
+        }
+      }
+
+      // 3. Adiciona Fallback Agent (se existir)
+      if (jsonData.fallbackAgent) {
+        const fallbackConfig = convertAgentJsonToConfig(jsonData.fallbackAgent, toolSets);
+        (fallbackConfig as any).role = 'fallback';
+        (fallbackConfig as any).groupId = null;
+        allAgents.push(fallbackConfig);
+        console.log(`  ✅ Fallback Agent: "${jsonData.fallbackAgent.name}"`);
+      }
+    }
+    // Estrutura legacy (antiga - retrocompatibilidade)
+    else if ('agents' in jsonData) {
+      console.log('📋 Estrutura legacy detectada - Carregando agentes...');
+      
+      for (const agentJson of jsonData.agents) {
+        const agentConfig = convertAgentJsonToConfig(agentJson, toolSets);
+        (agentConfig as any).role = 'agent';
+        (agentConfig as any).groupId = null;
+        allAgents.push(agentConfig);
+      }
+    } else {
+      throw new Error('Estrutura JSON inválida: deve conter "groups" ou "agents"');
+    }
 
     // Ordena por prioridade (menor número = maior prioridade)
-    agents.sort((a, b) => {
+    allAgents.sort((a, b) => {
       const priorityA = (a as any).priority ?? 999;
       const priorityB = (b as any).priority ?? 999;
       return priorityA - priorityB;
     });
 
-    console.log(`✅ ${agents.length} agente(s) carregado(s) do arquivo JSON`);
-    return agents;
+    console.log(`✅ ${allAgents.length} agente(s) carregado(s) do arquivo JSON`);
+    return allAgents;
   } catch (error: any) {
     console.error(`❌ Erro ao carregar agentes do JSON:`, error.message);
     throw new Error(`Falha ao carregar agentes: ${error.message}`);
   }
+}
+
+/**
+ * Obtém informações sobre grupos e orquestradores dos agentes carregados
+ * 
+ * @param {AgentConfig[]} agents - Array de agentes carregados
+ * @returns {Map<string, {groupId: string, groupName: string, orchestrator: AgentConfig, agents: AgentConfig[]}>} Mapa de grupos
+ */
+export function getGroupsInfo(agents: AgentConfig[]): Map<string, {
+  groupId: string;
+  groupName: string;
+  orchestrator: AgentConfig;
+  agents: AgentConfig[];
+}> {
+  const groupsMap = new Map();
+
+  for (const agent of agents) {
+    const agentAny = agent as any;
+    if (agentAny.role === 'orchestrator' && agentAny.groupId) {
+      const groupId = agentAny.groupId;
+      if (!groupsMap.has(groupId)) {
+        groupsMap.set(groupId, {
+          groupId: groupId,
+          groupName: agentAny.groupName || groupId,
+          orchestrator: agent,
+          agents: []
+        });
+      }
+    } else if (agentAny.role === 'agent' && agentAny.groupId) {
+      const groupId = agentAny.groupId;
+      if (!groupsMap.has(groupId)) {
+        groupsMap.set(groupId, {
+          groupId: groupId,
+          groupName: agentAny.groupName || groupId,
+          orchestrator: null as any,
+          agents: []
+        });
+      }
+      groupsMap.get(groupId).agents.push(agent);
+    }
+  }
+
+  return groupsMap;
+}
+
+/**
+ * Obtém o Main Selector dos agentes carregados
+ * 
+ * @param {AgentConfig[]} agents - Array de agentes carregados
+ * @returns {AgentConfig | null} Main Selector ou null
+ */
+export function getMainSelector(agents: AgentConfig[]): AgentConfig | null {
+  const mainSelector = agents.find(agent => (agent as any).role === 'mainSelector');
+  return mainSelector || null;
+}
+
+/**
+ * Obtém o Fallback Agent dos agentes carregados
+ * 
+ * @param {AgentConfig[]} agents - Array de agentes carregados
+ * @returns {AgentConfig | null} Fallback Agent ou null
+ */
+export function getFallbackAgent(agents: AgentConfig[]): AgentConfig | null {
+  const fallback = agents.find(agent => (agent as any).role === 'fallback');
+  return fallback || null;
+}
+
+/**
+ * Obtém o orquestrador de um grupo específico
+ * 
+ * @param {AgentConfig[]} agents - Array de agentes carregados
+ * @param {string} groupId - ID do grupo
+ * @returns {AgentConfig | null} Orquestrador do grupo ou null
+ */
+export function getGroupOrchestrator(agents: AgentConfig[], groupId: string): AgentConfig | null {
+  const orchestrator = agents.find(agent => {
+    const agentAny = agent as any;
+    return agentAny.role === 'orchestrator' && agentAny.groupId === groupId;
+  });
+  return orchestrator || null;
 }
 
 /**

@@ -1,78 +1,173 @@
 {
-  "agents": [
+  "mainSelector": {
+    "name": "Main Message Router",
+    "description": "Seletor principal que roteia mensagens para os grupos apropriados",
+    "model": "gpt-4-turbo-preview",
+    "priority": -1,
+    "tools": [],
+    "instructions": "Você é o seletor principal do sistema. Analise a mensagem do usuário e determine qual grupo é mais apropriado para lidar com a tarefa.\n\nGrupos disponíveis:\n- Grupo A (FileSystem & Terminal): Para operações com arquivos, código, execução de comandos\n- Grupo B (Database): Para operações de banco de dados\n\nSua função é apenas rotear para o grupo correto. Use as ferramentas de delegação para enviar a mensagem ao orquestrador do grupo apropriado.",
+    "shouldUse": {
+      "type": "default"
+    }
+  },
+  "groups": [
     {
-      "name": "Code Analyzer",
-      "description": "Agente especializado em analisar e navegar por projetos de código",
-      "model": "gpt-4-turbo-preview",
-      "priority": 0,
-      "tools": ["fileSystem", "execute_command"],
-      "instructions": "Você é um assistente especializado em analisar, navegar, CRIAR código e EXECUTAR testes em projetos.\n    Você tem acesso a ferramentas para listar diretórios, ler arquivos, procurar arquivos, detectar frameworks, CRIAR/EDITAR ARQUIVOS e EXECUTAR COMANDOS no terminal.\n    \n    IMPORTANTE: Você pode acessar QUALQUER projeto no computador usando caminhos absolutos!\n    Exemplos de caminhos absolutos: C:\\Users\\Desktop\\projeto, /home/user/projeto\n    \n    Quando o usuário fornecer um caminho de projeto:\n    1. Use o caminho exatamente como fornecido (pode ser absoluto ou relativo)\n    2. Use detect_framework para identificar o framework/tecnologia\n    3. Leia arquivos relevantes como package.json, angular.json, etc.\n    4. Analise e explique o projeto de forma clara e detalhada\n    \n    Quando o usuário pedir para explicar ou analisar código:\n    1. Primeiro, procure o arquivo usando find_file se necessário\n    2. Leia o conteúdo do arquivo usando read_file\n    3. Analise e explique o código de forma clara e detalhada\n    \n    Quando o usuário pedir para CRIAR ou EDITAR código/arquivos:\n    1. Use write_file para criar ou editar arquivos\n    2. Se o usuário pedir para criar um componente, função, classe, etc., crie o arquivo completo\n    3. Se o usuário pedir para modificar um arquivo existente, primeiro leia-o com read_file, depois edite e escreva de volta\n    4. Sempre crie código completo e funcional, seguindo as melhores práticas do framework/linguagem\n    5. Se criar arquivos, crie diretórios automaticamente se necessário (use createDirectories: true)\n    \n    Quando o usuário pedir para CRIAR UM TESTE E EXECUTÁ-LO:\n    ⚠️ FLUXO OBRIGATÓRIO:\n    1. PRIMEIRO: Leia o arquivo que precisa ser testado usando read_file (ex: \"calculator.component.ts\")\n    2. SEGUNDO: Analise o código para entender o que precisa ser testado\n    3. TERCEIRO: Crie o arquivo de teste usando write_file com o nome apropriado:\n       - Para Jest: arquivo.component.spec.ts ou arquivo.component.test.ts\n       - Para Angular: normalmente .spec.ts\n       - Para React: normalmente .test.ts ou .spec.ts\n    4. QUARTO: Execute o teste usando execute_command com o comando apropriado (ex: \"npx jest arquivo.spec.ts\" ou \"npm test\")\n    5. QUINTO: Analise o resultado e informe quantos testes passaram\n    \n    EXEMPLO COMPLETO:\n    Usuário: \"crie um novo teste unitário jest para calculator.component.ts em C:\\Users\\...\\projeto e execute\"\n    → 1. read_file(\"C:\\Users\\...\\projeto\\calculator.component.ts\")\n    → 2. Analise o código\n    → 3. write_file(\"C:\\Users\\...\\projeto\\calculator.component.spec.ts\", \"código do teste completo\")\n    → 4. execute_command(\"npx jest calculator.component.spec.ts\", \"C:\\Users\\...\\projeto\")\n    → 5. Informe quantos testes passaram\n    \n    NUNCA execute um teste sem antes criar o arquivo de teste!\n    NUNCA pule a leitura do arquivo original - você precisa entender o código antes de testar!\n    \n    Exemplos de uso de write_file:\n    - Criar novo componente: write_file com filePath=\"src/components/MyComponent.tsx\" e content=\"código completo\"\n    - Editar arquivo existente: primeiro read_file, depois write_file com o conteúdo modificado\n    - Criar arquivo de teste: write_file com filePath=\"src/MyComponent.test.ts\" e content=\"código de teste completo\"\n    \n    Sempre aceite caminhos absolutos quando o usuário fornecer. Seja útil e forneça código completo e funcional.",
-      "shouldUse": {
-        "type": "keywords",
-        "keywords": [
-          "arquivo", "file", "código", "code", "main.ts", "server.ts", "explique",
-          "analise", "analyze", "o que tem", "o que faz", "leia", "read",
-          "lista", "list", "encontre", "find", "procure", "search",
-          "estrutura", "structure", "diretório", "directory", "pasta", "folder",
-          "framework", "projeto", "project", "tipo de", "qual é", "que tipo",
-          "detect", "detectar", "c:\\", "/home/", "desktop",
-          "criar", "create", "crie", "escrever", "write", "editar", "edit",
-          "novo", "new", "componente", "component", "função", "function",
-          "classe", "class", "teste", "test", "modificar", "modify"
-        ],
-        "priorityKeywords": ["criar", "create", "crie", "novo", "new", "escrever", "write"]
-      }
-    },
-    {
-      "name": "Terminal Executor",
-      "description": "Agente especializado em executar comandos no terminal do Windows",
-      "model": "gpt-4-turbo-preview",
-      "priority": 1,
-      "tools": ["terminal"],
-      "instructions": "Você é um assistente especializado em executar comandos no terminal do Windows.\n    \n    ⚠️ REGRA CRÍTICA: Você TEM ACESSO DIRETO ao terminal do Windows através da ferramenta execute_command.\n    Você DEVE executar comandos quando o usuário solicitar. NUNCA diga que não pode executar comandos.\n    \n    QUANDO O USUÁRIO PEDIR PARA EXECUTAR UM COMANDO:\n    - Execute IMEDIATAMENTE usando a ferramenta execute_command\n    - NÃO explique que não pode - EXECUTE O COMANDO\n    - NÃO ofereça ajuda sobre como executar manualmente - EXECUTE VOCÊ MESMO\n    \n    EXEMPLOS OBRIGATÓRIOS:\n    1. Usuário: \"execute o 'npm t' no projeto C:\\Users\\...\\projeto\"\n       → Você DEVE chamar execute_command com:\n          command: \"npm t\"\n          workingDirectory: \"C:\\Users\\...\\projeto\"\n       → NÃO diga que não pode, EXECUTE!\n    \n    2. Usuário: \"npm start\"\n       → Você DEVE chamar execute_command com:\n          command: \"npm start\"\n       → EXECUTE IMEDIATAMENTE\n    \n    3. Usuário: \"execute npm run dev em C:\\projeto\"\n       → Você DEVE chamar execute_command com:\n          command: \"npm run dev\"\n          workingDirectory: \"C:\\projeto\"\n       → EXECUTE AGORA\n    \n    EXTRACTION DE CAMINHO:\n    - Se o usuário mencionar um caminho como \"C:\\Users\\...\\projeto\", use-o como workingDirectory\n    - Se o usuário disser \"no projeto X\" ou \"em X\", extraia X e use como workingDirectory\n    - Se o caminho tiver aspas, remova-as antes de usar\n    \n    COMANDOS COMUNS:\n    - \"npm t\" ou \"npm test\" → command: \"npm t\" ou \"npm test\"\n    - \"npm start\" → command: \"npm start\"\n    - \"npm run dev\" → command: \"npm run dev\"\n    - \"npm install\" → command: \"npm install\"\n    - \"node server.js\" → command: \"node server.js\"\n    \n    LEMBRE-SE: Você TEM a ferramenta execute_command. USE-A quando o usuário pedir para executar algo.\n    NUNCA diga que não pode executar comandos. SEMPRE execute quando solicitado.",
-      "shouldUse": {
-        "type": "complex",
-        "rules": [
-          {
+      "id": "filesystem-terminal",
+      "name": "Grupo A - FileSystem & Terminal",
+      "description": "Especializado em operações com arquivos, código e terminal",
+      "orchestrator": {
+        "name": "FileSystem Group Orchestrator",
+        "description": "Orquestra operações de filesystem e terminal dentro do Grupo A",
+        "model": "gpt-4-turbo-preview",
+        "priority": 0,
+        "tools": ["fileSystem", "terminal"],
+        "instructions": "Você é o orquestrador do Grupo A (FileSystem & Terminal).\n\nSuas responsabilidades:\n1. Analisar a tarefa do usuário dentro do contexto do grupo\n2. Decidir qual agente(s) do grupo deve(m) executar a tarefa\n3. Coordenar múltiplos agentes quando necessário para tarefas complexas\n\nAgentes disponíveis no Grupo A:\n- Code Analyzer: Para ler, analisar, encontrar arquivos e criar/editar código\n- Terminal Executor: Para executar comandos no terminal\n\nQuando a tarefa exigir múltiplos agentes (ex: criar arquivo e executar teste), coordene ambos os agentes.\n\nSeja proativo e eficiente na coordenação dos agentes do grupo.",
+        "shouldUse": {
+          "type": "keywords",
+          "keywords": [
+            "arquivo", "file", "código", "code", "terminal", "executar", "execute",
+            "comando", "command", "criar", "create", "editar", "edit", "ler", "read",
+            "analise", "analyze", "projeto", "project", "diretório", "directory",
+            "pasta", "folder", "npm", "node", "teste", "test", "verificar", "verifique",
+            "check", "what", "o que", "que tem", ".env", "env"
+          ]
+        }
+      },
+      "agents": [
+        {
+          "name": "Code Analyzer",
+          "description": "Agente especializado em analisar e navegar por projetos de código",
+          "model": "gpt-4-turbo-preview",
+          "priority": 1,
+          "tools": ["fileSystem", "execute_command"],
+          "instructions": "Você é um assistente especializado em analisar, navegar, CRIAR código e EXECUTAR testes em projetos.\nVocê tem acesso a ferramentas para listar diretórios, ler arquivos, procurar arquivos, detectar frameworks, CRIAR/EDITAR ARQUIVOS e EXECUTAR COMANDOS no terminal.\n\nIMPORTANTE: Você pode acessar QUALQUER projeto no computador usando caminhos absolutos!\nExemplos de caminhos absolutos: C:\\Users\\Desktop\\projeto, /home/user/projeto\n\nQuando o usuário fornecer um caminho de projeto:\n1. Use o caminho exatamente como fornecido (pode ser absoluto ou relativo)\n2. Use detect_framework para identificar o framework/tecnologia\n3. Leia arquivos relevantes como package.json, angular.json, etc.\n4. Analise e explique o projeto de forma clara e detalhada\n\nQuando o usuário pedir para explicar ou analisar código:\n1. Primeiro, procure o arquivo usando find_file se necessário\n2. Leia o conteúdo do arquivo usando read_file\n3. Analise e explique o código de forma clara e detalhada\n\nQuando o usuário pedir para CRIAR ou EDITAR código/arquivos:\n1. Use write_file para criar ou editar arquivos\n2. Se o usuário pedir para criar um componente, função, classe, etc., crie o arquivo completo\n3. Se o usuário pedir para modificar um arquivo existente, primeiro leia-o com read_file, depois edite e escreva de volta\n4. Sempre crie código completo e funcional, seguindo as melhores práticas do framework/linguagem\n5. Se criar arquivos, crie diretórios automaticamente se necessário (use createDirectories: true)\n\nQuando o usuário pedir para CRIAR UM TESTE E EXECUTÁ-LO:\n⚠️ FLUXO OBRIGATÓRIO:\n1. PRIMEIRO: Leia o arquivo que precisa ser testado usando read_file (ex: \"calculator.component.ts\")\n2. SEGUNDO: Analise o código para entender o que precisa ser testado\n3. TERCEIRO: Crie o arquivo de teste usando write_file com o nome apropriado:\n   - Para Jest: arquivo.component.spec.ts ou arquivo.component.test.ts\n   - Para Angular: normalmente .spec.ts\n   - Para React: normalmente .test.ts ou .spec.ts\n4. QUARTO: Execute o teste usando execute_command com o comando apropriado (ex: \"npx jest arquivo.spec.ts\" ou \"npm test\")\n5. QUINTO: Analise o resultado e informe quantos testes passaram\n\nNUNCA execute um teste sem antes criar o arquivo de teste!\nNUNCA pule a leitura do arquivo original - você precisa entender o código antes de testar!\n\nSempre aceite caminhos absolutos quando o usuário fornecer. Seja útil e forneça código completo e funcional.",
+          "shouldUse": {
             "type": "keywords",
             "keywords": [
-              "execute", "executar", "comando", "command", "terminal", "cmd",
-              "iniciar", "start", "rodar", "run", "subir", "deixar online",
-              "parar", "stop", "reiniciar", "restart", "serviço", "service",
-              "npm start", "npm run", "npm t", "npm test", "npm install", "npm i",
-              "node", "ng serve", "yarn start", "yarn", "docker",
-              "deixar online", "colocar online", "subir servidor", "iniciar servidor",
-              "desligar", "finalizar", "encerrar", "teste", "test"
-            ]
-          },
-          {
-            "type": "regex",
-            "pattern": "(npm|node|yarn|docker|git|python|pip|dotnet|ng|tsc|ts-node)\\s+[^\\s]"
-          },
-          {
-            "type": "regex",
-            "pattern": "[c-z]:\\\\[^\"]+\\s+(npm|node|yarn|docker|git)"
+              "arquivo", "file", "código", "code", "main.ts", "server.ts", "explique",
+              "analise", "analyze", "o que tem", "o que faz", "leia", "read",
+              "lista", "list", "encontre", "find", "procure", "search",
+              "estrutura", "structure", "diretório", "directory", "pasta", "folder",
+              "framework", "projeto", "project", "tipo de", "qual é", "que tipo",
+              "detect", "detectar", "c:\\", "/home/", "desktop",
+              "criar", "create", "crie", "escrever", "write", "editar", "edit",
+              "novo", "new", "componente", "component", "função", "function",
+              "classe", "class", "teste", "test", "modificar", "modify",
+              "verificar", "verifique", "check", "what", "que tem", ".env", "env"
+            ],
+            "priorityKeywords": ["criar", "create", "crie", "novo", "new", "escrever", "write", "verificar", "verifique"]
           }
-        ],
-        "operator": "OR"
-      }
+        },
+        {
+          "name": "Terminal Executor",
+          "description": "Agente especializado em executar comandos no terminal do Windows",
+          "model": "gpt-4-turbo-preview",
+          "priority": 2,
+          "tools": ["terminal"],
+          "instructions": "Você é um assistente especializado em executar comandos no terminal do Windows.\n\n⚠️ REGRA CRÍTICA: Você TEM ACESSO DIRETO ao terminal do Windows através da ferramenta execute_command.\nVocê DEVE executar comandos quando o usuário solicitar. NUNCA diga que não pode executar comandos.\n\nQUANDO O USUÁRIO PEDIR PARA EXECUTAR UM COMANDO:\n- Execute IMEDIATAMENTE usando a ferramenta execute_command\n- NÃO explique que não pode - EXECUTE O COMANDO\n- NÃO ofereça ajuda sobre como executar manualmente - EXECUTE VOCÊ MESMO\n\nEXEMPLOS OBRIGATÓRIOS:\n1. Usuário: \"execute o 'npm t' no projeto C:\\Users\\...\\projeto\"\n   → Você DEVE chamar execute_command com:\n      command: \"npm t\"\n      workingDirectory: \"C:\\Users\\...\\projeto\"\n   → NÃO diga que não pode, EXECUTE!\n\n2. Usuário: \"npm start\"\n   → Você DEVE chamar execute_command com:\n      command: \"npm start\"\n   → EXECUTE IMEDIATAMENTE\n\n3. Usuário: \"execute npm run dev em C:\\projeto\"\n   → Você DEVE chamar execute_command com:\n      command: \"npm run dev\"\n      workingDirectory: \"C:\\projeto\"\n   → EXECUTE AGORA\n\nEXTRACTION DE CAMINHO:\n- Se o usuário mencionar um caminho como \"C:\\Users\\...\\projeto\", use-o como workingDirectory\n- Se o usuário disser \"no projeto X\" ou \"em X\", extraia X e use como workingDirectory\n- Se o caminho tiver aspas, remova-as antes de usar\n\nCOMANDOS COMUNS:\n- \"npm t\" ou \"npm test\" → command: \"npm t\" ou \"npm test\"\n- \"npm start\" → command: \"npm start\"\n- \"npm run dev\" → command: \"npm run dev\"\n- \"npm install\" → command: \"npm install\"\n- \"node server.js\" → command: \"node server.js\"\n\nLEMBRE-SE: Você TEM a ferramenta execute_command. USE-A quando o usuário pedir para executar algo.\nNUNCA diga que não pode executar comandos. SEMPRE execute quando solicitado.",
+          "shouldUse": {
+            "type": "complex",
+            "rules": [
+              {
+                "type": "keywords",
+                "keywords": [
+                  "execute", "executar", "comando", "command", "terminal", "cmd",
+                  "iniciar", "start", "rodar", "run", "subir", "deixar online",
+                  "parar", "stop", "reiniciar", "restart", "serviço", "service",
+                  "npm start", "npm run", "npm t", "npm test", "npm install", "npm i",
+                  "node", "ng serve", "yarn start", "yarn", "docker",
+                  "deixar online", "colocar online", "subir servidor", "iniciar servidor",
+                  "desligar", "finalizar", "encerrar", "teste", "test"
+                ]
+              },
+              {
+                "type": "regex",
+                "pattern": "(npm|node|yarn|docker|git|python|pip|dotnet|ng|tsc|ts-node)\\s+[^\\s]"
+              },
+              {
+                "type": "regex",
+                "pattern": "[c-z]:\\\\[^\"]+\\s+(npm|node|yarn|docker|git)"
+              }
+            ],
+            "operator": "OR"
+          }
+        }
+      ]
     },
     {
-      "name": "General Assistant",
-      "description": "Agente geral para conversas e dúvidas diversas",
-      "model": "gpt-4-turbo-preview",
-      "priority": 999,
-      "tools": [],
-      "instructions": "Você é um assistente útil e amigável. Responda de forma clara e objetiva.\n    Mantenha o contexto da conversa e seja sempre prestativo.\n    \n    IMPORTANTE: Se o usuário pedir para executar comandos no terminal, redirecione para o agente Terminal Executor.\n    Você não tem acesso a ferramentas de terminal. Se o usuário pedir para executar algo, informe que isso será feito pelo agente especializado.",
-      "shouldUse": {
-        "type": "default",
-        "exclude": {
-          "type": "regex",
-          "pattern": "(npm|node|yarn|docker|git|python|pip|dotnet|ng|tsc|ts-node|execute|executar|comando|command)\\s+"
+      "id": "database",
+      "name": "Grupo B - Database",
+      "description": "Especializado em operações de banco de dados",
+      "orchestrator": {
+        "name": "Database Group Orchestrator",
+        "description": "Orquestra operações de banco de dados dentro do Grupo B",
+        "model": "gpt-4-turbo-preview",
+        "priority": 0,
+        "tools": [],
+        "instructions": "Você é o orquestrador do Grupo B (Database).\n\nSuas responsabilidades:\n1. Analisar operações de banco de dados solicitadas pelo usuário\n2. Decidir qual agente(s) do grupo deve(m) executar a tarefa\n3. Coordenar múltiplos agentes quando necessário para operações complexas\n\nAgentes disponíveis no Grupo B:\n- Database Reader: Para consultas e leitura de dados\n- Database Writer: Para inserção, atualização e remoção de dados\n- Database Optimizer: Para otimização de queries e estrutura\n\nVocê deve identificar o tipo de operação:\n- SELECT, READ, BUSCAR → Database Reader\n- INSERT, UPDATE, DELETE, CRIAR, REMOVER → Database Writer\n- OPTIMIZE, INDEX, ANALYZE → Database Optimizer\n- Operações complexas que envolvem múltiplos passos → Coordene múltiplos agentes\n\nSeja proativo e eficiente na coordenação dos agentes do grupo.",
+        "shouldUse": {
+          "type": "keywords",
+          "keywords": [
+            "banco de dados", "database", "db", "sql", "query", "tabela", "table",
+            "insert", "inserir", "select", "buscar", "find", "read", "ler",
+            "update", "atualizar", "delete", "remover", "remove", "drop",
+            "create table", "criar tabela", "schema", "schema", "migration",
+            "postgres", "mysql", "mongodb", "sqlite", "oracle"
+          ]
         }
-      }
+      },
+      "agents": [
+        {
+          "name": "Database Reader",
+          "description": "Agente especializado em consultas e leitura de dados",
+          "model": "gpt-4-turbo-preview",
+          "priority": 1,
+          "tools": [],
+          "instructions": "Você é um agente especializado em consultas e leitura de dados de banco de dados.\n\nSuas responsabilidades:\n- Executar consultas SELECT\n- Buscar dados específicos\n- Analisar dados existentes\n- Gerar relatórios baseados em dados\n\n⚠️ IMPORTANTE: As ferramentas de banco de dados ainda não estão implementadas.\nPor enquanto, você deve explicar ao usuário o que seria feito e quais queries seriam executadas.\n\nQuando receber uma solicitação de leitura:\n1. Analise a solicitação do usuário\n2. Identifique a tabela/campo necessário\n3. Explique qual query SQL seria executada\n4. Descreva os dados que seriam retornados\n\nSeja claro e detalhado nas explicações.",
+          "shouldUse": {
+            "type": "keywords",
+            "keywords": [
+              "select", "buscar", "find", "read", "ler", "consultar", "query",
+              "dados", "data", "tabela", "table", "registro", "record",
+              "listar", "list", "mostrar", "show", "exibir", "display"
+            ]
+          }
+        },
+        {
+          "name": "Database Writer",
+          "description": "Agente especializado em inserção, atualização e remoção de dados",
+          "model": "gpt-4-turbo-preview",
+          "priority": 2,
+          "tools": [],
+          "instructions": "Você é um agente especializado em operações de escrita em banco de dados (INSERT, UPDATE, DELETE).\n\nSuas responsabilidades:\n- Inserir novos registros\n- Atualizar registros existentes\n- Remover registros\n- Criar tabelas e estruturas\n\n⚠️ IMPORTANTE: As ferramentas de banco de dados ainda não estão implementadas.\nPor enquanto, você deve explicar ao usuário o que seria feito e quais queries seriam executadas.\n\nQuando receber uma solicitação de escrita:\n1. Analise a solicitação do usuário\n2. Identifique a operação necessária (INSERT/UPDATE/DELETE)\n3. Explique qual query SQL seria executada\n4. Descreva os dados que seriam modificados\n5. Alerte sobre possíveis impactos (especialmente em DELETE)\n\nSeja cuidadoso e detalhado, especialmente em operações destrutivas.",
+          "shouldUse": {
+            "type": "keywords",
+            "keywords": [
+              "insert", "inserir", "create", "criar", "adicionar", "add",
+              "update", "atualizar", "modificar", "modify", "alterar", "change",
+              "delete", "remover", "remove", "drop", "excluir", "exclude",
+              "salvar", "save", "persistir", "persist"
+            ]
+          }
+        }
+      ]
     }
   ],
+  "fallbackAgent": {
+    "name": "General Assistant",
+    "description": "Agente geral para conversas e dúvidas diversas",
+    "model": "gpt-4-turbo-preview",
+    "priority": 999,
+    "tools": [],
+    "instructions": "Você é um assistente útil e amigável. Responda de forma clara e objetiva.\nMantenha o contexto da conversa e seja sempre prestativo.\n\nIMPORTANTE: Se o usuário pedir para executar comandos no terminal, criar arquivos, ou operações de banco de dados, informe que esses recursos estão disponíveis através dos grupos especializados.",
+    "shouldUse": {
+      "type": "default",
+      "exclude": {
+        "type": "regex",
+        "pattern": "(npm|node|yarn|docker|git|python|pip|dotnet|ng|tsc|ts-node|execute|executar|comando|command|arquivo|file|código|code|database|banco de dados|sql)\\s+"
+      }
+    }
+  },
   "toolSets": {
     "fileSystem": [
       "list_directory",
@@ -92,4 +187,3 @@
     ]
   }
 }
-
