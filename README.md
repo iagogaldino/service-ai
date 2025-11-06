@@ -24,13 +24,11 @@ Projeto Node.js com TypeScript que integra Socket.IO com a **Assistants API da O
 npm install
 ```
 
-3. Configure as variáveis de ambiente:
-   - Crie um arquivo `.env` na raiz do projeto
-   - Adicione sua API key da OpenAI:
-   ```
-   OPENAI_API_KEY=sua-api-key-aqui
-   PORT=3000
-   ```
+3. Configure a API key:
+   - Inicie o servidor: `npm run dev`
+   - Acesse `http://localhost:3000` no navegador
+   - Clique no botão "⚙️ Config" e configure sua API key da OpenAI
+   - A configuração será salva automaticamente em `config.json`
 
 ## 🎯 Como usar
 
@@ -123,15 +121,16 @@ ServiceIA/
 ├── dist/                  # Arquivos compilados (TypeScript)
 ├── package.json
 ├── tsconfig.json
-├── .env                   # Variáveis de ambiente (criar manualmente)
+├── config.json            # Configurações da aplicação (criado via frontend)
 └── README.md
 ```
 
 ## ⚙️ Configuração
 
-### Variáveis de Ambiente
-- `OPENAI_API_KEY`: Sua chave da API OpenAI (necessária para Assistants API)
-- `PORT`: Porta do servidor (padrão: 3000)
+### Configuração via Frontend
+A aplicação utiliza `config.json` para armazenar configurações. Configure através da interface web:
+- `openaiApiKey`: Sua chave da API OpenAI (necessária para Assistants API)
+- `port`: Porta do servidor (padrão: 3000)
 
 ### Assistente
 O assistente é criado automaticamente na primeira execução com:
@@ -150,7 +149,7 @@ Você pode personalizar o assistente editando a função `getOrCreateAssistant()
 
 ## 🔒 Segurança
 
-⚠️ **Importante**: Nunca commite o arquivo `.env` no repositório. Ele está no `.gitignore` por padrão.
+⚠️ **Importante**: Nunca commite o arquivo `config.json` no repositório. Ele está no `.gitignore` por padrão.
 
 ## 📄 Licença
 

@@ -1053,6 +1053,34 @@ app.post('/api/config', async (req, res) => {
       initializeAgents().catch((err: any) => {
         console.error('❌ Erro ao reinicializar agentes:', err);
       });
+      
+      // Cria threads para sockets que estavam pendentes (sem API key)
+      const currentOpenai = openai;
+      if (currentOpenai) {
+        io.sockets.sockets.forEach(async (socket) => {
+          const connInfo = connectionsMap.get(socket.id);
+          if (connInfo && connInfo.threadId === 'pending') {
+            try {
+              const thread = await currentOpenai.beta.threads.create();
+              threadMap.set(socket.id, thread.id);
+              connInfo.threadId = thread.id;
+              connectionsMap.set(socket.id, connInfo);
+              
+              // Emite mensagem de sucesso
+              socket.emit('config_saved', {
+                type: 'config_saved',
+                message: '✅ API Key configurada com sucesso!',
+                details: 'Agora você pode usar o ServiceIA normalmente.',
+                timestamp: new Date().toISOString()
+              });
+              
+              console.log(`✅ Thread criada para socket pendente ${socket.id}: ${thread.id}`);
+            } catch (error) {
+              console.error(`❌ Erro ao criar thread para socket ${socket.id}:`, error);
+            }
+          }
+        });
+      }
     }
     
     res.json({
@@ -1111,9 +1139,39 @@ io.on('connection', async (socket: Socket) => {
   try {
     // Verifica se openai está configurado
     if (!openai) {
-      socket.emit('error', {
-        message: 'API key não configurada. Por favor, configure a API key através do painel de configuração.'
+      // Emite mensagem especial para o chat quando API key não está configurada
+      socket.emit('config_required', {
+        type: 'config_required',
+        message: '⚠️ API Key não configurada',
+        details: 'Para usar o ServiceIA, você precisa configurar sua OpenAI API Key.',
+        action: 'Clique no botão "⚙️ Config" no topo da página para configurar.',
+        timestamp: new Date().toISOString()
       });
+      
+      // Salva conexão sem thread (será criada quando API key for configurada)
+      const connectionInfo: ConnectionInfo = {
+        socketId: socket.id,
+        threadId: 'pending',
+        connectedAt: new Date(),
+        lastActivity: new Date(),
+        messageCount: 0,
+        userAgent: socket.handshake.headers['user-agent'],
+        ipAddress: socket.handshake.address || socket.request.socket.remoteAddress
+      };
+      connectionsMap.set(socket.id, connectionInfo);
+      
+      // Log de conexão sem API key
+      saveLogToJson({
+        type: 'connection',
+        socketId: socket.id,
+        metadata: {
+          userAgent: connectionInfo.userAgent,
+          ipAddress: connectionInfo.ipAddress,
+          connectedAt: connectionInfo.connectedAt.toISOString(),
+          apiKeyMissing: true
+        }
+      });
+      
       return;
     }
 
@@ -1216,8 +1274,13 @@ io.on('connection', async (socket: Socket) => {
 
       // Verifica se openai está configurado
       if (!openai) {
-        socket.emit('error', {
-          message: 'API key não configurada. Por favor, configure a API key através do painel de configuração.'
+        // Emite mensagem especial para o chat
+        socket.emit('config_required', {
+          type: 'config_required',
+          message: '⚠️ API Key não configurada',
+          details: 'Para usar o ServiceIA, você precisa configurar sua OpenAI API Key.',
+          action: 'Clique no botão "⚙️ Config" no topo da página para configurar.',
+          timestamp: new Date().toISOString()
         });
         return;
       }
@@ -1493,21 +1556,55 @@ io.on('connection', async (socket: Socket) => {
   } catch (error: any) {
     console.error('Erro ao configurar conexão:', error);
     
-    // Log de erro na conexão
-    saveLogToJson({
-      type: 'error',
-      socketId: socket.id,
-      error: error.message || 'Erro desconhecido ao configurar conexão',
-      errorStack: error.stack,
-      metadata: {
-        errorName: error.name,
-        errorType: 'connection_setup'
-      }
-    });
+    // Detecta erro de autenticação (API key incorreta)
+    const isAuthError = error?.status === 401 || 
+                       error?.code === 'invalid_api_key' ||
+                       error?.message?.toLowerCase().includes('incorrect api key') ||
+                       error?.message?.toLowerCase().includes('invalid api key') ||
+                       error?.error?.type === 'invalid_request_error' ||
+                       error?.error?.code === 'invalid_api_key';
     
-    socket.emit('error', {
-      message: 'Erro ao inicializar assistente. Tente novamente.'
-    });
+    if (isAuthError) {
+      // Emite mensagem especial para o chat sobre API key incorreta
+      socket.emit('api_key_invalid', {
+        type: 'api_key_invalid',
+        message: '❌ API Key inválida ou incorreta',
+        details: 'A API Key configurada está incorreta ou inválida. Por favor, verifique sua API Key.',
+        action: 'Clique no botão "⚙️ Config" no topo da página para configurar uma API Key válida.',
+        errorMessage: error?.error?.message || error?.message || 'API key inválida',
+        timestamp: new Date().toISOString()
+      });
+      
+      // Log de erro de autenticação
+      saveLogToJson({
+        type: 'error',
+        socketId: socket.id,
+        error: error?.error?.message || error?.message || 'API key inválida',
+        errorStack: error.stack,
+        metadata: {
+          errorName: error.name || 'AuthenticationError',
+          errorType: 'api_key_invalid',
+          statusCode: error?.status || 401,
+          errorCode: error?.code || error?.error?.code || 'invalid_api_key'
+        }
+      });
+    } else {
+      // Log de erro genérico na conexão
+      saveLogToJson({
+        type: 'error',
+        socketId: socket.id,
+        error: error.message || 'Erro desconhecido ao configurar conexão',
+        errorStack: error.stack,
+        metadata: {
+          errorName: error.name,
+          errorType: 'connection_setup'
+        }
+      });
+      
+      socket.emit('error', {
+        message: 'Erro ao inicializar assistente. Tente novamente.'
+      });
+    }
   }
 });
 

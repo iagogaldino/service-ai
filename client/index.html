@@ -391,6 +391,89 @@
         });
 
         // Recebe erros
+        // Recebe notificação de que a API key precisa ser configurada
+        socket.on('config_required', (data) => {
+            const configMessage = document.createElement('div');
+            configMessage.className = 'message';
+            configMessage.style.background = '#fff3cd';
+            configMessage.style.border = '2px solid #ffc107';
+            configMessage.style.borderRadius = '10px';
+            configMessage.style.padding = '15px';
+            configMessage.style.marginBottom = '15px';
+            configMessage.innerHTML = `
+                <div class="message-label" style="color: #856404; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
+                <div style="color: #856404; margin-bottom: 10px;">
+                    ${escapeHtml(data.details)}
+                </div>
+                <div style="color: #856404; margin-bottom: 15px; font-weight: 500;">
+                    ${escapeHtml(data.action)}
+                </div>
+                <button 
+                    onclick="toggleConfigPanel()" 
+                    style="background: #ffc107; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.95em;"
+                    onmouseover="this.style.background='#e0a800';"
+                    onmouseout="this.style.background='#ffc107';"
+                >
+                    ⚙️ Configurar API Key
+                </button>
+            `;
+            chatContainer.appendChild(configMessage);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+
+        // Recebe notificação de que a API key foi configurada
+        socket.on('config_saved', (data) => {
+            const successMessage = document.createElement('div');
+            successMessage.className = 'message';
+            successMessage.style.background = '#d4edda';
+            successMessage.style.border = '2px solid #28a745';
+            successMessage.style.borderRadius = '10px';
+            successMessage.style.padding = '15px';
+            successMessage.style.marginBottom = '15px';
+            successMessage.innerHTML = `
+                <div class="message-label" style="color: #155724; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
+                <div style="color: #155724;">
+                    ${escapeHtml(data.details)}
+                </div>
+            `;
+            chatContainer.appendChild(successMessage);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+
+        // Recebe notificação de que a API key está inválida
+        socket.on('api_key_invalid', (data) => {
+            const invalidKeyMessage = document.createElement('div');
+            invalidKeyMessage.className = 'message';
+            invalidKeyMessage.style.background = '#f8d7da';
+            invalidKeyMessage.style.border = '2px solid #dc3545';
+            invalidKeyMessage.style.borderRadius = '10px';
+            invalidKeyMessage.style.padding = '15px';
+            invalidKeyMessage.style.marginBottom = '15px';
+            invalidKeyMessage.innerHTML = `
+                <div class="message-label" style="color: #721c24; font-weight: bold; margin-bottom: 10px;">${escapeHtml(data.message)}</div>
+                <div style="color: #721c24; margin-bottom: 10px;">
+                    ${escapeHtml(data.details)}
+                </div>
+                <div style="color: #721c24; margin-bottom: 15px; font-weight: 500;">
+                    ${escapeHtml(data.action)}
+                </div>
+                <div style="color: #856404; font-size: 0.85em; margin-bottom: 10px; padding: 8px; background: rgba(255, 193, 7, 0.1); border-radius: 5px;">
+                    <strong>Detalhes do erro:</strong><br>
+                    ${escapeHtml(data.errorMessage)}
+                </div>
+                <button 
+                    onclick="toggleConfigPanel()" 
+                    style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.95em;"
+                    onmouseover="this.style.background='#c82333';"
+                    onmouseout="this.style.background='#dc3545';"
+                >
+                    ⚙️ Corrigir API Key
+                </button>
+            `;
+            chatContainer.appendChild(invalidKeyMessage);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+
         socket.on('error', (data) => {
             removeLoading();
             removeAgentActions();

@@ -1,13 +1,10 @@
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
 /**
  * Configuração e carregamento de variáveis de ambiente
  * 
- * Este módulo gerencia o carregamento do arquivo .env com múltiplas
- * estratégias de fallback para garantir compatibilidade em diferentes ambientes.
- * Agora também suporta carregamento de configurações via config.json.
+ * Este módulo gerencia o carregamento de configurações via config.json.
  */
 
 /**
@@ -18,15 +15,6 @@ export interface AppConfig {
   port?: number;
   lastUpdated?: string;
 }
-
-/**
- * Caminhos possíveis para o arquivo .env
- */
-const ENV_PATHS = [
-  path.join(process.cwd(), '.env'),
-  path.resolve(__dirname, '..', '..', '.env'),
-  path.resolve(process.cwd(), '.env')
-];
 
 /**
  * Carrega configuração do arquivo config.json
@@ -69,13 +57,11 @@ export function saveConfigToJson(config: AppConfig): void {
 }
 
 /**
- * Carrega variáveis de ambiente do arquivo .env
- * Tenta múltiplos caminhos até encontrar o arquivo
+ * Carrega variáveis de ambiente do arquivo config.json
  * 
- * @returns {boolean} Retorna true se o arquivo foi carregado com sucesso
+ * @returns {boolean} Retorna true se a configuração foi carregada com sucesso
  */
 export function loadEnvironmentVariables(): boolean {
-  // Primeiro tenta carregar do config.json
   const config = loadConfigFromJson();
   if (config?.openaiApiKey) {
     process.env.OPENAI_API_KEY = config.openaiApiKey;
@@ -83,26 +69,10 @@ export function loadEnvironmentVariables(): boolean {
       process.env.PORT = config.port.toString();
     }
     console.log('✅ API Key carregada do config.json');
+    return true;
   }
 
-  // Depois tenta carregar do .env (fallback)
-  let envLoaded = false;
-  for (const envPath of ENV_PATHS) {
-    const result = dotenv.config({ path: envPath });
-    if (!result.error) {
-      console.log(`✅ Arquivo .env carregado de: ${envPath}`);
-      envLoaded = true;
-      break;
-    }
-  }
-
-  if (!envLoaded && !config?.openaiApiKey) {
-    console.warn('⚠️  Aviso: Arquivo .env não encontrado nos caminhos padrão');
-    console.warn('   Tentando carregar do diretório atual...');
-    dotenv.config(); // Tenta carregar do diretório atual
-  }
-
-  return envLoaded || !!config?.openaiApiKey;
+  return false;
 }
 
 /**
@@ -125,7 +95,7 @@ export function validateRequiredEnvVars(requiredVars: string[]): void {
     missing.forEach(varName => {
       console.error(`   - ${varName}`);
     });
-    console.error(`\nPor favor, configure a API key através do frontend ou crie um arquivo .env na raiz do projeto.`);
+    console.error(`\nPor favor, configure a API key através do frontend.`);
     // Não faz exit(1) para permitir que o usuário configure via frontend
     console.warn(`⚠️  Continuando sem API key - configure através do frontend antes de usar`);
   }
