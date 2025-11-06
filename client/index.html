@@ -148,6 +148,19 @@
             flex-shrink: 0;
             min-height: 0;
             overflow: hidden;
+            transition: width 0.3s ease, flex 0.3s ease;
+        }
+
+        /* Chat Area Expandida */
+        .chat-area.expanded {
+            width: auto;
+            flex: 1;
+            border-right: 2px solid var(--border-color);
+        }
+
+        /* Content Area - Escondida quando chat está expandido */
+        .content-area.hidden {
+            display: none;
         }
 
         .chat-area-header {
@@ -367,14 +380,17 @@
         }
 
         .message {
-            margin-bottom: 12px; /* Reduzido */
-            padding: 10px 14px; /* Reduzido */
-            border-radius: 10px; /* Reduzido */
-            max-width: 85%; /* Aumentado para compensar fonte menor */
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 85%;
             word-wrap: break-word;
             animation: messageSlide 0.3s ease-out;
             backdrop-filter: blur(10px);
-            font-size: 0.9em; /* Reduzido */
+            font-size: 0.9em;
+            display: block;
+            box-sizing: border-box;
+            width: fit-content;
         }
 
         @keyframes messageSlide {
@@ -403,12 +419,13 @@
         }
 
         .message-label {
-            font-size: 0.7em; /* Reduzido de 0.75em */
+            font-size: 0.7em;
             opacity: 0.8;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            display: block;
         }
 
         .input-container {
@@ -654,7 +671,7 @@
 <body>
     <!-- Navbar -->
     <nav class="navbar">
-        <h1>🤖 DelsucIA</h1>
+        <h1>DelsucIA</h1>
     </nav>
 
     <!-- Main Content -->
@@ -683,9 +700,14 @@
             <div class="chat-area-header">
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                     <h2 style="margin: 0;">💬 Chat</h2>
-                    <button id="clearChatBtn" onclick="clearConversation()" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.15); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; transition: all 0.3s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'" title="Limpar conversa">
-                        🗑️ Limpar
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="expandChatBtn" onclick="toggleChatExpand()" style="padding: 6px 12px; background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; transition: all 0.3s; display: flex; align-items: center; gap: 4px;" onmouseover="this.style.background='rgba(99, 102, 241, 0.25)'" onmouseout="this.style.background='rgba(99, 102, 241, 0.15)'" title="Expandir chat">
+                            <span id="expandChatIcon">⬌</span>
+                        </button>
+                        <button id="clearChatBtn" onclick="clearConversation()" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.15); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; transition: all 0.3s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'" title="Limpar conversa">
+                            🗑️ Limpar
+                        </button>
+                    </div>
                 </div>
                 <div id="status" class="status disconnected">Desconectado</div>
         </div>
@@ -1468,6 +1490,30 @@
             }
         });
 
+        // Função para expandir/colapsar o chat
+        function toggleChatExpand() {
+            const chatArea = document.querySelector('.chat-area');
+            const contentArea = document.querySelector('.content-area');
+            const expandIcon = document.getElementById('expandChatIcon');
+            
+            if (chatArea && contentArea && expandIcon) {
+                const isExpanded = chatArea.classList.contains('expanded');
+                
+                if (isExpanded) {
+                    // Colapsa o chat
+                    chatArea.classList.remove('expanded');
+                    contentArea.classList.remove('hidden');
+                    expandIcon.textContent = '⬌';
+                    expandIcon.parentElement.title = 'Expandir chat';
+                } else {
+                    // Expande o chat
+                    chatArea.classList.add('expanded');
+                    contentArea.classList.add('hidden');
+                    expandIcon.textContent = '⬍';
+                    expandIcon.parentElement.title = 'Colapsar chat';
+                }
+            }
+        }
 
         // Função para mostrar painel específico
         function showPanel(panelName) {
@@ -1475,6 +1521,22 @@
             if (monitorRefreshInterval) {
                 clearInterval(monitorRefreshInterval);
                 monitorRefreshInterval = null;
+            }
+            
+            // Colapsa o chat se estiver expandido
+            const chatArea = document.querySelector('.chat-area');
+            const contentArea = document.querySelector('.content-area');
+            const expandIcon = document.getElementById('expandChatIcon');
+            
+            if (chatArea && chatArea.classList.contains('expanded')) {
+                chatArea.classList.remove('expanded');
+                if (contentArea) {
+                    contentArea.classList.remove('hidden');
+                }
+                if (expandIcon) {
+                    expandIcon.textContent = '⬌';
+                    expandIcon.parentElement.title = 'Expandir chat';
+                }
             }
             
             // Remove active de todos os painéis
