@@ -29,6 +29,9 @@ const ALLOWED_COMMANDS_PATTERNS = [
   /^type\s+/,
   /^net\s+start/,
   /^net\s+stop/,
+  /^netstat\s+/,
+  /^findstr\s+/,
+  /^taskkill\s+/,
   /^git\s+/,
   /^docker\s+/,
   /^python\s+/,
@@ -299,6 +302,74 @@ export async function stopService(serviceName: string): Promise<string> {
   }
 }
 
+/**
+ * Mata um processo que está usando uma porta específica
+ */
+export async function killProcessOnPort(port: number): Promise<string> {
+  try {
+    // Primeiro, encontra o PID do processo que está usando a porta
+    const findCommand = `netstat -aon | findstr :${port}`;
+    const { stdout: netstatOutput } = await execAsync(findCommand);
+
+    if (!netstatOutput || netstatOutput.trim().length === 0) {
+      return `ℹ️ Nenhum processo encontrado usando a porta ${port}`;
+    }
+
+    // Extrai os PIDs do output do netstat
+    // Formato: "TCP    0.0.0.0:3300    0.0.0.0:0    LISTENING    12345"
+    // Pode ter múltiplas linhas, então extraímos todos os PIDs únicos
+    const lines = netstatOutput.trim().split('\n');
+    const pids = new Set<string>();
+    
+    for (const line of lines) {
+      // O PID é sempre o último número na linha
+      const match = line.trim().match(/\s+(\d+)\s*$/);
+      if (match) {
+        pids.add(match[1]);
+      }
+    }
+
+    if (pids.size === 0) {
+      return `❌ Não foi possível extrair o PID do processo usando a porta ${port}\nOutput: ${netstatOutput}`;
+    }
+
+    // Mata todos os processos encontrados
+    const results: string[] = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const pid of pids) {
+      try {
+        const killCommand = `taskkill /F /PID ${pid}`;
+        const { stdout: killOutput, stderr: killError } = await execAsync(killCommand);
+
+        if (killError && !killOutput.includes('SUCCESS') && !killOutput.includes('terminado')) {
+          results.push(`⚠️ Erro ao matar processo PID ${pid}: ${killError}`);
+          failCount++;
+        } else {
+          results.push(`✅ Processo PID ${pid} encerrado`);
+          successCount++;
+        }
+      } catch (error: any) {
+        results.push(`⚠️ Erro ao matar processo PID ${pid}: ${error.message}`);
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      return `✅ ${successCount} processo(s) na porta ${port} foi(ram) encerrado(s) com sucesso\n${results.join('\n')}`;
+    } else {
+      return `❌ Não foi possível encerrar os processos na porta ${port}\n${results.join('\n')}`;
+    }
+  } catch (error: any) {
+    // Se não encontrou processo, retorna mensagem amigável
+    if (error.message && (error.message.includes('findstr') || error.code === 1)) {
+      return `ℹ️ Nenhum processo encontrado usando a porta ${port}`;
+    }
+    return `❌ Erro ao matar processo na porta ${port}: ${error.message}`;
+  }
+}
+
 // Define as tools (funções) disponíveis para o assistente
 export const tools = [
   {
@@ -370,6 +441,23 @@ export const tools = [
           }
         },
         required: ['serviceName']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'kill_process_on_port',
+      description: 'Mata um processo que está usando uma porta específica. Útil para liberar portas ocupadas por serviços em desenvolvimento.',
+      parameters: {
+        type: 'object',
+        properties: {
+          port: {
+            type: 'number',
+            description: 'Número da porta do processo a ser encerrado (ex: 3300, 3000, 8080)'
+          }
+        },
+        required: ['port']
       }
     }
   }

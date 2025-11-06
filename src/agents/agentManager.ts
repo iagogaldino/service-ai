@@ -11,7 +11,7 @@ import OpenAI from 'openai';
 import { Socket } from 'socket.io';
 import { AgentConfig, selectAgent } from './config';
 import { fileSystemFunctions } from '../tools/fileSystemTools';
-import { executeCommand, checkServiceStatus, startService, stopService } from '../tools/terminalTools';
+import { executeCommand, checkServiceStatus, startService, stopService, killProcessOnPort } from '../tools/terminalTools';
 
 /**
  * Gerenciador de agentes OpenAI
@@ -186,6 +186,9 @@ export async function executeTool(
     
     case 'stop_service':
       return await stopService(args.serviceName);
+    
+    case 'kill_process_on_port':
+      return await killProcessOnPort(args.port);
     
     // ========================================================================
     // FERRAMENTA DESCONHECIDA
