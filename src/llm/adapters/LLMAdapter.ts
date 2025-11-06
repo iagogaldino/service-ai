@@ -120,4 +120,14 @@ export interface LLMAdapter {
     runId: string,
     toolOutputs: Array<{ tool_call_id: string; output: string }>
   ): Promise<LLMRun>;
+
+  /**
+   * Lista runs de uma thread
+   */
+  listRuns(threadId: string, limit?: number): Promise<LLMRun[]>;
+
+  /**
+   * Cancela um run ativo
+   */
+  cancelRun(threadId: string, runId: string): Promise<LLMRun>;
 }

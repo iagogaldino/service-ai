@@ -785,50 +785,66 @@
                     </div>
 
                     <!-- Configuração OpenAI -->
-                    <div id="openaiConfig" style="display: none;">
-                        <div style="margin-bottom: 15px;">
-                            <label class="config-label">OpenAI API Key</label>
-                            <input 
-                                type="password" 
-                                id="openaiApiKeyInput" 
-                                placeholder="sk-..." 
-                                class="config-input"
-                            >
-                            <div id="openaiApiKeyStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                    <div id="openaiConfig" style="display: block;">
+                        <div style="margin-bottom: 10px; padding: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                <strong style="color: var(--text-primary);">OpenAI</strong>
+                                <span id="openaiActiveBadge" style="font-size: 0.75em; padding: 2px 8px; background: rgba(16, 185, 129, 0.2); color: var(--success); border-radius: 4px; display: none;">ATIVO</span>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label class="config-label">OpenAI API Key</label>
+                                <input 
+                                    type="password" 
+                                    id="openaiApiKeyInput" 
+                                    placeholder="sk-..." 
+                                    class="config-input"
+                                >
+                                <div id="openaiApiKeyStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Configuração StackSpot -->
-                    <div id="stackspotConfig" style="display: none;">
-                        <div style="margin-bottom: 15px;">
-                            <label class="config-label">StackSpot Client ID</label>
-                            <input 
-                                type="text" 
-                                id="stackspotClientIdInput" 
-                                placeholder="Seu Client ID" 
-                                class="config-input"
-                            >
-                            <div id="stackspotClientIdStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                    <div id="stackspotConfig" style="display: block;">
+                        <div style="margin-bottom: 10px; padding: 10px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                <strong style="color: var(--text-primary);">StackSpot</strong>
+                                <span id="stackspotActiveBadge" style="font-size: 0.75em; padding: 2px 8px; background: rgba(16, 185, 129, 0.2); color: var(--success); border-radius: 4px; display: none;">ATIVO</span>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label class="config-label">StackSpot Client ID</label>
+                                <input 
+                                    type="text" 
+                                    id="stackspotClientIdInput" 
+                                    placeholder="Seu Client ID" 
+                                    class="config-input"
+                                >
+                                <div id="stackspotClientIdStatus" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);"></div>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label class="config-label">StackSpot Client Secret</label>
+                                <input 
+                                    type="password" 
+                                    id="stackspotClientSecretInput" 
+                                    placeholder="Seu Client Secret" 
+                                    class="config-input"
+                                >
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label class="config-label">StackSpot Realm (opcional)</label>
+                                <input 
+                                    type="text" 
+                                    id="stackspotRealmInput" 
+                                    placeholder="stackspot-freemium" 
+                                    class="config-input"
+                                    value="stackspot-freemium"
+                                >
+                            </div>
                         </div>
-                        <div style="margin-bottom: 15px;">
-                            <label class="config-label">StackSpot Client Secret</label>
-                            <input 
-                                type="password" 
-                                id="stackspotClientSecretInput" 
-                                placeholder="Seu Client Secret" 
-                                class="config-input"
-                            >
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label class="config-label">StackSpot Realm (opcional)</label>
-                            <input 
-                                type="text" 
-                                id="stackspotRealmInput" 
-                                placeholder="stackspot-freemium" 
-                                class="config-input"
-                                value="stackspot-freemium"
-                            >
-                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; font-size: 0.85em; color: var(--text-secondary);">
+                        💡 <strong>Dica:</strong> Você pode configurar ambos os providers e alternar entre eles. As credenciais serão preservadas.
                     </div>
 
                     <!-- Porta -->
@@ -845,8 +861,11 @@
                         onclick="saveConfig()" 
                         style="width: 100%; margin-top: 10px;"
                     >
-                        💾 Salvar Configuração
+                        💾 Salvar/Atualizar Configuração
                     </button>
+                    <div style="margin-top: 8px; font-size: 0.8em; color: var(--text-secondary); text-align: center;">
+                        💡 Configure ambos os providers. Apenas selecione qual usar atualmente.
+                    </div>
                     <div id="configMessage" style="margin-top: 12px; padding: 12px; border-radius: 10px; display: none; font-size: 0.9em;"></div>
                 </div>
             </div>
@@ -929,6 +948,9 @@
             totalTokens: 0
         };
 
+        // Variável para armazenar o provider atual
+        let currentLLMProvider = 'openai';
+
         // Eventos de conexão
         socket.on('connect', () => {
             statusDiv.textContent = 'Conectado';
@@ -956,7 +978,13 @@
 
         // Recebe informação sobre qual agente foi selecionado
         socket.on('agent_selected', (data) => {
-            addAgentSelection(data.agentName, data.description);
+            // Inclui o LLM provider na seleção do agente
+            let description = data.description || '';
+            if (data.llmProvider) {
+                const providerLabel = data.llmProvider.toUpperCase();
+                description += ` (LLM: ${providerLabel})`;
+            }
+            addAgentSelection(data.agentName, description);
         });
 
         // Recebe resposta do servidor
@@ -964,7 +992,12 @@
             removeLoading();
             removeAgentActions();
             setButtonLoading(false);
-            const senderLabel = data.agentName ? `IA (${data.agentName})` : 'IA';
+            // Inclui o LLM provider no label do remetente
+            let senderLabel = data.agentName ? `IA (${data.agentName})` : 'IA';
+            if (data.llmProvider) {
+                const providerLabel = data.llmProvider.toUpperCase();
+                senderLabel += ` [${providerLabel}]`;
+            }
             
             // Adiciona mensagem principal
             addMessage(senderLabel, data.message, 'bot');
@@ -1050,7 +1083,14 @@
         });
 
         // Recebe notificação de que a API key foi configurada
-        socket.on('config_saved', (data) => {
+        socket.on('config_saved', async (data) => {
+            // Recarrega tokens quando a configuração é salva (provider pode ter mudado)
+            const tokensPanel = document.getElementById('tokensPanel');
+            if (tokensPanel && tokensPanel.classList.contains('active')) {
+                await loadTokens();
+            }
+            await reloadSavedTokens();
+            
             const successMessage = document.createElement('div');
             successMessage.className = 'message';
             successMessage.style.background = 'rgba(16, 185, 129, 0.15)';
@@ -1157,7 +1197,16 @@
                 if (msg.role === 'user') {
                     addMessage('Você', msg.content, 'user');
                 } else if (msg.role === 'assistant') {
-                    const senderLabel = msg.agentName ? `IA (${msg.agentName})` : 'IA';
+                    // Inclui o LLM provider no label do remetente
+                    let senderLabel = msg.agentName ? `IA (${msg.agentName})` : 'IA';
+                    if (msg.llmProvider) {
+                        const providerLabel = msg.llmProvider.toUpperCase();
+                        senderLabel += ` [${providerLabel}]`;
+                    } else if (data.llmProvider) {
+                        // Fallback: usa o llmProvider da conversa se a mensagem não tiver
+                        const providerLabel = data.llmProvider.toUpperCase();
+                        senderLabel += ` [${providerLabel}]`;
+                    }
                     addMessage(senderLabel, msg.content, 'bot');
                 }
                 console.log(`✅ Mensagem ${index + 1}/${data.messages.length} carregada: ${msg.role}`);
@@ -1833,10 +1882,22 @@
             };
         }
         
+        // Função para obter o provider atual
+        function getCurrentProvider() {
+            const providerSelect = document.getElementById('providerSelect');
+            if (providerSelect && providerSelect.value) {
+                currentLLMProvider = providerSelect.value;
+                return currentLLMProvider;
+            }
+            // Retorna o provider salvo ou padrão
+            return currentLLMProvider || 'openai';
+        }
+
         // Função para recarregar tokens salvos e resetar thread atual
         async function reloadSavedTokens() {
             try {
-                const response = await fetch('/api/tokens');
+                const currentProvider = getCurrentProvider();
+                const response = await fetch(`/api/tokens?llmProvider=${currentProvider}`);
                 const data = await response.json();
                 
                 if (data.totalTokens) {
@@ -1900,7 +1961,8 @@
             tokensContent.innerHTML = 'Carregando tokens...';
             
             try {
-                const response = await fetch('/api/tokens');
+                const currentProvider = getCurrentProvider();
+                const response = await fetch(`/api/tokens?llmProvider=${currentProvider}`);
                 const data = await response.json();
                 
                 let html = '';
@@ -1928,8 +1990,9 @@
                         totalTokens.completionTokens
                     );
                     
+                    const providerLabel = data.filteredBy ? data.filteredBy.toUpperCase() : 'TODOS';
                     html += `<div id="tokensTotalCard" style="margin-bottom: 20px; padding: 15px; background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: var(--text-primary); border-radius: 8px; text-align: center;">
-                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens</div>
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">💰 Total de Tokens (${providerLabel})</div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px;">
                             <div>
                                 <div style="font-size: 0.9em; opacity: 0.9;">Prompt</div>
@@ -1960,11 +2023,13 @@
                     entries.forEach((entry, index) => {
                         const date = new Date(entry.timestamp);
                         const dateStr = date.toLocaleString('pt-BR');
+                        const entryProvider = entry.llmProvider ? entry.llmProvider.toUpperCase() : 'OPENAI';
                         
                         html += `<div style="margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; border-left: 4px solid var(--warning);">
                             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                                 <div>
                                     <strong style="color: var(--text-primary);">${escapeHtml(entry.agentName)}</strong>
+                                    <div style="font-size: 0.75em; color: var(--accent-primary); margin-top: 2px;">[${entryProvider}]</div>
                                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 3px;">${escapeHtml(entry.message)}</div>
                                 </div>
                                 <div style="font-size: 0.75em; color: var(--text-secondary); text-align: right;">
@@ -2076,15 +2141,17 @@
             logsContent.innerHTML = 'Carregando logs...';
             
             try {
-                const response = await fetch('/api/logs');
+                const currentProvider = getCurrentProvider();
+                const response = await fetch(`/api/logs?llmProvider=${currentProvider}`);
                 const data = await response.json();
                 
                 let html = '';
                 
                 // Estatísticas
                 if (data.statistics) {
+                    const providerLabel = data.filteredBy ? data.filteredBy.toUpperCase() : 'TODOS';
                     html += `<div style="margin-bottom: 20px; padding: 15px; background: rgba(59, 130, 246, 0.2); border: 1px solid var(--info); color: var(--text-primary); border-radius: 8px;">
-                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">📊 Estatísticas</div>
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">📊 Estatísticas (${providerLabel})</div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
                             <div style="text-align: center;">
                                 <div style="font-size: 0.9em; opacity: 0.9;">Conexões</div>
@@ -2566,8 +2633,9 @@
                 
                 // Define provider selecionado
                 if (providerSelect) {
-                    providerSelect.value = data.llmProvider || 'openai';
-                    onProviderChange(); // Atualiza visibilidade dos campos
+                    currentLLMProvider = data.llmProvider || 'openai';
+                    providerSelect.value = currentLLMProvider;
+                    onProviderChange(); // Atualiza badges e destaque visual
                 }
                 
                 // Carrega configuração OpenAI
@@ -2628,9 +2696,11 @@
             }
         }
 
-        // Atualiza visibilidade dos campos baseado no provider selecionado
+        // Atualiza indicadores de qual provider está ativo
         function onProviderChange() {
             const providerSelect = document.getElementById('providerSelect');
+            const openaiActiveBadge = document.getElementById('openaiActiveBadge');
+            const stackspotActiveBadge = document.getElementById('stackspotActiveBadge');
             const openaiConfig = document.getElementById('openaiConfig');
             const stackspotConfig = document.getElementById('stackspotConfig');
             
@@ -2638,12 +2708,44 @@
             
             const provider = providerSelect.value;
             
-            if (provider === 'openai') {
-                if (openaiConfig) openaiConfig.style.display = 'block';
-                if (stackspotConfig) stackspotConfig.style.display = 'none';
-            } else if (provider === 'stackspot') {
-                if (openaiConfig) openaiConfig.style.display = 'none';
-                if (stackspotConfig) stackspotConfig.style.display = 'block';
+            // Atualiza badges de provider ativo
+            if (openaiActiveBadge) {
+                openaiActiveBadge.style.display = provider === 'openai' ? 'inline-block' : 'none';
+            }
+            if (stackspotActiveBadge) {
+                stackspotActiveBadge.style.display = provider === 'stackspot' ? 'inline-block' : 'none';
+            }
+            
+            // Destaca visualmente o provider ativo
+            if (openaiConfig) {
+                const containerDiv = openaiConfig.querySelector('div');
+                if (containerDiv) {
+                    if (provider === 'openai') {
+                        containerDiv.style.background = 'rgba(59, 130, 246, 0.15)';
+                        containerDiv.style.border = '2px solid rgba(59, 130, 246, 0.5)';
+                    } else {
+                        containerDiv.style.background = 'rgba(59, 130, 246, 0.1)';
+                        containerDiv.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+                    }
+                }
+            }
+            if (stackspotConfig) {
+                const containerDiv = stackspotConfig.querySelector('div');
+                if (containerDiv) {
+                    if (provider === 'stackspot') {
+                        containerDiv.style.background = 'rgba(139, 92, 246, 0.15)';
+                        containerDiv.style.border = '2px solid rgba(139, 92, 246, 0.5)';
+                    } else {
+                        containerDiv.style.background = 'rgba(139, 92, 246, 0.1)';
+                        containerDiv.style.border = '1px solid rgba(139, 92, 246, 0.3)';
+                    }
+                }
+            }
+            
+            // Recarrega tokens quando o provider mudar
+            const tokensPanel = document.getElementById('tokensPanel');
+            if (tokensPanel && tokensPanel.classList.contains('active')) {
+                loadTokens();
             }
         }
 
@@ -2662,26 +2764,32 @@
             const provider = providerSelect.value;
             const port = parseInt(portInput?.value || '') || null;
             
-            // Valida credenciais baseado no provider
-            if (provider === 'openai') {
-                const apiKey = openaiApiKeyInput?.value.trim() || '';
-                if (!apiKey) {
+            // Valida credenciais apenas se estiver fornecendo novas credenciais
+            // Permite alternar o provider sem precisar fornecer credenciais novamente
+            const openaiApiKey = openaiApiKeyInput?.value.trim() || '';
+            const stackspotClientId = stackspotClientIdInput?.value.trim() || '';
+            const stackspotClientSecret = stackspotClientSecretInput?.value.trim() || '';
+            
+            // Se está configurando OpenAI e forneceu uma API key, valida
+            if (provider === 'openai' && openaiApiKey) {
+                if (!openaiApiKey.startsWith('sk-')) {
                     configMessage.style.display = 'block';
                     configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
                     configMessage.style.color = '#dc3545';
                     configMessage.style.border = '1px solid #dc3545';
-                    configMessage.textContent = 'Por favor, insira uma OpenAI API key válida';
+                    configMessage.textContent = 'OpenAI API key inválida. Deve começar com "sk-"';
                     return;
                 }
-            } else if (provider === 'stackspot') {
-                const clientId = stackspotClientIdInput?.value.trim() || '';
-                const clientSecret = stackspotClientSecretInput?.value.trim() || '';
-                if (!clientId || !clientSecret) {
+            }
+            
+            // Se está configurando StackSpot e forneceu credenciais, valida ambas
+            if (provider === 'stackspot' && (stackspotClientId || stackspotClientSecret)) {
+                if (!stackspotClientId || !stackspotClientSecret) {
                     configMessage.style.display = 'block';
                     configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
                     configMessage.style.color = '#dc3545';
                     configMessage.style.border = '1px solid #dc3545';
-                    configMessage.textContent = 'Por favor, insira Client ID e Client Secret do StackSpot';
+                    configMessage.textContent = 'Por favor, forneça tanto Client ID quanto Client Secret do StackSpot';
                     return;
                 }
             }
@@ -2693,16 +2801,19 @@
             configMessage.textContent = '⏳ Salvando configuração...';
             
             // Prepara body da requisição
+            // Envia apenas o provider selecionado e as credenciais fornecidas (se houver)
             const body = {
                 llmProvider: provider,
                 port: port
             };
             
-            if (provider === 'openai') {
-                body.openaiApiKey = openaiApiKeyInput?.value.trim() || '';
-            } else if (provider === 'stackspot') {
-                body.stackspotClientId = stackspotClientIdInput?.value.trim() || '';
-                body.stackspotClientSecret = stackspotClientSecretInput?.value.trim() || '';
+            // Adiciona credenciais apenas se foram fornecidas (não vazias)
+            if (openaiApiKey) {
+                body.openaiApiKey = openaiApiKey;
+            }
+            if (stackspotClientId && stackspotClientSecret) {
+                body.stackspotClientId = stackspotClientId;
+                body.stackspotClientSecret = stackspotClientSecret;
                 body.stackspotRealm = stackspotRealmInput?.value.trim() || 'stackspot-freemium';
             }
             
@@ -2723,14 +2834,29 @@
                     configMessage.style.border = '1px solid var(--success)';
                     configMessage.textContent = `✅ ${data.message}`;
                     
-                    // Limpa os campos por segurança
-                    if (openaiApiKeyInput) openaiApiKeyInput.value = '';
-                    if (stackspotClientIdInput) stackspotClientIdInput.value = '';
-                    if (stackspotClientSecretInput) stackspotClientSecretInput.value = '';
+                    // Limpa apenas os campos que foram enviados (por segurança)
+                    // Mantém os campos vazios para permitir novas configurações
+                    if (openaiApiKey && openaiApiKeyInput) {
+                        openaiApiKeyInput.value = '';
+                        // O placeholder será atualizado pelo loadConfig
+                    }
+                    if (stackspotClientId && stackspotClientIdInput) {
+                        stackspotClientIdInput.value = '';
+                        stackspotClientSecretInput.value = '';
+                        // O placeholder será atualizado pelo loadConfig
+                    }
                     
-                    // Recarrega status
+                    // Recarrega tokens quando a configuração é salva (provider pode ter mudado)
+                    const tokensPanel = document.getElementById('tokensPanel');
+                    if (tokensPanel && tokensPanel.classList.contains('active')) {
+                        await loadTokens();
+                    }
+                    await reloadSavedTokens();
+                    
+                    // Recarrega status para atualizar placeholders e badges
                     setTimeout(() => {
                         loadConfig();
+                        onProviderChange(); // Atualiza badges
                     }, 1000);
                 } else {
                     configMessage.style.background = 'rgba(220, 53, 69, 0.1)';

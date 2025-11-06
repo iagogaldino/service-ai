@@ -91,6 +91,27 @@ export class OpenAIAdapter implements LLMAdapter {
     role: 'user' | 'assistant' | 'system',
     content: string
   ): Promise<LLMMessage> {
+    // Verifica se há runs ativos antes de adicionar mensagem
+    const activeRuns = await this.listRuns(threadId, 10);
+    const runningRuns = activeRuns.filter(
+      run => run.status === 'queued' || run.status === 'in_progress' || run.status === 'requires_action'
+    );
+
+    // Cancela runs ativos para permitir adicionar nova mensagem
+    if (runningRuns.length > 0) {
+      console.log(`⚠️ Encontrado(s) ${runningRuns.length} run(s) ativo(s) na thread ${threadId}. Cancelando...`);
+      for (const run of runningRuns) {
+        try {
+          await this.cancelRun(threadId, run.id);
+          console.log(`✅ Run ${run.id} cancelado`);
+        } catch (error: any) {
+          console.warn(`⚠️ Erro ao cancelar run ${run.id}:`, error.message);
+        }
+      }
+      // Aguarda um pouco para garantir que o cancelamento foi processado
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
     // OpenAI não aceita 'system' em mensagens de thread, apenas 'user' e 'assistant'
     const openaiRole = role === 'system' ? 'user' : role;
     const message = await this.openai.beta.threads.messages.create(threadId, {
@@ -185,18 +206,46 @@ export class OpenAIAdapter implements LLMAdapter {
       }
 
       if (run.status === 'completed') {
-        const messages = await this.openai.beta.threads.messages.list(threadId, { limit: 10 });
-        const lastMessage = messages.data[messages.data.length - 1];
-        if (lastMessage.content[0].type === 'text' && 'text' in lastMessage.content[0]) {
-          return {
-            message: lastMessage.content[0].text.value,
-            tokenUsage: {
-              promptTokens: totalPromptTokens,
-              completionTokens: totalCompletionTokens,
-              totalTokens: totalTokens,
-            },
-          };
+        // A API da OpenAI retorna mensagens em ordem decrescente (mais recentes primeiro)
+        // Quando um run completa, a mensagem do assistente é adicionada à thread
+        // Então a primeira mensagem do assistente na lista é a resposta mais recente
+        const messages = await this.openai.beta.threads.messages.list(threadId, { limit: 20 });
+        
+        // Procura a primeira mensagem do assistente (role === 'assistant') na lista
+        // Como a lista está em ordem decrescente, a primeira mensagem do assistente é a mais recente
+        const assistantMessage = messages.data.find(msg => msg.role === 'assistant');
+        
+        if (assistantMessage) {
+          // Procura conteúdo de texto na mensagem
+          const textContent = assistantMessage.content.find((c: any) => c.type === 'text');
+          if (textContent && 'text' in textContent) {
+            return {
+              message: textContent.text.value,
+              tokenUsage: {
+                promptTokens: totalPromptTokens,
+                completionTokens: totalCompletionTokens,
+                totalTokens: totalTokens,
+              },
+            };
+          }
         }
+        
+        // Fallback: se não encontrou mensagem do assistente, tenta pegar a primeira mensagem
+        const firstMessage = messages.data[0];
+        if (firstMessage) {
+          const textContent = firstMessage.content.find((c: any) => c.type === 'text');
+          if (textContent && 'text' in textContent) {
+            return {
+              message: textContent.text.value,
+              tokenUsage: {
+                promptTokens: totalPromptTokens,
+                completionTokens: totalCompletionTokens,
+                totalTokens: totalTokens,
+              },
+            };
+          }
+        }
+        
         return {
           message: 'Resposta não disponível.',
           tokenUsage: {
@@ -247,5 +296,45 @@ export class OpenAIAdapter implements LLMAdapter {
       tool_outputs: toolOutputs,
     });
     return this.retrieveRun(threadId, runId);
+  }
+
+  async listRuns(threadId: string, limit: number = 10): Promise<LLMRun[]> {
+    const runs = await this.openai.beta.threads.runs.list(threadId, { limit });
+    return runs.data.map((run) => ({
+      id: run.id,
+      thread_id: run.thread_id,
+      assistant_id: run.assistant_id,
+      status: run.status as any,
+      created_at: run.created_at,
+      started_at: run.started_at || undefined,
+      completed_at: run.completed_at || undefined,
+      failed_at: run.failed_at || undefined,
+      last_error: run.last_error
+        ? {
+            code: run.last_error.code || 'unknown',
+            message: run.last_error.message || 'Unknown error',
+          }
+        : undefined,
+    }));
+  }
+
+  async cancelRun(threadId: string, runId: string): Promise<LLMRun> {
+    const run = await this.openai.beta.threads.runs.cancel(threadId, runId);
+    return {
+      id: run.id,
+      thread_id: run.thread_id,
+      assistant_id: run.assistant_id,
+      status: run.status as any,
+      created_at: run.created_at,
+      started_at: run.started_at || undefined,
+      completed_at: run.completed_at || undefined,
+      failed_at: run.failed_at || undefined,
+      last_error: run.last_error
+        ? {
+            code: run.last_error.code || 'unknown',
+            message: run.last_error.message || 'Unknown error',
+          }
+        : undefined,
+    };
   }
 }

@@ -101,6 +101,32 @@ export class StackSpotAdapter implements LLMAdapter {
     role: 'user' | 'assistant' | 'system',
     content: string
   ): Promise<LLMMessage> {
+    // Verifica se há runs ativos antes de adicionar mensagem
+    try {
+      const activeRuns = await this.listRuns(threadId, 10);
+      const runningRuns = activeRuns.filter(
+        run => run.status === 'queued' || run.status === 'in_progress' || run.status === 'requires_action'
+      );
+
+      // Cancela runs ativos para permitir adicionar nova mensagem
+      if (runningRuns.length > 0) {
+        console.log(`⚠️ Encontrado(s) ${runningRuns.length} run(s) ativo(s) na thread ${threadId}. Cancelando...`);
+        for (const run of runningRuns) {
+          try {
+            await this.cancelRun(threadId, run.id);
+            console.log(`✅ Run ${run.id} cancelado`);
+          } catch (error: any) {
+            console.warn(`⚠️ Erro ao cancelar run ${run.id}:`, error.message);
+          }
+        }
+        // Aguarda um pouco para garantir que o cancelamento foi processado
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    } catch (error: any) {
+      // Se não conseguir listar runs (pode não estar implementado no StackSpot), continua
+      console.warn(`⚠️ Não foi possível verificar runs ativos: ${error.message}`);
+    }
+
     const message = await this.stackspot.beta.threads.messages.create(threadId, {
       role,
       content,
@@ -212,5 +238,58 @@ export class StackSpotAdapter implements LLMAdapter {
       tool_outputs: toolOutputs,
     });
     return this.retrieveRun(threadId, runId);
+  }
+
+  async listRuns(threadId: string, limit: number = 10): Promise<LLMRun[]> {
+    try {
+      // StackSpot pode ter API diferente, tenta usar a mesma interface
+      const runs = await this.stackspot.beta.threads.runs.list(threadId, { limit });
+      return runs.data.map((run: any) => ({
+        id: run.id,
+        thread_id: run.thread_id,
+        assistant_id: run.assistant_id,
+        status: run.status as any,
+        created_at: run.created_at,
+        started_at: run.started_at || undefined,
+        completed_at: run.completed_at || undefined,
+        failed_at: run.failed_at || undefined,
+        last_error: run.last_error
+          ? {
+              code: run.last_error.code || 'unknown',
+              message: run.last_error.message || 'Unknown error',
+            }
+          : undefined,
+      }));
+    } catch (error: any) {
+      // Se não estiver implementado, retorna array vazio
+      console.warn(`⚠️ listRuns não implementado no StackSpot: ${error.message}`);
+      return [];
+    }
+  }
+
+  async cancelRun(threadId: string, runId: string): Promise<LLMRun> {
+    try {
+      const run = await this.stackspot.beta.threads.runs.cancel(threadId, runId);
+      return {
+        id: run.id,
+        thread_id: run.thread_id,
+        assistant_id: run.assistant_id,
+        status: run.status as any,
+        created_at: run.created_at,
+        started_at: run.started_at || undefined,
+        completed_at: run.completed_at || undefined,
+        failed_at: run.failed_at || undefined,
+        last_error: run.last_error
+          ? {
+              code: run.last_error.code || 'unknown',
+              message: run.last_error.message || 'Unknown error',
+            }
+          : undefined,
+      };
+    } catch (error: any) {
+      // Se não estiver implementado, retorna o run atual
+      console.warn(`⚠️ cancelRun não implementado no StackSpot: ${error.message}`);
+      return this.retrieveRun(threadId, runId);
+    }
   }
 }
