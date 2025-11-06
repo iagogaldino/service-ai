@@ -468,6 +468,24 @@
             box-shadow: none;
         }
 
+        /* Loading spinner para o botão */
+        .button-loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .loading {
             text-align: center;
             color: var(--text-secondary);
@@ -701,6 +719,20 @@
                 <div class="panel-header">
                     <h2>💰 Histórico de Tokens</h2>
                 </div>
+                <div style="margin: 15px; padding: 12px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; border-left: 4px solid var(--info);">
+                    <div style="display: flex; align-items: start; gap: 10px;">
+                        <div style="font-size: 1.2em;">ℹ️</div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">O que são Tokens?</div>
+                            <div style="font-size: 0.9em; color: var(--text-secondary); line-height: 1.5;">
+                                Tokens são unidades de texto que a IA processa. Cada palavra ou parte de palavra é convertida em tokens. 
+                                O <strong style="color: var(--text-primary);">Prompt</strong> representa os tokens enviados para a IA (sua mensagem), 
+                                enquanto o <strong style="color: var(--text-primary);">Completion</strong> representa os tokens retornados pela IA (resposta). 
+                                O custo é calculado baseado no modelo utilizado e na quantidade de tokens processados.
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div id="tokensContent" style="color: var(--text-secondary);">Carregando tokens...</div>
             </div>
 
@@ -856,6 +888,7 @@
         socket.on('response', async (data) => {
             removeLoading();
             removeAgentActions();
+            setButtonLoading(false);
             const senderLabel = data.agentName ? `IA (${data.agentName})` : 'IA';
             
             // Adiciona mensagem principal
@@ -912,6 +945,8 @@
         // Recebe erros
         // Recebe notificação de que a API key precisa ser configurada
         socket.on('config_required', (data) => {
+            removeLoading();
+            setButtonLoading(false);
             const configMessage = document.createElement('div');
             configMessage.className = 'message';
             configMessage.style.background = 'rgba(245, 158, 11, 0.15)';
@@ -961,6 +996,8 @@
 
         // Recebe notificação de que a API key está inválida
         socket.on('api_key_invalid', (data) => {
+            removeLoading();
+            setButtonLoading(false);
             const invalidKeyMessage = document.createElement('div');
             invalidKeyMessage.className = 'message';
             invalidKeyMessage.style.background = 'rgba(239, 68, 68, 0.15)';
@@ -995,6 +1032,7 @@
         socket.on('error', (data) => {
             removeLoading();
             removeAgentActions();
+            setButtonLoading(false);
             addMessage('Erro', data.message, 'bot');
         });
 
@@ -1405,16 +1443,22 @@
             if (!message) return;
 
             addMessage('Você', message, 'user');
-            addLoading();
             messageInput.value = '';
-            sendButton.disabled = true;
+            setButtonLoading(true);
 
             socket.emit('message', { message: message });
+        }
 
-            setTimeout(() => {
+        // Função para ativar loading no botão
+        function setButtonLoading(isLoading) {
+            if (isLoading) {
+                sendButton.disabled = true;
+                sendButton.innerHTML = '<span class="button-loading"></span>';
+            } else {
                 sendButton.disabled = false;
+                sendButton.innerHTML = 'Enviar';
                 messageInput.focus();
-            }, 100);
+            }
         }
 
         // Envia mensagem ao pressionar Enter

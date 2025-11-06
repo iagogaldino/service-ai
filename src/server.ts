@@ -648,27 +648,83 @@ function loadConversation(threadId: string): Conversation | null {
  * Limpa conversa de uma thread
  * 
  * @param threadId - ID da thread
+ * @param socketId - ID do socket (opcional, usado como fallback)
  */
-function clearConversation(threadId: string): void {
+function clearConversation(threadId: string, socketId?: string): void {
   try {
     const conversationsFilePath = path.join(process.cwd(), 'conversations.json');
     
     if (!fs.existsSync(conversationsFilePath)) {
+      console.log('⚠️ Arquivo conversations.json não existe, nada para limpar');
       return;
     }
 
-    const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8');
-    const conversationsData: ConversationsJsonFile = JSON.parse(fileContent);
+    const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8').trim();
     
-    // Remove a conversa da lista
-    conversationsData.conversations = conversationsData.conversations.filter(
-      conv => conv.threadId !== threadId
-    );
+    // Verifica se o arquivo está vazio
+    if (!fileContent || fileContent.length === 0) {
+      console.log('⚠️ Arquivo conversations.json está vazio, nada para limpar');
+      return;
+    }
+
+    let conversationsData: ConversationsJsonFile;
+    try {
+      conversationsData = JSON.parse(fileContent);
+    } catch (parseError) {
+      console.error('❌ Erro ao fazer parse do conversations.json:', parseError);
+      return;
+    }
+    
+    // Verifica se a estrutura está correta
+    if (!conversationsData || !Array.isArray(conversationsData.conversations)) {
+      console.log('⚠️ Estrutura do conversations.json inválida');
+      return;
+    }
+
+    // Conta quantas conversas existiam antes
+    const beforeCount = conversationsData.conversations.length;
+    
+    let removedCount = 0;
+    
+    // Remove a conversa da lista por threadId (se threadId não for vazio)
+    if (threadId) {
+      const beforeFilter = conversationsData.conversations.length;
+      conversationsData.conversations = conversationsData.conversations.filter(
+        conv => conv.threadId !== threadId
+      );
+      removedCount = beforeFilter - conversationsData.conversations.length;
+      
+      // Se não encontrou por threadId e temos socketId, tenta por socketId como fallback
+      if (removedCount === 0 && socketId) {
+        console.log(`⚠️ Conversa não encontrada por threadId ${threadId}, tentando por socketId ${socketId}`);
+        const beforeSocketFilter = conversationsData.conversations.length;
+        conversationsData.conversations = conversationsData.conversations.filter(
+          conv => conv.socketId !== socketId
+        );
+        removedCount = beforeSocketFilter - conversationsData.conversations.length;
+      }
+    } else if (socketId) {
+      // Se não temos threadId, tenta apenas por socketId
+      const beforeSocketFilter = conversationsData.conversations.length;
+      conversationsData.conversations = conversationsData.conversations.filter(
+        conv => conv.socketId !== socketId
+      );
+      removedCount = beforeSocketFilter - conversationsData.conversations.length;
+    }
+    
+    const afterCount = conversationsData.conversations.length;
+    
+    if (removedCount > 0) {
+      console.log(`✅ Removida(s) ${removedCount} conversa(s) do JSON (threadId: ${threadId || 'N/A'}, socketId: ${socketId || 'N/A'})`);
+    } else {
+      console.log(`⚠️ Nenhuma conversa encontrada para remover (threadId: ${threadId || 'N/A'}, socketId: ${socketId || 'N/A'})`);
+    }
     
     conversationsData.lastUpdated = new Date().toISOString();
 
     // Salva o arquivo
     fs.writeFileSync(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
+    console.log(`💾 Arquivo conversations.json atualizado (${afterCount} conversa(s) restante(s))`);
   } catch (error) {
     console.error('❌ Erro ao limpar conversa:', error);
   }
@@ -1745,9 +1801,14 @@ io.on('connection', async (socket: Socket) => {
 
       try {
         // Limpa a conversa antiga do JSON se existir
+        // Passa tanto threadId quanto socketId para garantir que encontre a conversa
         if (oldThreadId) {
-          clearConversation(oldThreadId);
-          console.log(`🗑️ Conversa limpa para thread ${oldThreadId}`);
+          clearConversation(oldThreadId, socket.id);
+          console.log(`🗑️ Limpando conversa para thread ${oldThreadId} e socket ${socket.id}`);
+        } else {
+          // Mesmo sem threadId, tenta limpar por socketId
+          console.log(`⚠️ Nenhum threadId encontrado no map, tentando limpar por socketId ${socket.id}`);
+          clearConversation('', socket.id);
         }
 
         // Cria uma nova thread
