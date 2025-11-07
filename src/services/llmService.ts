@@ -15,7 +15,7 @@ let llmAdapter: LLMAdapter | undefined;
  */
 export function initializeLLMAdapter(): void {
   const config = loadConfigFromJson();
-  const provider = config?.llmProvider || 'openai';
+  const provider = config?.llmProvider || 'stackspot';
 
   const validation = validateLLMCredentials(provider, config);
   if (!validation.valid) {
@@ -58,7 +58,7 @@ export function getLLMAdapter(): LLMAdapter | undefined {
 export function getCurrentLLMProvider(): LLMProvider {
   try {
     const config = loadConfigFromJson();
-    return config?.llmProvider || 'openai';
+    return config?.llmProvider || 'stackspot';
   } catch (error) {
     console.warn('⚠️ Erro ao obter LLM provider, usando padrão (openai):', error);
     return 'openai';
@@ -70,7 +70,7 @@ export function getCurrentLLMProvider(): LLMProvider {
  */
 export function updateLLMConfig(newConfig: AppConfig): { success: boolean; error?: string } {
   const validation = validateLLMCredentials(
-    newConfig.llmProvider || 'openai', 
+    newConfig.llmProvider || 'stackspot', 
     newConfig
   );
   

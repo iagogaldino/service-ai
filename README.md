@@ -450,6 +450,130 @@ socket.on('response', (data) => {
 });
 ```
 
+## 🔌 Integração a partir de outras aplicações
+
+Outros serviços podem consumir o DelsucIA como um **provider de agentes** de forma headless. Abaixo estão os passos recomendados para construir uma integração server-to-server.
+
+### 1. Habilite e configure o serviço
+- Execute `npm run dev` (ou `npm start` em produção).
+- Configure o provider ativo via `POST /api/config` (OpenAI ou StackSpot) ou pela interface web.
+- Garanta que a aplicação cliente tenha acesso de rede ao host/porta do DelsucIA.
+
+### 2. Conecte-se via Socket.IO
+Use o protocolo WebSocket para trocar mensagens com os agentes. O exemplo abaixo mostra um backend Node/TypeScript se conectando ao serviço:
+
+```typescript
+import { io, Socket } from 'socket.io-client';
+
+const socket: Socket = io('http://delsucia.internal:3000', {
+  transports: ['websocket'],
+  reconnectionAttempts: 3,
+});
+
+socket.on('connect', () => {
+  console.log('[delsucia] conectado', socket.id);
+
+  // opcional: restaura uma thread existente salva na sua aplicação
+  const savedThreadId = loadThreadIdForUser('user-123');
+  if (savedThreadId) {
+    socket.emit('restore_thread', { threadId: savedThreadId });
+  }
+
+  // envia a primeira mensagem
+  socket.emit('message', { message: 'Precisamos gerar um relatório mensal.' });
+});
+
+socket.on('thread_created', ({ threadId }) => {
+  console.log('[delsucia] nova thread', threadId);
+  persistThreadIdForUser('user-123', threadId);
+});
+
+socket.on('agent_selected', (data) => {
+  console.log('[delsucia] agente escolhido', data.agentName, data.llmProvider);
+});
+
+socket.on('agent_message', (data) => {
+  // Inclui mensagens do usuário encaminhadas, respostas intermediárias,
+  // chamadas de função e resultados das tools
+  console.log('[delsucia] evento agent_message', data.type, data.message);
+});
+
+socket.on('agent_action', (data) => {
+  console.log('[delsucia] ação em andamento', data.action);
+});
+
+socket.on('agent_action_complete', (data) => {
+  console.log('[delsucia] ação finalizada', data.action, data.success);
+});
+
+socket.on('response', (data) => {
+  console.log('[delsucia] resposta final', data.message);
+  console.log('[delsucia] tokens desta mensagem', data.tokenUsage.totalTokens);
+  console.log('[delsucia] tokens acumulados', data.accumulatedTokenUsage.totalTokens);
+});
+
+socket.on('error', (err) => {
+  console.error('[delsucia] erro', err);
+});
+```
+
+#### Exemplo rápido em Python
+```python
+import socketio
+
+sio = socketio.Client()
+
+@sio.event
+def connect():
+    print('conectado')
+    sio.emit('message', {'message': 'Olá do Python!'})
+
+@sio.on('response')
+def handle_response(data):
+    print('resposta:', data['message'])
+
+sio.connect('http://localhost:3000', transports=['websocket'])
+sio.wait()
+```
+
+### 3. Conheça os eventos emitidos
+- `thread_created`: nova thread persistente criada para a conexão.
+- `thread_restored`: confirmação de restauração de uma thread existente.
+- `agent_selected`: identifica o agente e provider que atuarão na mensagem.
+- `agent_message`: transmite tudo o que circula entre agentes (mensagens de usuário, respostas, chamadas de função, resultados).
+- `agent_action`: descrição de actions em andamento (execução de tool).
+- `agent_action_complete`: status final da action anterior.
+- `response`: resposta final do run atual (contém tokens desta interação e acumulados).
+- `token_usage`: eventos incrementais de tokens (caso a UI esteja habilitada).
+- `error` / `config_required` / `api_key_invalid`: tratativas de erro ou necessidade de configuração.
+
+> **Dica:** sempre grave o `threadId` retornado (via `thread_created` ou `thread_restored`) no seu domínio. Emitir `restore_thread` ao reconectar mantém o contexto da conversa.
+
+### 4. REST APIs auxiliares
+Além do canal em tempo real, o DelsucIA expõe endpoints REST úteis para integrações e dashboards:
+
+| Método | Rota | Uso |
+|--------|------|-----|
+| `GET` | `/api/agents` | Lista agentes, grupos e ferramentas disponíveis. |
+| `GET` | `/api/connections` | Mostra conexões Socket.IO ativas. |
+| `GET` | `/api/connections/:socketId` | Detalhes de uma conexão específica. |
+| `GET` | `/api/tokens?llmProvider=openai` | Histórico agregado de tokens e custos (filtrável por provider). |
+| `GET` | `/api/logs` | Últimos logs gerados pelo serviço. |
+| `POST` | `/api/config` | Configura o provider e credenciais (OpenAI ou StackSpot). |
+| `GET` | `/api/config` | Obtém o estado atual de configuração. |
+
+Todas as rotas expõem JSON. Quando integrar, utilize um token ou camada de autenticação própria (ex.: API Gateway) para proteger estes endpoints se o serviço ficar disponível fora da rede interna.
+
+### 5. Boas práticas
+- Sempre trate `socket.on('error')` para reagir a credenciais inválidas ou ausência de provider.
+- Sincronize `threadId` com um identificador da sua aplicação (usuário, sessão, ticket).
+- Reaproveite a mesma conexão Socket.IO para múltiplas requisições sequenciais do mesmo ator; o cache de contexto fica na thread.
+- Para resetar o contexto, emita `clear_conversation` e aguarde o novo `thread_created`.
+- Use as rotas REST para auditoria (`/api/logs`) e billing (`/api/tokens`) periódicos.
+- Versões mobile/desktop podem embutir o mesmo fluxo com bibliotecas Socket.IO compatíveis.
+
+Seguindo os passos acima, qualquer aplicação externa consegue orquestrar agentes, acompanhar chamadas de tool em tempo real e integrar o DelsucIA como um serviço de IA conversacional completo.
+
 ## 📁 Estrutura do Projeto
 
 ```

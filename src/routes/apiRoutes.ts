@@ -291,7 +291,7 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
       
       // Retorna formato completo esperado pelo frontend
       res.json({
-        llmProvider: config?.llmProvider || 'openai',
+        llmProvider: config?.llmProvider || 'stackspot',
         openai: openaiConfig,
         stackspot: stackspotConfig,
         port: config?.port || 3000,

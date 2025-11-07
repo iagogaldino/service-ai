@@ -776,8 +776,8 @@
                     <div style="margin-bottom: 20px;">
                         <label class="config-label">LLM Provider</label>
                         <select id="providerSelect" class="config-input" onchange="onProviderChange()">
+                            <option value="stackspot" selected>StackSpot</option>
                             <option value="openai">OpenAI</option>
-                            <option value="stackspot">StackSpot</option>
                         </select>
                         <div style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);">
                             Escolha qual LLM Provider deseja usar
@@ -785,7 +785,7 @@
                     </div>
 
                     <!-- Configuração OpenAI -->
-                    <div id="openaiConfig" style="display: block;">
+                    <div id="openaiConfig" style="display: none;">
                         <div style="margin-bottom: 10px; padding: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px;">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
                                 <strong style="color: var(--text-primary);">OpenAI</strong>
@@ -805,7 +805,7 @@
                     </div>
 
                     <!-- Configuração StackSpot -->
-                    <div id="stackspotConfig" style="display: block;">
+                    <div id="stackspotConfig" style="display: none;">
                         <div style="margin-bottom: 10px; padding: 10px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px;">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
                                 <strong style="color: var(--text-primary);">StackSpot</strong>
@@ -949,7 +949,7 @@
         };
 
         // Variável para armazenar o provider atual
-        let currentLLMProvider = 'openai';
+        let currentLLMProvider = 'stackspot';
 
         // Eventos de conexão
         socket.on('connect', () => {
@@ -1890,7 +1890,7 @@
                 return currentLLMProvider;
             }
             // Retorna o provider salvo ou padrão
-            return currentLLMProvider || 'openai';
+            return currentLLMProvider || 'stackspot';
         }
 
         // Função para recarregar tokens salvos e resetar thread atual
@@ -2633,7 +2633,7 @@
                 
                 // Define provider selecionado
                 if (providerSelect) {
-                    currentLLMProvider = data.llmProvider || 'openai';
+                    currentLLMProvider = data.llmProvider || 'stackspot';
                     providerSelect.value = currentLLMProvider;
                     onProviderChange(); // Atualiza badges e destaque visual
                 }
@@ -2708,6 +2708,14 @@
             
             const provider = providerSelect.value;
             
+            // Atualiza exibição dos blocos de configuração
+            if (openaiConfig) {
+                openaiConfig.style.display = provider === 'openai' ? 'block' : 'none';
+            }
+            if (stackspotConfig) {
+                stackspotConfig.style.display = provider === 'stackspot' ? 'block' : 'none';
+            }
+
             // Atualiza badges de provider ativo
             if (openaiActiveBadge) {
                 openaiActiveBadge.style.display = provider === 'openai' ? 'inline-block' : 'none';

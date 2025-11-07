@@ -121,7 +121,7 @@ async function handleConnection(socket: Socket): Promise<void> {
  */
 async function handleConnectionWithoutAdapter(socket: Socket): Promise<void> {
   const config = loadConfigFromJson();
-  const provider = config?.llmProvider || 'openai';
+  const provider = config?.llmProvider || 'stackspot';
   const providerName = provider === 'openai' ? 'OpenAI' : 'StackSpot';
   
   socket.emit('config_required', {
@@ -237,7 +237,7 @@ async function handleRestoreThread(
 async function createNewThreadForSocket(socket: Socket): Promise<void> {
   if (!llmAdapter) {
     const config = loadConfigFromJson();
-    const provider = config?.llmProvider || 'openai';
+    const provider = config?.llmProvider || 'stackspot';
     const validation = validateLLMCredentials(provider, config);
     console.error(`❌ Não é possível criar thread: ${validation.error || 'LLM adapter não configurado'}`);
     socket.emit('error', {
@@ -361,7 +361,7 @@ async function handleClearConversation(socket: Socket): Promise<void> {
   
   if (!llmAdapter) {
     const config = loadConfigFromJson();
-    const provider = config?.llmProvider || 'openai';
+    const provider = config?.llmProvider || 'stackspot';
     const validation = validateLLMCredentials(provider, config);
     socket.emit('error', {
       message: validation.error || 'LLM Provider não configurado. Configure o provider primeiro.'
@@ -432,7 +432,7 @@ async function handleMessage(socket: Socket, data: { message: string }): Promise
   // Verifica se llmAdapter está configurado
   if (!llmAdapter || !agentManager) {
     const config = loadConfigFromJson();
-    const provider = config?.llmProvider || 'openai';
+    const provider = config?.llmProvider || 'stackspot';
     const validation = validateLLMCredentials(provider, config);
     
     socket.emit('config_required', {

@@ -13,10 +13,10 @@ import { loadConfigFromJson } from '../config/env';
 function getCurrentLLMProvider(): LLMProvider {
   try {
     const config = loadConfigFromJson();
-    return config?.llmProvider || 'openai';
+    return config?.llmProvider || 'stackspot';
   } catch (error) {
-    console.warn('⚠️ Erro ao obter LLM provider, usando padrão (openai):', error);
-    return 'openai';
+    console.warn('⚠️ Erro ao obter LLM provider, usando padrão (stackspot):', error);
+    return 'stackspot';
   }
 }
 

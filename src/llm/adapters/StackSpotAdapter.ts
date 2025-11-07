@@ -7,23 +7,15 @@ import { AgentConfig } from '../../agents/config';
 import { LLMAdapter, LLMThread, LLMMessage, LLMRun, TokenUsage } from './LLMAdapter';
 import { executeTool } from '../../agents/agentManager';
 import { emitToMonitors } from '../../services/monitoringService';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import StackSpotSDK from 'stackspotdelsuc-sdk';
 
-// Importação dinâmica do StackSpot SDK
-// O SDK está na raiz do projeto: sdk-stackspot/
-// __dirname aqui é: src/llm/adapters, então precisamos subir 3 níveis
-let StackSpotClass: any;
-try {
-  // Caminho correto: de src/llm/adapters para raiz do projeto (3 níveis acima)
-  const projectRoot = path.resolve(__dirname, '../../../');
-  const sdkPath = path.join(projectRoot, 'sdk-stackspot', 'src', 'index');
-  StackSpotClass = require(sdkPath).default;
-  console.log(`✅ StackSpot SDK carregado de: ${sdkPath}`);
-} catch (error: any) {
-  console.error('❌ Erro ao carregar StackSpot SDK:', error.message);
-  console.error('📁 Tentou carregar de:', path.resolve(__dirname, '../../../sdk-stackspot/src/index'));
-  throw new Error('StackSpot SDK não encontrado. Certifique-se de que o SDK está na raiz do projeto em sdk-stackspot/');
+// Importação do StackSpot SDK via pacote npm
+const StackSpotClass: any = (StackSpotSDK as any)?.default ?? StackSpotSDK;
+
+if (!StackSpotClass) {
+  throw new Error(
+    'StackSpot SDK não encontrado. Certifique-se de que o pacote stackspotdelsuc-sdk está instalado nas dependências.'
+  );
 }
 
 export interface StackSpotConfig {
