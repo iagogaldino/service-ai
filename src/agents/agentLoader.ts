@@ -12,9 +12,14 @@ import { tools as fileSystemTools } from '../tools/fileSystemTools';
 import { tools as terminalTools } from '../tools/terminalTools';
 
 /**
+ * Caminho padrão do arquivo agents.json
+ */
+export const AGENTS_JSON_PATH = path.join(__dirname, 'agents.json');
+
+/**
  * Interface para configuração de regras shouldUse em JSON
  */
-interface ShouldUseRule {
+export interface ShouldUseRule {
   type: 'keywords' | 'regex' | 'complex' | 'default';
   keywords?: string[];
   pattern?: string;
@@ -27,7 +32,7 @@ interface ShouldUseRule {
 /**
  * Interface para configuração de agente em JSON
  */
-interface AgentJsonConfig {
+export interface AgentJsonConfig {
   name: string;
   description: string;
   model: string;
@@ -42,7 +47,7 @@ interface AgentJsonConfig {
 /**
  * Interface para grupo de agentes
  */
-interface GroupConfig {
+export interface GroupConfig {
   id: string;
   name: string;
   description: string;
@@ -53,7 +58,7 @@ interface GroupConfig {
 /**
  * Interface para o arquivo JSON completo (nova estrutura hierárquica)
  */
-interface AgentsJsonFileHierarchical {
+export interface AgentsJsonFileHierarchical {
   mainSelector?: AgentJsonConfig;
   groups?: GroupConfig[];
   fallbackAgent?: AgentJsonConfig;
@@ -63,7 +68,7 @@ interface AgentsJsonFileHierarchical {
 /**
  * Interface para o arquivo JSON completo (estrutura antiga - retrocompatibilidade)
  */
-interface AgentsJsonFileLegacy {
+export interface AgentsJsonFileLegacy {
   agents: AgentJsonConfig[];
   toolSets: Record<string, string[]>;
 }
@@ -71,7 +76,7 @@ interface AgentsJsonFileLegacy {
 /**
  * Tipo união para suportar ambas as estruturas
  */
-type AgentsJsonFile = AgentsJsonFileHierarchical | AgentsJsonFileLegacy;
+export type AgentsJsonFile = AgentsJsonFileHierarchical | AgentsJsonFileLegacy;
 
 /**
  * Registro de todas as tools disponíveis
@@ -292,7 +297,7 @@ function convertAgentJsonToConfig(
  * @param {AgentsJsonFile} jsonData - Dados do JSON
  * @returns {boolean} True se for estrutura hierárquica
  */
-function isHierarchicalStructure(jsonData: AgentsJsonFile): jsonData is AgentsJsonFileHierarchical {
+export function isHierarchicalStructure(jsonData: AgentsJsonFile): jsonData is AgentsJsonFileHierarchical {
   return 'groups' in jsonData || 'mainSelector' in jsonData;
 }
 
@@ -303,8 +308,7 @@ function isHierarchicalStructure(jsonData: AgentsJsonFile): jsonData is AgentsJs
  * @returns {Promise<AgentConfig[]>} Array de configurações de agentes
  */
 export async function loadAgentsFromJson(jsonPath?: string): Promise<AgentConfig[]> {
-  const defaultPath = path.join(__dirname, 'agents.json');
-  const filePath = jsonPath || defaultPath;
+  const filePath = jsonPath || AGENTS_JSON_PATH;
 
   try {
     const fileContent = await fs.readFile(filePath, 'utf-8');
@@ -490,5 +494,20 @@ export function registerTool(toolName: string, toolObject: any): void {
  */
 export function registerToolSet(setName: string, toolNames: string[]): void {
   TOOL_SETS[setName] = toolNames;
+}
+
+/**
+ * Lê o arquivo agents.json bruto sem conversão
+ */
+export async function readAgentsJsonRaw(jsonPath: string = AGENTS_JSON_PATH): Promise<AgentsJsonFile> {
+  const fileContent = await fs.readFile(jsonPath, 'utf-8');
+  return JSON.parse(fileContent) as AgentsJsonFile;
+}
+
+/**
+ * Salva dados diretamente no arquivo agents.json
+ */
+export async function saveAgentsJson(data: AgentsJsonFile, jsonPath: string = AGENTS_JSON_PATH): Promise<void> {
+  await fs.writeFile(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
 }
 

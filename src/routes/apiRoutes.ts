@@ -10,6 +10,15 @@ import { Server } from 'socket.io';
 import { getAllConnections, getConnection } from '../services/connectionService';
 import { getAgentsConfig } from '../agents/config';
 import { getGroupsInfo, getMainSelector, getFallbackAgent } from '../agents/agentLoader';
+import {
+  AgentCrudError,
+  AgentCreatePayload,
+  AgentUpdatePayload,
+  createAgent,
+  deleteAgent,
+  getAgentsHierarchy,
+  updateAgent,
+} from '../agents/agentCrudService';
 import { loadTokens } from '../storage/tokenStorage';
 import { loadLogs } from '../storage/logStorage';
 import { clearConversation, loadConversation } from '../storage/conversationStorage';
@@ -40,6 +49,17 @@ export interface ApiRoutesDependencies {
  * @param deps - Dependências necessárias para as rotas
  */
 export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
+  /**
+   * Helper de tratamento de erro para operações de agentes.
+   */
+  const handleAgentError = (res: Response, error: unknown) => {
+    if (error instanceof AgentCrudError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    console.error('Erro inesperado ao manipular agentes:', error);
+    return res.status(500).json({ error: 'Erro interno ao manipular agentes.' });
+  };
+
   /**
    * API: Lista todas as conexões ativas
    */
@@ -165,6 +185,61 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
     } catch (error: any) {
       console.error('Erro ao obter agentes:', error);
       res.status(500).json({ error: 'Erro ao obter lista de agentes' });
+    }
+  });
+
+  /**
+   * API: Obtém o conteúdo bruto do arquivo agents.json (estrutura hierárquica)
+   */
+  app.get('/api/agents/config', async (_req: Request, res: Response) => {
+    try {
+      const hierarchy = await getAgentsHierarchy();
+      res.json(hierarchy);
+    } catch (error) {
+      handleAgentError(res, error);
+    }
+  });
+
+  /**
+   * API: Cria um novo agente em um grupo.
+   */
+  app.post('/api/agents/groups/:groupId/agents', async (req: Request, res: Response) => {
+    try {
+      const { groupId } = req.params;
+      const payload = req.body as AgentCreatePayload;
+      const created = await createAgent(groupId, payload);
+      res.status(201).json(created);
+    } catch (error) {
+      handleAgentError(res, error);
+    }
+  });
+
+  /**
+   * API: Atualiza um agente existente.
+   */
+  app.put('/api/agents/groups/:groupId/agents/:agentName', async (req: Request, res: Response) => {
+    try {
+      const { groupId } = req.params;
+      const agentName = decodeURIComponent(req.params.agentName);
+      const updates = req.body as AgentUpdatePayload;
+      const updated = await updateAgent(groupId, agentName, updates);
+      res.json(updated);
+    } catch (error) {
+      handleAgentError(res, error);
+    }
+  });
+
+  /**
+   * API: Remove um agente de um grupo.
+   */
+  app.delete('/api/agents/groups/:groupId/agents/:agentName', async (req: Request, res: Response) => {
+    try {
+      const { groupId } = req.params;
+      const agentName = decodeURIComponent(req.params.agentName);
+      await deleteAgent(groupId, agentName);
+      res.json({ success: true });
+    } catch (error) {
+      handleAgentError(res, error);
     }
   });
 
