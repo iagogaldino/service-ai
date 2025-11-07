@@ -80,6 +80,73 @@ async function executar() {
 executar().catch(console.error);
 ```
 
+## APIs disponíveis
+
+A interface `stackspot.beta` é dividida em namespaces compatíveis com o SDK da OpenAI. Abaixo um resumo dos principais métodos e como usá-los no dia a dia.
+
+### `assistants`
+
+- `list(params?)` – retorna os agentes configurados no seu workspace. Útil para descobrir IDs.
+- `retrieve(assistantId)` – busca detalhes de um agente específico.
+- `create/update/del` – existem apenas para compatibilidade; no momento os agentes devem ser gerenciados via portal StackSpot.
+
+```ts
+const agentes = await stackspot.beta.assistants.list();
+console.log(agentes.data.map((agente) => agente.name));
+```
+
+### `threads`
+
+- `create({ messages? })` – abre uma nova conversa. Você pode opcionalmente enviar mensagens iniciais.
+- `retrieve(threadId)` – obtém metadados da thread.
+- `update(threadId, metadata)` – anexa metadados customizados.
+- `del(threadId)` – remove a thread e histórico local.
+
+```ts
+const thread = await stackspot.beta.threads.create({
+  messages: [{ role: 'user', content: 'Quero gerar um relatório.' }],
+});
+```
+
+#### `threads.messages`
+
+- `create(threadId, { role, content })` – adiciona mensagens do usuário ou do sistema.
+- `list(threadId, { order })` – lê o histórico; `order: 'asc'` retorna do mais antigo para o mais recente.
+
+```ts
+await stackspot.beta.threads.messages.create(thread.id, {
+  role: 'user',
+  content: 'Liste os três principais tópicos.'
+});
+
+const historico = await stackspot.beta.threads.messages.list(thread.id, { order: 'asc' });
+```
+
+#### `threads.runs`
+
+- `create(threadId, { assistant_id, stream?, instructions?, tools? })` – dispara a execução do agente para a thread.
+- `retrieve(threadId, runId)` – acompanha o status (`queued`, `in_progress`, `completed`, `failed`).
+- `list(threadId, { limit, order })` – historiza execuções.
+- `cancel(threadId, runId)` – tenta cancelar um run pendente.
+- `submitToolOutputs(threadId, runId, { tool_outputs })` – compatibilidade para cenários onde o agente exige intervenção humana.
+
+```ts
+const run = await stackspot.beta.threads.runs.create(thread.id, {
+  assistant_id: process.env.STACKSPOT_AGENT_ID!,
+});
+
+let status = run.status;
+while (status === 'queued' || status === 'in_progress') {
+  await new Promise((r) => setTimeout(r, 1000));
+  status = (await stackspot.beta.threads.runs.retrieve(thread.id, run.id)).status;
+}
+```
+
+### Utilitários
+
+- `FileStorage` – implementação padrão de armazenamento local (JSON). Você pode injetar outra estratégia se desejar.
+- `functionCallParser` – helpers para detectar e executar function calling nos exemplos multiagentes.
+
 ## Exemplos incluídos
 
 - `examples/basic-usage.ts` – fluxo de conversa básico com polling.
