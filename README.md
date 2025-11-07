@@ -555,6 +555,10 @@ Além do canal em tempo real, o DelsucIA expõe endpoints REST úteis para integ
 | Método | Rota | Uso |
 |--------|------|-----|
 | `GET` | `/api/agents` | Lista agentes, grupos e ferramentas disponíveis. |
+| `GET` | `/api/agents/config` | Obtém o conteúdo hierárquico de `agents.json` incluindo grupos, toolsets e metadados. |
+| `POST` | `/api/agents/groups/:groupId/agents` | Cria um novo agente no grupo informado (CRUD). |
+| `PUT` | `/api/agents/groups/:groupId/agents/:agentName` | Atualiza um agente existente dentro do grupo (CRUD). |
+| `DELETE` | `/api/agents/groups/:groupId/agents/:agentName` | Remove um agente do grupo (CRUD). |
 | `GET` | `/api/connections` | Mostra conexões Socket.IO ativas. |
 | `GET` | `/api/connections/:socketId` | Detalhes de uma conexão específica. |
 | `GET` | `/api/tokens?llmProvider=openai` | Histórico agregado de tokens e custos (filtrável por provider). |
@@ -563,6 +567,89 @@ Além do canal em tempo real, o DelsucIA expõe endpoints REST úteis para integ
 | `GET` | `/api/config` | Obtém o estado atual de configuração. |
 
 Todas as rotas expõem JSON. Quando integrar, utilize um token ou camada de autenticação própria (ex.: API Gateway) para proteger estes endpoints se o serviço ficar disponível fora da rede interna.
+
+#### Payloads e exemplos do CRUD de agentes
+
+**Criar agente (`POST /api/agents/groups/:groupId/agents`)**
+
+```http
+POST /api/agents/groups/filesystem-terminal/agents HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "Docs Generator",
+  "description": "Gera documentação a partir de comentários de código.",
+  "model": "gpt-4-turbo-preview",
+  "priority": 10,
+  "tools": ["fileSystem"],
+  "instructions": "Crie documentação com base nos arquivos fornecidos.",
+  "shouldUse": {
+    "type": "keywords",
+    "keywords": ["documentação", "docs", "README"]
+  }
+}
+```
+
+Resposta esperada (`201 Created`):
+
+```json
+{
+  "name": "Docs Generator",
+  "description": "Gera documentação a partir de comentários de código.",
+  "model": "gpt-4-turbo-preview",
+  "priority": 10,
+  "tools": ["fileSystem"],
+  "instructions": "Crie documentação com base nos arquivos fornecidos.",
+  "shouldUse": {
+    "type": "keywords",
+    "keywords": ["documentação", "docs", "README"]
+  }
+}
+```
+
+**Atualizar agente (`PUT /api/agents/groups/:groupId/agents/:agentName`)**
+
+```http
+PUT /api/agents/groups/filesystem-terminal/agents/Docs%20Generator HTTP/1.1
+Content-Type: application/json
+
+{
+  "priority": 5,
+  "instructions": "Atualize a documentação analisando os arquivos modificados.",
+  "tools": ["fileSystem", "terminal"]
+}
+```
+
+Resposta esperada (`200 OK`):
+
+```json
+{
+  "name": "Docs Generator",
+  "description": "Gera documentação a partir de comentários de código.",
+  "model": "gpt-4-turbo-preview",
+  "priority": 5,
+  "tools": ["fileSystem", "terminal"],
+  "instructions": "Atualize a documentação analisando os arquivos modificados.",
+  "shouldUse": {
+    "type": "keywords",
+    "keywords": ["documentação", "docs", "README"]
+  }
+}
+```
+
+**Remover agente (`DELETE /api/agents/groups/:groupId/agents/:agentName`)**
+
+```http
+DELETE /api/agents/groups/filesystem-terminal/agents/Docs%20Generator HTTP/1.1
+```
+
+Resposta esperada (`200 OK`):
+
+```json
+{
+  "success": true
+}
+```
 
 ### 5. Boas práticas
 - Sempre trate `socket.on('error')` para reagir a credenciais inválidas ou ausência de provider.
