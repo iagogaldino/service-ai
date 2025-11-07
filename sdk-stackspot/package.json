@@ -4,17 +4,18 @@
   "description": "SDK do StackSpot similar ao OpenAI SDK para integração com StackSpot GenAI API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "example:basic": "ts-node examples/basic-usage.ts",
-    "example:thread-id": "ts-node examples/thread-id-usage.ts",
-    "example:comparison": "ts-node examples/comparison-openai.ts",
-    "example:file-access": "ts-node examples/file-access-example.ts",
-    "test:file-access": "ts-node examples/quick-file-test.ts",
-    "test:create-server": "ts-node examples/create-express-server-test.ts",
-    "test:create-jest": "ts-node examples/create-jest-test.ts",
-    "test:create-and-run-jest": "ts-node examples/create-and-run-jest-test.ts"
+    "example:open-chrome": "ts-node examples/open-chrome-command.ts",
+    "example:create-page": "ts-node examples/create-simple-page.ts",
+    "test": "vitest run"
   },
   "keywords": [
     "stackspot",
@@ -23,13 +24,25 @@
     "sdk",
     "openai-compatible"
   ],
-  "author": "",
+  "author": "StackSpot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stackspot/sdk-stackspot.git"
+  },
+  "homepage": "https://github.com/stackspot/sdk-stackspot#readme",
+  "bugs": {
+    "url": "https://github.com/stackspot/sdk-stackspot/issues"
+  },
   "license": "ISC",
+  "dependencies": {
+    "node-fetch": "^2.6.12"
+  },
   "devDependencies": {
     "@types/node": "^20.10.5",
-    "socket.io-client": "^4.8.1",
+    "@types/node-fetch": "^2.6.11",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

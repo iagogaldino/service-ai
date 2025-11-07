@@ -6,12 +6,26 @@
 
 import StackSpot from '../src/index';
 
+function requireEnv(varName: string): string {
+  const value = process.env[varName];
+  if (!value) {
+    throw new Error(`Variável de ambiente ${varName} não definida.`);
+  }
+  return value;
+}
+
+/**
+ * Pré-requisitos:
+ * - Configure STACKSPOT_CLIENT_ID, STACKSPOT_CLIENT_SECRET e STACKSPOT_AGENT_ID no ambiente
+ * - Opcional: defina STACKSPOT_REALM para usar outro workspace além do padrão
+ */
+
 async function exemploBasico() {
-  // Inicializa o cliente StackSpot
+  // Inicializa o cliente StackSpot com credenciais externas
   const stackspot = new StackSpot({
-    clientId: '7022296d-5677-40f6-9b71-618a5f259f8b',
-    clientSecret: 'f1kYnMmF3KilMTqU6rLGIb189383N6JD818XGf7NRsXt8GPM8JYT42NtUIzJw0X9',
-    realm: 'stackspot-freemium',
+    clientId: requireEnv('STACKSPOT_CLIENT_ID'),
+    clientSecret: requireEnv('STACKSPOT_CLIENT_SECRET'),
+    realm: process.env.STACKSPOT_REALM || 'stackspot-freemium',
   });
 
   console.log('✅ Cliente StackSpot inicializado\n');
@@ -30,7 +44,7 @@ async function exemploBasico() {
   console.log(`✅ Mensagem adicionada: ${userMessage.id}\n`);
 
   // 3. Criar e executar um run (usando o ID do agente do StackSpot)
-  const agentId = '01K9CGV7PDN62MPDG8RF0YDZMA'; // Substitua pelo ID do seu agente
+  const agentId = requireEnv('STACKSPOT_AGENT_ID');
   console.log(`🚀 Criando run com agente ${agentId}...`);
   const run = await stackspot.beta.threads.runs.create(thread.id, {
     assistant_id: agentId,
