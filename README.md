@@ -722,15 +722,18 @@ The dynamic agent system is optimized to maintain the same performance as the ha
 
 ## 🔄 CI/CD Automation
 
-The workflow defined at `.github/workflows/npm-publish.yml` automates npm publishing.
+The workflow in `.github/workflows/npm-publish.yml` automates npm publishing.
 
-- **Trigger**: fires automatically whenever a GitHub release is created, or manually via *Run workflow*.
-- **Environment**: uses Node.js 20 via `actions/setup-node@v4`.
-- **Steps**: checkout, `npm ci`, `npm run build`, tag/version validation, then `npm publish`.
-- **Secret required**: configure `NPM_TOKEN` in repository secrets with publish access to `delsuc-ia`.
-- **Tag format**: release tags must match `v<semver>` (e.g., `v1.2.3`) and align with `package.json`'s `version`.
+- **Triggers**:
+  - any push to `main`
+  - GitHub release creation
+  - manual runs via *Run workflow*
+- **Runtime**: Node.js 20 with `actions/setup-node@v4`.
+- **Pipeline**: checkout → `npm ci` → `npm run build` → optional tag/version check → `npm publish`.
+- **Secret**: add `NPM_TOKEN` (publish scope for `delsuc-ia`) to repository secrets.
+- **Tag check**: enforced only when the workflow runs from a tag (release). Tags must follow `v<semver>` and match `package.json`'s `version`.
 
-To trigger manually, open the workflow in GitHub Actions and optionally provide `release_tag`; if omitted, the release tag associated with the run is used.
+Manual runs let you optionally set `release_tag`; otherwise the current ref is used.
 
 ## 📚 References
 
