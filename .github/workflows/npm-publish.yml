@@ -19,6 +19,7 @@ jobs:
 
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -68,7 +69,7 @@ jobs:
 
       - name: Publish package
         if: ${{ steps.version_check.outputs.already_published != 'true' }}
-        run: npm publish --access public
+        run: npm publish --provenance
 
       - name: Skip publish (version already exists)
         if: ${{ steps.version_check.outputs.already_published == 'true' }}
