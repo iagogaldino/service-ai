@@ -43,6 +43,21 @@ jobs:
       - name: Run build
         run: npm run build
 
+      - name: Check if version already published
+        id: version_check
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED_VERSION=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version || true)
+          if [[ "$PUBLISHED_VERSION" == "$PACKAGE_VERSION" ]]; then
+            echo "Version ${PACKAGE_VERSION} already published for ${PACKAGE_NAME}. Skipping npm publish."
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${PACKAGE_VERSION} not yet published for ${PACKAGE_NAME}. Proceeding."
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
       - name: Verify package version matches tag
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: |
@@ -55,6 +70,11 @@ jobs:
         shell: bash
 
       - name: Publish package
+        if: ${{ steps.version_check.outputs.already_published != 'true' }}
         run: npm publish --access public
+
+      - name: Skip publish (version already exists)
+        if: ${{ steps.version_check.outputs.already_published == 'true' }}
+        run: echo "Skipping npm publish because this version already exists on the registry."
 
 
