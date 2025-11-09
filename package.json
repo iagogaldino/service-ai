@@ -1,6 +1,6 @@
 {
   "name": "delsuc-ia",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Serviço Node.js com TypeScript, Socket.IO e integração OpenAI",
   "main": "dist/server.js",
   "scripts": {
