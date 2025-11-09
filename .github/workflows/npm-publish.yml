@@ -48,7 +48,7 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED_VERSION=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version || true)
+          PUBLISHED_VERSION=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null || true)
           if [[ "$PUBLISHED_VERSION" == "$PACKAGE_VERSION" ]]; then
             echo "Version ${PACKAGE_VERSION} already published for ${PACKAGE_NAME}. Skipping npm publish."
             echo "already_published=true" >> "$GITHUB_OUTPUT"

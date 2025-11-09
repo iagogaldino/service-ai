@@ -729,7 +729,7 @@ The workflow in `.github/workflows/npm-publish.yml` automates npm publishing.
   - GitHub release creation
   - manual runs via *Run workflow*
 - **Runtime**: Node.js 20 with `actions/setup-node@v4`.
-- **Pipeline**: checkout → `npm ci` → `npm run build` → check if the version is already on npm → optional tag/version check → `npm publish`.
+- **Pipeline**: checkout → `npm ci` → `npm run build` → silent version check on npm → optional tag/version check → `npm publish`.
 - **Secret**: add `NPM_TOKEN` (publish scope for `delsuc-ia`) to repository secrets.
 - **Tag check**: enforced only when the workflow runs from a tag (release). Tags must follow `v<semver>` and match `package.json`'s `version`.
 - **Duplicate protection**: if the package version already exists on npm, the workflow skips publication gracefully.
