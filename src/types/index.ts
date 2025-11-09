@@ -19,6 +19,21 @@ export type LogType =
 export type LLMProvider = 'openai' | 'stackspot';
 
 /**
+ * Informações de inicialização do serviço
+ */
+export interface ServiceInitializationInfo {
+  port: number;
+  serverUrl: string;
+  configPath: string;
+  agentsPath: string;
+  llmProvider: LLMProvider;
+  openaiApiKeyConfigured: boolean;
+  stackspotCredentialsConfigured: boolean;
+  workingDirectory: string;
+  configLastUpdated?: string;
+}
+
+/**
  * Interface para informações de uso de tokens
  */
 export interface TokenUsage {
