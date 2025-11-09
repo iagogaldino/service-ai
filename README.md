@@ -1,144 +1,142 @@
 # DelsucIA
 
-Projeto Node.js com TypeScript que integra Socket.IO com a **Assistants API da OpenAI** para comunicação em tempo real com agentes inteligentes.
+Node.js + TypeScript project that combines Socket.IO with the OpenAI **Assistants API** to enable real-time conversations with intelligent agents.
 
-## 🚀 Tecnologias
+## 🚀 Tech Stack
 
-- **Node.js** - Runtime JavaScript
-- **TypeScript** - Superset do JavaScript com tipagem estática
-- **Socket.IO** - Biblioteca para comunicação WebSocket em tempo real
-- **OpenAI Assistants API** - SDK de Agentes da OpenAI com threads persistentes
-- **Express** - Framework web para Node.js
+- **Node.js** – JavaScript runtime
+- **TypeScript** – Static typing on top of JavaScript
+- **Socket.IO** – Real-time WebSocket communication
+- **OpenAI Assistants API** – Persistent-thread agent SDK
+- **Express** – Web framework for Node.js
 
-## 📋 Pré-requisitos
+## 📋 Prerequisites
 
-- Node.js (versão 16 ou superior)
-- npm ou yarn
+- Node.js (version 16 or later)
+- npm or yarn
 
-## 🛠️ Instalação
+## 🛠️ Installation
 
-1. Clone o repositório ou navegue até a pasta do projeto
+1. Clone this repository or navigate to the project folder.
+2. Install dependencies:
+   `ash
+   npm install
+   `
+3. Configure your API key:
+   - Start the server: 
+pm run dev
+   - Open http://localhost:3000
+   - Click the "⚙️ Config" button and provide your OpenAI API key
+   - The key is stored automatically in config.json
 
-2. Instale as dependências:
-```bash
-npm install
-```
+## 🎯 Usage
 
-3. Configure a API key:
-   - Inicie o servidor: `npm run dev`
-   - Acesse `http://localhost:3000` no navegador
-   - Clique no botão "⚙️ Config" e configure sua API key da OpenAI
-   - A configuração será salva automaticamente em `config.json`
-
-## 🎯 Como usar
-
-### Modo Desenvolvimento
-```bash
+### Development Mode
+`ash
 npm run dev
-```
+`
 
-### Modo Produção
-```bash
+### Production Mode
+`ash
 npm run build
 npm start
-```
+`
 
-O servidor estará rodando em `http://localhost:3000`
+The server listens on http://localhost:3000.
 
-## 📡 Como funciona
+## 📡 How It Works
 
-1. O cliente se conecta ao servidor via Socket.IO
-2. Uma **thread** é criada automaticamente para cada conexão (mantém contexto da conversa)
-3. O cliente envia mensagens através do socket (ex: "Hello")
-4. O servidor adiciona a mensagem à thread e cria um **run** para processar
-5. O **assistente** (agente) processa a mensagem usando a Assistants API
-6. A resposta da IA é enviada de volta ao cliente através do mesmo canal socket
-7. O contexto da conversa é mantido na thread para cada conexão
+1. The client connects to the server via Socket.IO.
+2. A dedicated **thread** is created for every connection (conversation context is preserved).
+3. The client sends messages through the socket (e.g., "Hello").
+4. The server adds the message to that thread and creates a **run** to process it.
+5. The **assistant** (agent) handles the message through the Assistants API.
+6. The agent response is sent back to the client through the same socket channel.
+7. The thread keeps the full conversation history for that connection.
 
-### ✨ Recursos da Assistants API
+### ✨ Assistants API Highlights
 
-- **Threads Persistentes**: Cada conexão tem sua própria thread que mantém o histórico da conversa
-- **Agentes Inteligentes**: Usa GPT-4 Turbo para respostas mais inteligentes
-- **Contexto Mantido**: O assistente lembra do contexto da conversa anterior
-- **Gerenciamento Automático**: O assistente é criado automaticamente na primeira execução
-- **Navegação de Arquivos**: O agente pode navegar, ler e analisar arquivos do projeto
+- **Persistent Threads**: every connection owns a context thread.
+- **Smart Agents**: powered by GPT-4 Turbo for higher-quality answers.
+- **Context Preservation**: the assistant remembers prior conversation context.
+- **Automatic Provisioning**: the assistant is created during the first execution.
+- **File Navigation Tools**: the agent can inspect files within the project.
 
-### 🗂️ Funcionalidades de Navegação de Arquivos
+### 🗂️ File Navigation Tools
 
-O agente possui três ferramentas principais para trabalhar com arquivos:
+Agents have three primary tools for file operations:
 
-1. **`list_directory`** - Lista arquivos e diretórios em um caminho específico
-   - Exemplo: "Liste os arquivos na pasta src"
-   
-2. **`read_file`** - Lê o conteúdo completo de um arquivo
-   - Exemplo: "Leia o arquivo src/server.ts"
-   
-3. **`find_file`** - Procura arquivos por nome no projeto
-   - Exemplo: "Encontre arquivos chamados main.ts"
+1. **list_directory** – Lists files and folders in a specific path.
+   - Example: "List the files inside src"
+2. **
+ead_file** – Reads the full contents of a file.
+   - Example: "Read src/server.ts"
+3. **ind_file** – Searches for files by name.
+   - Example: "Find files named main.ts"
 
-**Exemplo de uso:**
-- "Me explique o que tem no código de main.ts"
-- "Qual é a estrutura do projeto?"
-- "Analise o arquivo server.ts e me diga o que ele faz"
+**Sample prompts:**
+- "Explain what main.ts does"
+- "What is the project structure?"
+- "Analyze server.ts and tell me what it does"
 
-## 🤖 Sistema de Agentes
+## 🤖 Agent System
 
-O DelsucIA utiliza um sistema hierárquico de agentes organizados em grupos com orquestradores.
+DelsucIA uses a hierarchical agent system organized into groups, each managed by an orchestrator.
 
-### 📊 Estrutura Hierárquica
+### 📊 Hierarchy Overview
 
-```
-Seletor Principal (Main Selector)
-  ├── Orquestrador de Grupo A (FileSystem & Terminal)
+`
+Main Selector
+  ├── Group A Orchestrator (FileSystem & Terminal)
   │   ├── Code Analyzer
   │   └── Terminal Executor
-  └── Orquestrador de Grupo B (Database)
+  └── Group B Orchestrator (Database)
       ├── Database Reader
       └── Database Writer
-```
+`
 
-### 🎯 Componentes do Sistema
+### 🎯 Core Components
 
 #### 1. Main Selector
-- **Função**: Rotear mensagens para grupos apropriados
-- **Prioridade**: -1 (mais alta)
-- **Quando usar**: Seletor inteligente que analisa a mensagem e decide qual grupo deve lidar
+- **Role**: routes incoming messages to the appropriate group
+- **Priority**: -1 (highest)
+- **When it triggers**: smart router that analyzes the request before delegating
 
-#### 2. Grupos
-Cada grupo contém:
-- **id**: Identificador único do grupo
-- **name**: Nome descritivo
-- **description**: Descrição do propósito do grupo
-- **orchestrator**: Orquestrador do grupo
-- **agents**: Array de agentes especializados do grupo
+#### 2. Groups
+Each group stores:
+- **id** – unique identifier
+- **name** – descriptive label
+- **description** – group purpose
+- **orchestrator** – orchestrator configuration
+- **agents** – specialized agents inside the group
 
-#### 3. Orquestrador
-- **Função**: Coordenar agentes dentro do grupo
-- **Responsabilidades**:
-  - Analisar tarefas dentro do contexto do grupo
-  - Decidir qual agente(s) deve(m) executar
-  - Coordenar múltiplos agentes para tarefas complexas
+#### 3. Orchestrator
+- **Role**: coordinates agents inside the group
+- **Responsibilities**:
+  - Understands the task within the group context
+  - Selects which agent(s) should run
+  - Coordinates multi-step, multi-agent tasks
 
-#### 4. Agentes Especializados
-- **Função**: Executar tarefas específicas
-- **Pertencem a**: Um grupo específico
-- **Coordenados por**: Orquestrador do grupo
+#### 4. Specialized Agents
+- **Role**: execute focused tasks
+- **Belong to**: a specific group
+- **Managed by**: that group orchestrator
 
 #### 5. Fallback Agent
-- **Função**: Agente padrão quando nenhum grupo/orquestrador corresponde
-- **Prioridade**: 999 (mais baixa)
+- **Role**: default agent when no other agent matches
+- **Priority**: 999 (lowest)
 
-### 📝 Configuração via JSON
+### 📝 JSON Configuration
 
-Os agentes são configurados através do arquivo `src/agents/agents.json`. O sistema suporta estrutura hierárquica ou legacy.
+Agents are defined in src/agents/agents.json. The system supports hierarchical (recommended) and legacy structures.
 
-#### Estrutura Hierárquica
+#### Hierarchical Example
 
-```json
+`json
 {
   "mainSelector": {
     "name": "Main Message Router",
-    "description": "Seletor principal que roteia mensagens para os grupos",
+    "description": "Routes messages to the appropriate groups",
     "model": "gpt-4-turbo-preview",
     "priority": -1,
     "tools": [],
@@ -148,16 +146,16 @@ Os agentes são configurados através do arquivo `src/agents/agents.json`. O sis
   "groups": [
     {
       "id": "filesystem-terminal",
-      "name": "Grupo A - FileSystem & Terminal",
-      "description": "Especializado em operações com arquivos e terminal",
+      "name": "Group A - FileSystem & Terminal",
+      "description": "Specialized in file system and terminal actions",
       "orchestrator": {
         "name": "FileSystem Group Orchestrator",
-        "description": "Orquestra operações do grupo",
+        "description": "Coordinates the group agents",
         "model": "gpt-4-turbo-preview",
         "priority": 0,
         "tools": ["fileSystem", "terminal"],
         "instructions": "...",
-        "shouldUse": { "type": "keywords", "keywords": [...] }
+        "shouldUse": { "type": "keywords", "keywords": ["..."] }
       },
       "agents": [
         {
@@ -167,7 +165,7 @@ Os agentes são configurados através do arquivo `src/agents/agents.json`. O sis
           "priority": 1,
           "tools": ["fileSystem"],
           "instructions": "...",
-          "shouldUse": { "type": "keywords", "keywords": [...] }
+          "shouldUse": { "type": "keywords", "keywords": ["..."] }
         }
       ]
     }
@@ -182,55 +180,49 @@ Os agentes são configurados através do arquivo `src/agents/agents.json`. O sis
     "shouldUse": { "type": "default" }
   },
   "toolSets": {
-    "fileSystem": [...],
-    "terminal": [...]
+    "fileSystem": ["..."],
+    "terminal": ["..."]
   }
 }
-```
+`
 
-### 🔄 Regras de Seleção (shouldUse)
+### 🔄 Selection Rules (shouldUse)
 
-O sistema suporta diferentes tipos de regras para determinar quando um agente deve ser usado:
+Multiple rule types determine when an agent should run:
 
-#### 1. Keywords (Palavras-chave)
-```json
+#### 1. Keywords
+`json
 {
   "type": "keywords",
-  "keywords": ["criar", "create", "código", "code"]
+  "keywords": ["create", "code", "generate"]
 }
-```
-Verifica se a mensagem contém alguma das palavras-chave.
+`
+Matches when the incoming prompt includes one of the keywords.
 
-#### 2. Regex (Expressão Regular)
-```json
+#### 2. Regex
+`json
 {
   "type": "regex",
   "pattern": "(npm|node|yarn)\\s+[^\\s]"
 }
-```
-Verifica se a mensagem corresponde ao padrão regex.
+`
+Executes when the prompt matches the regular expression.
 
-#### 3. Complex (Regras Complexas)
-```json
+#### 3. Complex Rules
+`json
 {
   "type": "complex",
   "operator": "OR",
   "rules": [
-    {
-      "type": "keywords",
-      "keywords": ["execute", "executar"]
-    },
-    {
-      "type": "regex",
-      "pattern": "npm\\s+\\w+"
-    }
+    { "type": "keywords", "keywords": ["execute", "run"] },
+    { "type": "regex", "pattern": "npm\\s+\\w+" }
   ]
 }
-```
-Combina múltiplas regras com operador AND ou OR.
+`
+Combines multiple rules with logical AND/OR operations.
 
-#### 4. Default (Agente Padrão)
-```json
+#### 4. Default
+`json
 {
   "type": "default",
   "exclude": {
@@ -238,39 +230,37 @@ Combina múltiplas regras com operador AND ou OR.
     "pattern": "(npm|node)\\s+"
   }
 }
-```
-Usado para agentes padrão. Pode ter regras de exclusão.
+`
+Acts as a fallback rule and can exclude specific patterns.
 
-### 🚀 Como Adicionar um Novo Agente
+### 🚀 Adding a New Agent
 
-#### Passo 1: Editar `agents.json`
+#### Step 1: Edit gents.json
+Add a new entry inside the group gents array or create a brand-new group:
 
-Adicione um novo objeto no array `agents` do grupo apropriado ou crie um novo grupo:
-
-```json
+`json
 {
   "name": "Translation Agent",
-  "description": "Especializado em traduzir textos",
+  "description": "Specialized in text translation",
   "model": "gpt-4-turbo-preview",
   "priority": 5,
   "tools": [],
-  "instructions": "Você é um tradutor profissional...",
+  "instructions": "You are a professional translator...",
   "shouldUse": {
     "type": "keywords",
-    "keywords": ["traduz", "translate", "tradução"]
+    "keywords": ["translate", "translation", "traduz"]
   }
 }
-```
+`
 
-#### Passo 2: Reiniciar o Servidor
+#### Step 2: Restart the Server
+The server reloads the JSON file on startup and picks up the new configuration automatically.
 
-O servidor carregará automaticamente os novos agentes do JSON.
+### 🔧 Tool Sets
 
-### 🔧 Conjuntos de Tools (ToolSets)
+	oolSets allow you to reference pre-defined tool collections:
 
-O JSON suporta conjuntos pré-definidos de tools:
-
-```json
+`json
 {
   "toolSets": {
     "fileSystem": [
@@ -285,496 +275,470 @@ O JSON suporta conjuntos pré-definidos de tools:
     ]
   }
 }
-```
+`
 
-No campo `tools` do agente, você pode usar:
-- Nome de um conjunto: `["fileSystem"]`
-- Nome de uma tool individual: `["execute_command"]`
-- Combinação: `["fileSystem", "execute_command"]`
+Inside the agent 	ools property you can use:
+- A tool set name: "tools": ["fileSystem"]
+- Individual tools: "tools": ["execute_command"]
+- A mix of both: "tools": ["fileSystem", "execute_command"]
 
-### 📊 Prioridades
+### 📊 Priorities
 
-A prioridade determina a ordem de verificação:
-- **Prioridade -1**: Main Selector (verificado primeiro)
-- **Prioridade 0**: Orquestradores
-- **Prioridade 1+**: Agentes especializados
-- **Prioridade 999**: Fallback Agent (último recurso)
+Priority defines evaluation order:
+- **Priority -1**: main selector (evaluated first)
+- **Priority 0**: group orchestrators
+- **Priority 1+**: specialized agents
+- **Priority 999**: fallback agent (last resort)
 
-## 💰 Tracking de Tokens
+## 💰 Token Tracking
 
-O sistema rastreia automaticamente o uso de tokens durante interações com os agentes e retorna essa informação junto com a resposta final para o frontend.
+Token usage is tracked automatically during every run and returned to the frontend alongside agent responses.
 
-### 📊 Estrutura de Dados
+### 📊 Data Structure
 
-```typescript
+`	ypescript
 interface TokenUsage {
-  promptTokens: number;      // Tokens usados no prompt/entrada
-  completionTokens: number;  // Tokens usados na resposta/saída
-  totalTokens: number;        // Total de tokens (prompt + completion)
+  promptTokens: number;      // Tokens for the prompt/input
+  completionTokens: number;  // Tokens for the response/output
+  totalTokens: number;       // Sum of prompt + completion
 }
-```
+`
 
-### 🎯 Eventos do Servidor
+### 🎯 Server Events
 
-O sistema emite três tipos de eventos relacionados a tokens:
+The system emits three token-related events:
 
-#### 1. Evento `token_usage` (em tempo real)
-Emitido sempre que tokens são utilizados em um run:
+#### 1. 	oken_usage
+Emitted in real time whenever tokens are consumed.
 
-```javascript
-socket.on('token_usage', (data) => {
-  // data.tokens - Tokens desta mensagem/run específica
-  // data.accumulated - Total acumulado na thread
-  console.log('Tokens desta mensagem:', data.tokens.totalTokens);
-  console.log('Total acumulado:', data.accumulated.totalTokens);
+`javascript
+socket.on("token_usage", (data) => {
+  // data.tokens – tokens used in this specific run
+  // data.accumulated – total tokens in the thread
+  console.log("Tokens (current run):", data.tokens.totalTokens);
+  console.log("Tokens (accumulated):", data.accumulated.totalTokens);
 });
-```
+`
 
-#### 2. Evento `agent_message` (com tokens acumulados)
-Cada mensagem do agente inclui tokens acumulados:
+#### 2. gent_message
+Each agent message can include accumulated token usage.
 
-```javascript
-socket.on('agent_message', (data) => {
+`javascript
+socket.on("agent_message", (data) => {
   if (data.tokenUsage) {
-    console.log('Mensagem:', data.message);
-    console.log('Tokens acumulados:', data.tokenUsage.totalTokens);
+    console.log("Message:", data.message);
+    console.log("Accumulated tokens:", data.tokenUsage.totalTokens);
   }
 });
-```
+`
 
-#### 3. Evento `response` (resposta final)
-Inclui tokens da mensagem atual e total acumulado:
+#### 3. 
+esponse
+Includes current-run tokens and the thread total.
 
-```javascript
-socket.on('response', (data) => {
-  // data.tokenUsage - Tokens desta mensagem específica
-  // data.accumulatedTokenUsage - Total acumulado de todas as mensagens
-  console.log('Tokens desta mensagem:', data.tokenUsage.totalTokens);
-  console.log('Total acumulado na thread:', data.accumulatedTokenUsage.totalTokens);
+`javascript
+socket.on("response", (data) => {
+  console.log("Tokens (current run):", data.tokenUsage.totalTokens);
+  console.log("Tokens (thread total):", data.accumulatedTokenUsage.totalTokens);
 });
-```
+`
 
-### 💵 Cálculo de Custo
+### 💵 Cost Calculation
 
-O sistema calcula automaticamente o custo em dólares baseado nos preços do modelo OpenAI:
+Costs are calculated automatically using the OpenAI price list:
 
-- **GPT-4 Turbo**: $0.01 / 1K tokens (prompt) + $0.03 / 1K tokens (completion)
-- **GPT-4**: $0.03 / 1K tokens (prompt) + $0.06 / 1K tokens (completion)
-- **GPT-3.5 Turbo**: $0.0015 / 1K tokens (prompt) + $0.002 / 1K tokens (completion)
+- **GPT-4 Turbo**: .01 / 1K prompt tokens + .03 / 1K completion tokens
+- **GPT-4**: .03 / 1K prompt tokens + .06 / 1K completion tokens
+- **GPT-3.5 Turbo**: .0015 / 1K prompt tokens + .002 / 1K completion tokens
 
-Os custos são salvos automaticamente em `tokens.json` e podem ser visualizados no frontend através do botão "💰 Tokens".
+Totals are stored in 	okens.json and displayed on the frontend via the "💰 Tokens" button.
 
-### 📈 Persistência
+### 📈 Persistence
 
-O uso de tokens é salvo automaticamente em `tokens.json` com:
-- Total de tokens e custos por thread
-- Histórico de interações
-- Estatísticas por agente
-- Custo total acumulado
+	okens.json stores:
+- Total tokens and costs per thread
+- Interaction history
+- Agent-level statistics
+- Accumulated total cost
 
-## 📝 Sistema de Logs
+## 📝 Logging System
 
-O sistema registra todas as atividades da aplicação em `logs.json` para total controle e monitoramento.
+All application activity is recorded to logs.json for traceability and monitoring.
 
-### 📊 Tipos de Logs
+### 📊 Log Types
 
-- **connection**: Conexões de clientes
-- **disconnection**: Desconexões de clientes
-- **agent_selection**: Seleção de agentes
-- **message_sent**: Mensagens enviadas
-- **run_status**: Status de runs do OpenAI
-- **tool_execution**: Execução de tools
-- **tool_result**: Resultados de tools
-- **response**: Respostas finais
-- **token_usage**: Uso de tokens
-- **error**: Erros e exceções
+- **connection** – new socket connections
+- **disconnection** – socket disconnections
+- **agent_selection** – which agent was chosen
+- **message_sent** – outgoing messages
+- **run_status** – Assistants API run status updates
+- **tool_execution** – tool execution details
+- **tool_result** – tool results
+- **response** – final responses
+- **token_usage** – token consumption
+- **error** – errors and exceptions
 
-### 📈 Estatísticas
+### 📈 Metrics
 
-O sistema mantém estatísticas automáticas:
-- Total de conexões
-- Total de mensagens processadas
-- Total de tokens utilizados
-- Custo total acumulado
-- Erros ocorridos
+Automatically tracked statistics include:
+- Total connections
+- Total processed messages
+- Total tokens consumed
+- Accumulated costs
+- Logged errors
 
-### 🔍 Visualização
+### 🔍 Visualization
 
-Os logs podem ser visualizados no frontend através do botão "📝 Logs", que exibe:
-- Estatísticas gerais
-- Histórico detalhado de eventos
-- Filtros por tipo de log
-- Informações de tokens e custos
+The frontend "📝 Logs" view shows:
+- Overview metrics
+- Detailed event history
+- Log-type filters
+- Token and cost information
 
-## 🌐 Cliente Web
+## 🌐 Web Client
 
-Acesse `http://localhost:3000` no seu navegador para usar a interface web que permite:
+Open http://localhost:3000 to explore the built-in web UI:
 
-- **Chat**: Conectar ao servidor via Socket.IO e enviar mensagens
-- **Agentes**: Visualizar todos os agentes configurados e suas ferramentas
-- **Tokens**: Visualizar histórico de uso de tokens e custos
-- **Logs**: Visualizar logs da aplicação em tempo real
-- **Configuração**: Configurar API key e porta do servidor
+- **Chat** – interact with the assistants via Socket.IO
+- **Agents** – browse the configured agents and their tools
+- **Tokens** – inspect real-time and historical token usage
+- **Logs** – view live system logs
+- **Config** – configure API key and server port
 
-### Funcionalidades do Frontend
+### Frontend Features
 
-- Conectar ao servidor via Socket.IO
-- Enviar mensagens para a IA
-- Receber respostas em tempo real
-- Ver o status da conexão
-- Visualizar tokens utilizados em tempo real
-- Visualizar histórico de tokens e custos
-- Visualizar logs da aplicação
-- Configurar API key e porta via interface
+- Connect to the server via Socket.IO
+- Send messages to the assistant
+- Receive responses in real time
+- Track connection status
+- Monitor token usage in real time
+- Review historical tokens and costs
+- Inspect logs with filters
+- Configure API key and port directly in the UI
 
-## 📝 Exemplo de uso
+## 📝 Usage Examples
 
-### Cliente HTML (já incluído)
-O projeto inclui um cliente HTML que se conecta automaticamente ao servidor.
+### Included HTML Client
+The repository ships with an HTML client that connects automatically.
 
-### Exemplo programático
-```javascript
-const io = require('socket.io-client');
-const socket = io('http://localhost:3000');
+### Programmatic Example (JavaScript)
+`javascript
+const io = require("socket.io-client");
+const socket = io("http://localhost:3000");
 
-socket.on('connect', () => {
-  console.log('Conectado!');
-  
-  socket.emit('message', { message: 'Hello' });
+socket.on("connect", () => {
+  console.log("Connected!");
+  socket.emit("message", { message: "Hello" });
 });
 
-socket.on('response', (data) => {
-  console.log('Resposta:', data.message);
-  console.log('Tokens:', data.tokenUsage.totalTokens);
-  console.log('Custo:', data.cost);
+socket.on("response", (data) => {
+  console.log("Response:", data.message);
+  console.log("Tokens:", data.tokenUsage.totalTokens);
+  console.log("Cost:", data.cost);
 });
-```
+`
 
-## 🔌 Integração a partir de outras aplicações
-
-Outros serviços podem consumir o DelsucIA como um **provider de agentes** de forma headless. Abaixo estão os passos recomendados para construir uma integração server-to-server.
-
-### 1. Habilite e configure o serviço
-- Execute `npm run dev` (ou `npm start` em produção).
-- Configure o provider ativo via `POST /api/config` (OpenAI ou StackSpot) ou pela interface web.
-- Garanta que a aplicação cliente tenha acesso de rede ao host/porta do DelsucIA.
-
-### 2. Conecte-se via Socket.IO
-Use o protocolo WebSocket para trocar mensagens com os agentes. O exemplo abaixo mostra um backend Node/TypeScript se conectando ao serviço:
-
-```typescript
-import { io, Socket } from 'socket.io-client';
-
-const socket: Socket = io('http://delsucia.internal:3000', {
-  transports: ['websocket'],
-  reconnectionAttempts: 3,
-});
-
-socket.on('connect', () => {
-  console.log('[delsucia] conectado', socket.id);
-
-  // opcional: restaura uma thread existente salva na sua aplicação
-  const savedThreadId = loadThreadIdForUser('user-123');
-  if (savedThreadId) {
-    socket.emit('restore_thread', { threadId: savedThreadId });
-  }
-
-  // envia a primeira mensagem
-  socket.emit('message', { message: 'Precisamos gerar um relatório mensal.' });
-});
-
-socket.on('thread_created', ({ threadId }) => {
-  console.log('[delsucia] nova thread', threadId);
-  persistThreadIdForUser('user-123', threadId);
-});
-
-socket.on('agent_selected', (data) => {
-  console.log('[delsucia] agente escolhido', data.agentName, data.llmProvider);
-});
-
-socket.on('agent_message', (data) => {
-  // Inclui mensagens do usuário encaminhadas, respostas intermediárias,
-  // chamadas de função e resultados das tools
-  console.log('[delsucia] evento agent_message', data.type, data.message);
-});
-
-socket.on('agent_action', (data) => {
-  console.log('[delsucia] ação em andamento', data.action);
-});
-
-socket.on('agent_action_complete', (data) => {
-  console.log('[delsucia] ação finalizada', data.action, data.success);
-});
-
-socket.on('response', (data) => {
-  console.log('[delsucia] resposta final', data.message);
-  console.log('[delsucia] tokens desta mensagem', data.tokenUsage.totalTokens);
-  console.log('[delsucia] tokens acumulados', data.accumulatedTokenUsage.totalTokens);
-});
-
-socket.on('error', (err) => {
-  console.error('[delsucia] erro', err);
-});
-```
-
-#### Exemplo rápido em Python
-```python
+### Programmatic Example (Python)
+`python
 import socketio
 
 sio = socketio.Client()
 
 @sio.event
 def connect():
-    print('conectado')
-    sio.emit('message', {'message': 'Olá do Python!'})
+    print("connected")
+    sio.emit("message", {"message": "Hello from Python!"})
 
-@sio.on('response')
+@sio.on("response")
 def handle_response(data):
-    print('resposta:', data['message'])
+    print("response:", data["message"])
 
-sio.connect('http://localhost:3000', transports=['websocket'])
+sio.connect("http://localhost:3000", transports=["websocket"])
 sio.wait()
-```
+`
 
-### 3. Conheça os eventos emitidos
-- `thread_created`: nova thread persistente criada para a conexão.
-- `thread_restored`: confirmação de restauração de uma thread existente.
-- `agent_selected`: identifica o agente e provider que atuarão na mensagem.
-- `agent_message`: transmite tudo o que circula entre agentes (mensagens de usuário, respostas, chamadas de função, resultados).
-- `agent_action`: descrição de actions em andamento (execução de tool).
-- `agent_action_complete`: status final da action anterior.
-- `response`: resposta final do run atual (contém tokens desta interação e acumulados).
-- `token_usage`: eventos incrementais de tokens (caso a UI esteja habilitada).
-- `error` / `config_required` / `api_key_invalid`: tratativas de erro ou necessidade de configuração.
+## 🔌 Integrating from Other Services
 
-> **Dica:** sempre grave o `threadId` retornado (via `thread_created` ou `thread_restored`) no seu domínio. Emitir `restore_thread` ao reconectar mantém o contexto da conversa.
+You can consume DelsucIA headlessly as an **agent provider**. Recommended steps for server-to-server integrations:
 
-### 4. REST APIs auxiliares
-Além do canal em tempo real, o DelsucIA expõe endpoints REST úteis para integrações e dashboards:
+### 1. Enable and Configure the Service
+- Run 
+pm run dev (or 
+pm start in production).
+- Configure the active provider via POST /api/config (OpenAI or StackSpot) or through the web UI.
+- Ensure the consumer service can reach the host/port where DelsucIA is running.
 
-| Método | Rota | Uso |
-|--------|------|-----|
-| `GET` | `/api/agents` | Lista agentes, grupos e ferramentas disponíveis. |
-| `GET` | `/api/agents/config` | Obtém o conteúdo hierárquico de `agents.json` incluindo grupos, toolsets e metadados. |
-| `POST` | `/api/agents/groups/:groupId/agents` | Cria um novo agente no grupo informado (CRUD). |
-| `PUT` | `/api/agents/groups/:groupId/agents/:agentName` | Atualiza um agente existente dentro do grupo (CRUD). |
-| `DELETE` | `/api/agents/groups/:groupId/agents/:agentName` | Remove um agente do grupo (CRUD). |
-| `GET` | `/api/connections` | Mostra conexões Socket.IO ativas. |
-| `GET` | `/api/connections/:socketId` | Detalhes de uma conexão específica. |
-| `GET` | `/api/tokens?llmProvider=openai` | Histórico agregado de tokens e custos (filtrável por provider). |
-| `GET` | `/api/logs` | Últimos logs gerados pelo serviço. |
-| `POST` | `/api/config` | Configura o provider e credenciais (OpenAI ou StackSpot). |
-| `GET` | `/api/config` | Obtém o estado atual de configuração. |
+### 2. Connect Using Socket.IO
+Use WebSockets to exchange messages with the agents. Example backend connection in TypeScript:
 
-Todas as rotas expõem JSON. Quando integrar, utilize um token ou camada de autenticação própria (ex.: API Gateway) para proteger estes endpoints se o serviço ficar disponível fora da rede interna.
+`	ypescript
+import { io, Socket } from "socket.io-client";
 
-#### Payloads e exemplos do CRUD de agentes
+const socket: Socket = io("http://delsucia.internal:3000", {
+  transports: ["websocket"],
+  reconnectionAttempts: 3,
+});
 
-**Criar agente (`POST /api/agents/groups/:groupId/agents`)**
+socket.on("connect", () => {
+  console.log("[delsucia] connected", socket.id);
 
-```http
+  const savedThreadId = loadThreadIdForUser("user-123");
+  if (savedThreadId) {
+    socket.emit("restore_thread", { threadId: savedThreadId });
+  }
+
+  socket.emit("message", { message: "We need to generate the monthly report." });
+});
+
+socket.on("thread_created", ({ threadId }) => {
+  console.log("[delsucia] new thread", threadId);
+  persistThreadIdForUser("user-123", threadId);
+});
+
+socket.on("agent_selected", (data) => {
+  console.log("[delsucia] agent selected", data.agentName, data.llmProvider);
+});
+
+socket.on("agent_message", (data) => {
+  console.log("[delsucia] agent_message", data.type, data.message);
+});
+
+socket.on("agent_action", (data) => {
+  console.log("[delsucia] action in progress", data.action);
+});
+
+socket.on("agent_action_complete", (data) => {
+  console.log("[delsucia] action complete", data.action, data.success);
+});
+
+socket.on("response", (data) => {
+  console.log("[delsucia] final response", data.message);
+  console.log("[delsucia] tokens (run)", data.tokenUsage.totalTokens);
+  console.log("[delsucia] tokens (thread)", data.accumulatedTokenUsage.totalTokens);
+});
+
+socket.on("error", (err) => {
+  console.error("[delsucia] error", err);
+});
+`
+
+> **Tip:** Persist the 	hreadId returned via 	hread_created or 	hread_restored. Sending 
+estore_thread on reconnect keeps the conversation context.
+
+### 3. Learn the Emitted Events
+- 	hread_created – new persistent thread created for the connection
+- 	hread_restored – confirmation that an existing thread was restored
+- gent_selected – selected agent and provider for the message
+- gent_message – traffic between agents (user messages, responses, tool calls, results)
+- gent_action – action currently in progress (tool execution)
+- gent_action_complete – completion status of the previous action
+- 
+esponse – final response for the current run (includes per-run and accumulated tokens)
+- 	oken_usage – incremental token events (if enabled)
+- error / config_required / pi_key_invalid – error and configuration handlers
+
+### 4. REST Helper APIs
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | /api/agents | Lists all agents, groups, and available tools |
+| GET | /api/agents/config | Returns the hierarchical gents.json content |
+| POST | /api/agents/groups/:groupId/agents | Creates a new agent in the specified group |
+| PUT | /api/agents/groups/:groupId/agents/:agentName | Updates an existing agent within the group |
+| DELETE | /api/agents/groups/:groupId/agents/:agentName | Removes an agent from the group |
+| GET | /api/connections | Shows active Socket.IO connections |
+| GET | /api/connections/:socketId | Provides details about a specific connection |
+| GET | /api/tokens?llmProvider=openai | Aggregated token and cost history (filterable by provider) |
+| GET | /api/logs | Returns the latest logs |
+| POST | /api/config | Configures the provider and credentials (OpenAI or StackSpot) |
+| GET | /api/config | Retrieves the current configuration state |
+
+All endpoints return JSON. If exposing the service outside an internal network, protect these routes with authentication (e.g., API Gateway).
+
+### Example Payloads
+
+**Create an agent**
+`http
 POST /api/agents/groups/filesystem-terminal/agents HTTP/1.1
 Content-Type: application/json
 
 {
   "name": "Docs Generator",
-  "description": "Gera documentação a partir de comentários de código.",
+  "description": "Generates documentation from code comments.",
   "model": "gpt-4-turbo-preview",
   "priority": 10,
   "tools": ["fileSystem"],
-  "instructions": "Crie documentação com base nos arquivos fornecidos.",
+  "instructions": "Create documentation based on the provided files.",
   "shouldUse": {
     "type": "keywords",
-    "keywords": ["documentação", "docs", "README"]
+    "keywords": ["documentation", "docs", "readme"]
   }
 }
-```
+`
 
-Resposta esperada (`201 Created`):
-
-```json
-{
-  "name": "Docs Generator",
-  "description": "Gera documentação a partir de comentários de código.",
-  "model": "gpt-4-turbo-preview",
-  "priority": 10,
-  "tools": ["fileSystem"],
-  "instructions": "Crie documentação com base nos arquivos fornecidos.",
-  "shouldUse": {
-    "type": "keywords",
-    "keywords": ["documentação", "docs", "README"]
-  }
-}
-```
-
-**Atualizar agente (`PUT /api/agents/groups/:groupId/agents/:agentName`)**
-
-```http
+**Update an agent**
+`http
 PUT /api/agents/groups/filesystem-terminal/agents/Docs%20Generator HTTP/1.1
 Content-Type: application/json
 
 {
   "priority": 5,
-  "instructions": "Atualize a documentação analisando os arquivos modificados.",
+  "instructions": "Update documentation by analyzing modified files.",
   "tools": ["fileSystem", "terminal"]
 }
-```
+`
 
-Resposta esperada (`200 OK`):
-
-```json
-{
-  "name": "Docs Generator",
-  "description": "Gera documentação a partir de comentários de código.",
-  "model": "gpt-4-turbo-preview",
-  "priority": 5,
-  "tools": ["fileSystem", "terminal"],
-  "instructions": "Atualize a documentação analisando os arquivos modificados.",
-  "shouldUse": {
-    "type": "keywords",
-    "keywords": ["documentação", "docs", "README"]
-  }
-}
-```
-
-**Remover agente (`DELETE /api/agents/groups/:groupId/agents/:agentName`)**
-
-```http
+**Delete an agent**
+`http
 DELETE /api/agents/groups/filesystem-terminal/agents/Docs%20Generator HTTP/1.1
-```
+`
 
-Resposta esperada (`200 OK`):
-
-```json
+Response:
+`json
 {
   "success": true
 }
-```
+`
 
-### 5. Boas práticas
-- Sempre trate `socket.on('error')` para reagir a credenciais inválidas ou ausência de provider.
-- Sincronize `threadId` com um identificador da sua aplicação (usuário, sessão, ticket).
-- Reaproveite a mesma conexão Socket.IO para múltiplas requisições sequenciais do mesmo ator; o cache de contexto fica na thread.
-- Para resetar o contexto, emita `clear_conversation` e aguarde o novo `thread_created`.
-- Use as rotas REST para auditoria (`/api/logs`) e billing (`/api/tokens`) periódicos.
-- Versões mobile/desktop podem embutir o mesmo fluxo com bibliotecas Socket.IO compatíveis.
+### 🔐 Best Practices
 
-Seguindo os passos acima, qualquer aplicação externa consegue orquestrar agentes, acompanhar chamadas de tool em tempo real e integrar o DelsucIA como um serviço de IA conversacional completo.
+- Always handle socket.on("error") to detect missing or invalid credentials.
+- Map 	hreadId to your domain entities (user, session, ticket, etc.).
+- Reuse the same Socket.IO connection for sequential requests from the same actor to preserve context.
+- Emit clear_conversation when you need to reset the assistant context and wait for the new 	hread_created event.
+- Periodically audit /api/logs and /api/tokens for monitoring and billing.
+- Mobile/desktop apps can embed the same flow using Socket.IO client libraries.
 
-## 📁 Estrutura do Projeto
+Following these steps allows any external application to orchestrate agents, observe tool calls in real time, and adopt DelsucIA as a complete conversational AI service.
 
-```
+## 📁 Project Structure
+
+`
 DelsucIA/
 ├── src/
 │   ├── agents/
-│   │   ├── agents.json       # Configuração dos agentes
-│   │   ├── agentLoader.ts    # Carregador de agentes
-│   │   ├── agentManager.ts   # Gerenciador de agentes OpenAI
-│   │   └── config.ts          # Configuração e seleção de agentes
+│   │   ├── agents.json       # Agent configuration
+│   │   ├── agentLoader.ts    # Agent loader
+│   │   ├── agentManager.ts   # OpenAI agent manager
+│   │   └── config.ts         # Configuration and agent selection
 │   ├── config/
-│   │   └── env.ts            # Gerenciamento de configurações
+│   │   └── env.ts            # Environment configuration management
 │   ├── tools/
-│   │   ├── fileSystemTools.ts # Ferramentas de sistema de arquivos
-│   │   └── terminalTools.ts    # Ferramentas de terminal
+│   │   ├── fileSystemTools.ts  # File system tools
+│   │   └── terminalTools.ts    # Terminal tools
 │   ├── utils/
 │   │   ├── functionDescriptions.ts
 │   │   └── serverHelpers.ts
-│   ├── server.ts             # Servidor Socket.IO com integração OpenAI
-│   └── main.ts
+│   ├── server.ts             # Socket.IO server + OpenAI integration
+│   └── main.ts               # Sample TypeScript script
 ├── client/
-│   └── index.html            # Cliente web
-├── dist/                     # Arquivos compilados (TypeScript)
+│   └── index.html            # Web client
+├── dist/                     # Compiled TypeScript output
 ├── package.json
 ├── tsconfig.json
-├── config.json               # Configurações da aplicação (criado via frontend)
-├── tokens.json               # Histórico de tokens (gerado automaticamente)
-├── logs.json                 # Logs da aplicação (gerado automaticamente)
+├── config.json               # App configuration (created via frontend)
+├── tokens.json               # Token history (generated automatically)
+├── logs.json                 # Application logs (generated automatically)
 └── README.md
-```
+`
 
-## ⚙️ Configuração
+## ⚙️ Configuration
 
-### Configuração via Frontend
-A aplicação utiliza `config.json` para armazenar configurações. Configure através da interface web:
-- `openaiApiKey`: Sua chave da API OpenAI (necessária para Assistants API)
-- `port`: Porta do servidor (padrão: 3000)
+### Via Frontend
+config.json stores runtime configuration and is managed through the web UI:
+- openaiApiKey: your OpenAI API key (required for the Assistants API)
+- port: server port (default: 3000)
 
-### Assistente
-O assistente é criado automaticamente na primeira execução com:
-- **Nome**: DelsucIA Assistant
-- **Modelo**: GPT-4 Turbo Preview
-- **Instruções**: Assistente especializado em analisar e navegar por projetos de código
-- **Tools**: Funções para listar diretórios, ler arquivos e procurar arquivos
+### Default Assistant
+The assistant is created automatically on first run with:
+- **Name**: DelsucIA Assistant
+- **Model**: GPT-4 Turbo Preview
+- **Instructions**: AI assistant specialized in browsing code projects
+- **Tools**: file tooling to list, read, and search files
 
-Você pode personalizar os agentes editando o arquivo `src/agents/agents.json`.
+Customize agents by editing src/agents/agents.json.
 
-### Segurança de Arquivos
-- ✅ Acesso restrito apenas ao diretório raiz do projeto
-- ✅ Proteção contra acesso a arquivos fora do projeto (path traversal)
-- ✅ Limite de 1MB por arquivo
-- ✅ Ignora automaticamente `node_modules`, `.git` e `dist`
+### File Safety
+- ✅ Access restricted to the project root directory
+- ✅ Protection against path traversal outside the project
+- ✅ Maximum file size of 1 MB
+- ✅ Automatically ignores 
+ode_modules, .git, and dist
 
 ## ⚡ Performance
 
-O sistema de agentes dinâmicos foi otimizado para manter performance equivalente ao sistema hardcoded:
+The dynamic agent system is optimized to maintain the same performance as the hardcoded version.
 
-### Otimizações Implementadas
+### Implemented Optimizations
 
-1. **Cache de Configurações**: Cache em memória após primeira carga
-2. **Cache de Agentes Ordenados**: Agentes pré-ordenados por prioridade
-3. **Cache de Agentes Específicos**: Referências diretas para agentes comuns
-4. **Compilação de Regex**: Regex compiladas durante criação
-5. **Versão Síncrona Otimizada**: `selectAgentSync()` sem overhead de Promise
-6. **Inicialização na Startup**: Carregamento dos agentes na inicialização
+1. **Configuration Cache** – Keeps agent configuration in memory after first load
+2. **Pre-sorted Agents** – Agents are pre-ordered by priority
+3. **Agent Shortcuts** – Direct references for frequently used agents
+4. **Compiled Regex** – Regex rules are compiled during creation
+5. **Synchronous Selector** – selectAgentSync() avoids Promise overhead
+6. **Startup Initialization** – Agents load during server startup
 
 ### Benchmarks
 
-| Operação | Sistema Anterior | Sistema Novo (com otimizações) |
-|----------|------------------|--------------------------------|
-| Seleção de agente | ~0.1-0.5ms | **~0.1-0.5ms** |
-| Carregamento inicial | 0ms (hardcoded) | ~5-10ms (apenas na startup) |
-| Chamadas subsequentes | ~0.1-0.5ms | **~0.1-0.5ms** |
+| Operation            | Previous System | Optimized System |
+|---------------------|-----------------|------------------|
+| Agent selection      | ~0.1–0.5ms      | **~0.1–0.5ms**   |
+| Initial loading      | 0ms (hardcoded) | ~5–10ms (start only) |
+| Subsequent calls     | ~0.1–0.5ms      | **~0.1–0.5ms**   |
 
-**Conclusão**: A nova implementação NÃO perde performance significativa. Com as otimizações implementadas, a seleção de agentes é tão rápida quanto antes, com overhead inicial mínimo apenas na startup.
+**Conclusion**: The new implementation preserves the same runtime performance with only a small startup overhead.
 
-## 🔒 Segurança
+## 🔒 Security
 
-⚠️ **Importante**: Nunca commite os seguintes arquivos no repositório (estão no `.gitignore`):
-- `config.json` - Contém API keys
-- `tokens.json` - Histórico de uso
-- `logs.json` - Logs da aplicação
+⚠️ **Important**: Never commit the following files (ignored via .gitignore):
+- config.json – contains API keys
+- 	okens.json – token usage history
+- logs.json – application logs
 
 ## 🐛 Troubleshooting
 
-### Erro: "Nenhum agente configurado"
-**Causa**: Arquivo JSON não encontrado ou inválido  
-**Solução**: Verifique se `agents.json` existe e está no formato correto
+### Error: "No agents configured"
+**Cause**: Missing or invalid JSON configuration
+**Solution**: Ensure gents.json exists and has valid syntax
 
-### Erro: "Tool não encontrada"
-**Causa**: Tool referenciada não está registrada  
-**Solução**: Verifique se a tool está no `toolSets` ou registre-a
+### Error: "Tool not found"
+**Cause**: Tool reference is missing from registered tool sets
+**Solution**: Confirm the tool exists in 	oolSets or register it
 
-### Agente não está sendo selecionado
-**Causa**: Regras shouldUse muito restritivas ou conflito de prioridade  
-**Solução**: 
-1. Verifique as palavras-chave/regex
-2. Ajuste a prioridade
-3. Teste a regra manualmente
+### Agent not being selected
+**Cause**: shouldUse rules too restrictive or priority conflicts
+**Solution**:
+1. Review keyword/regex rules
+2. Adjust priority levels
+3. Test the rule manually
 
-### Erro: "API key não configurada"
-**Causa**: API key não foi configurada via frontend  
-**Solução**: Acesse a interface web e configure a API key no botão "⚙️ Config"
+### Error: "API key not configured"
+**Cause**: API key not set via frontend or environment
+**Solution**: Configure the API key using the "⚙️ Config" UI or environment variable
 
-### Erro: "AuthenticationError: Incorrect API key"
-**Causa**: API key inválida ou expirada  
-**Solução**: Verifique a API key configurada e atualize se necessário
+### Error: "AuthenticationError: Incorrect API key"
+**Cause**: Invalid or expired API key
+**Solution**: Update the API key with a valid credential
 
-## 📚 Referências
+## 🔄 CI/CD Automation
+
+The workflow defined at `.github/workflows/npm-publish.yml` automates npm publishing.
+
+- **Trigger**: fires automatically whenever a GitHub release is created, or manually via *Run workflow*.
+- **Environment**: uses Node.js 20 via `actions/setup-node@v4`.
+- **Steps**: checkout, `npm ci`, `npm run build`, tag/version validation, then `npm publish`.
+- **Secret required**: configure `NPM_TOKEN` in repository secrets with publish access to `delsuc-ia`.
+- **Tag format**: release tags must match `v<semver>` (e.g., `v1.2.3`) and align with `package.json`'s `version`.
+
+To trigger manually, open the workflow in GitHub Actions and optionally provide `release_tag`; if omitted, the release tag associated with the run is used.
+
+## 📚 References
 
 - [OpenAI Assistants API](https://platform.openai.com/docs/assistants)
 - [Function Calling](https://platform.openai.com/docs/guides/function-calling)
 - [Socket.IO Documentation](https://socket.io/docs/)
 
-## 📄 Licença
+## 📄 License
 
 ISC
+
