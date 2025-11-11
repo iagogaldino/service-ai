@@ -261,3 +261,14 @@ export function selectAgentSync(message: string): AgentConfig {
   // Fallback final: retorna o último agente ordenado (menor prioridade = padrão)
   return sortedAgents[sortedAgents.length - 1];
 }
+
+/**
+ * Busca um agente específico pelo nome.
+ * 
+ * @param name Nome do agente a ser buscado.
+ * @returns Configuração do agente ou null se não encontrado.
+ */
+export async function findAgentConfigByName(name: string): Promise<AgentConfig | null> {
+  const agents = await loadAgentsConfig();
+  return agents.find(agent => agent.name === name) || null;
+}

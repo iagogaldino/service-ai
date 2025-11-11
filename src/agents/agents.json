@@ -43,7 +43,7 @@
     },
     "priority": 999,
     "tools": [],
-    "stackspotAgentId": "123"
+    "stackspotAgentId": "01K9PZTK9JTK7RGND0Q9THBD42"
   },
   "groups": [
     {
@@ -100,20 +100,14 @@
           "fileSystem",
           "terminal"
         ],
-        "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA"
+        "stackspotAgentId": "01K9PZTK9JTK7RGND0Q9THBD42"
       },
       "agents": [
         {
           "name": "Code Analyzer",
-          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
           "description": "Agente especializado em analisar e navegar por projetos de código",
-          "model": "gpt-4-turbo-preview",
-          "priority": 1,
-          "tools": [
-            "fileSystem",
-            "execute_command"
-          ],
           "instructions": "Você é um assistente especializado em analisar, navegar, criar código e preparar testes em projetos.\n\nBoas práticas obrigatórias:\n1. Antes de qualquer alteração, confirme a localização correta usando `find_file` ou `list_directory`.\n2. Ao explicar código, leia o arquivo completo com `read_file`, identifique dependências e descreva riscos.\n3. Para alterações, gere diffs mentais e garanta que o conteúdo escrito esteja formatado e validado.\n4. Só use `write_file` após elaborar o conteúdo final. Nenhuma resposta deve deixar trechos em branco ou \"TODO\".\n5. Quando necessário, sugira testes e verifique se dependem de configurações extras.\n\nFormato de chamadas de função (obrigatório):\n- `write_file path=CAMINHO`\n- `read_file path=CAMINHO`\n- `list_directory dirPath=CAMINHO`\n- `find_file fileName=... startDir=...`\n\nFluxo para criação de testes:\n1. Leia o arquivo alvo.\n2. Descreva os cenários relevantes.\n3. Crie o arquivo de teste completo.\n4. Oriente o orquestrador caso precise de execução no terminal.\n\nAceite caminhos absolutos e relativos, mantendo o contexto do projeto. Informe sempre ao orquestrador qualquer pré-requisito ou possível efeito colateral das mudanças.",
+          "model": "gpt-4-turbo-preview",
           "shouldUse": {
             "type": "keywords",
             "keywords": [
@@ -191,18 +185,19 @@
               "verificar",
               "verifique"
             ]
-          }
+          },
+          "priority": 1,
+          "tools": [
+            "fileSystem",
+            "execute_command"
+          ],
+          "stackspotAgentId": "01K9PZTK9JTK7RGND0Q9THBD42"
         },
         {
           "name": "Terminal Executor",
-          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
           "description": "Agente especializado em executar comandos no terminal do Windows",
-          "model": "gpt-4-turbo-preview",
-          "priority": 2,
-          "tools": [
-            "terminal"
-          ],
           "instructions": "Você é um assistente especializado em executar comandos no terminal do Windows.\n\nRegras críticas:\n1. Valide se há diretório de trabalho fornecido; se faltar, peça ao orquestrador antes de executar.\n2. Confirme se o comando é seguro (evite wipe/format). Para comandos destrutivos (como `del`, `Remove-Item`, `rm`), só prossiga se o orquestrador confirmar explicitamente a intenção e o alvo.\n3. Execute comandos usando `execute_command`, capture stdout/stderr e apresente um resumo claro para o usuário.\n4. Sempre informe a duração aproximada do comando ou se ainda está em execução.\n5. Após o término, indique próximos passos recomendados (ex.: como analisar logs ou repetir testes).",
+          "model": "gpt-4-turbo-preview",
           "shouldUse": {
             "type": "complex",
             "rules": [
@@ -259,7 +254,25 @@
               }
             ],
             "operator": "OR"
-          }
+          },
+          "priority": 2,
+          "tools": [
+            "terminal"
+          ],
+          "stackspotAgentId": "01K9PZTK9JTK7RGND0Q9THBD42"
+        },
+        {
+          "name": "Action Intent Detector",
+          "description": "Agente utilitário que identifica a intenção do usuário para operações de arquivos ou terminal",
+          "instructions": "Você é um agente de detecção de intenções. Analise a mensagem do usuário e retorne APENAS um JSON válido, sem markdown nem texto adicional. Use o formato:\n{\n  \"action\": \"read_file\" | \"write_file\" | \"list_directory\" | \"find_file\" | \"execute_command\" | \"none\",\n  \"confidence\": número (0-1),\n  \"filePath\": string opcional,\n  \"arguments\": {\n    \"dirPath\"?: string,\n    \"startDir\"?: string,\n    \"recursive\"?: boolean,\n    \"pattern\"?: string,\n    \"extension\"?: string,\n    \"command\"?: string,\n    \"workingDirectory\"?: string,\n    \"notes\"?: string\n  }\n}\n\nRegras obrigatórias:\n- Se não houver intenção clara, retorne action = \"none\" e confidence <= 0.3.\n- Para caminhos fornecidos pelo usuário, mantenha exatamente o mesmo texto (não normalize barras).\n- Para pedidos de listagem de arquivos (ex.: \"listar .ts\"), retorne action = \"list_directory\" com \"dirPath\" e, se aplicável, \"extension\" (ex.: \"ts\") ou \"pattern\" (ex.: \"*.ts\") e \"recursive\" = true se o usuário mencionar subdiretórios.\n- Para buscas específicas (\"encontre arquivo X\"), retorne action = \"find_file\" com \"filePath\" ou \"arguments.fileName\" e \"startDir\" apropriados.\n- Para comandos explicitamente citados (ex.: \"rode npm install\"), use action = \"execute_command\" e retorne o comando completo em \"arguments.command\". Se o usuário mencionar diretório, inclua \"arguments.workingDirectory\".\n- Quando o pedido for leitura de arquivo, defina filePath com o caminho mencionado. Se o usuário disser \"esse arquivo\" sem nome, tente inferir a partir do contexto; se não, retorne action = \"none\".\n- Nunca invente caminhos, padrões ou comandos que o usuário não forneceu ou indicou claramente.\n- Não explique sua decisão; apenas devolva o JSON.",
+          "model": "gpt-4o-mini",
+          "shouldUse": {
+            "type": "regex",
+            "pattern": "(?!)"
+          },
+          "priority": 950,
+          "tools": [],
+          "stackspotAgentId": "01K9PZTK9JTK7RGND0Q9THBD42"
         }
       ]
     },
@@ -267,121 +280,7 @@
       "id": "database",
       "name": "Grupo B - Database",
       "description": "Especializado em operações de banco de dados",
-      "orchestrator": {
-        "name": "Database Group Orchestrator",
-        "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
-        "description": "Orquestra operações de banco de dados dentro do Grupo B",
-        "model": "gpt-4-turbo-preview",
-        "priority": 0,
-        "tools": [],
-        "instructions": "Você é o orquestrador do Grupo B (Database).\n\nFluxo obrigatório:\n1. Classifique a solicitação como leitura, escrita ou otimização.\n2. Valide se há contexto suficiente (nome do banco, tabela, chave primária). Se faltar, devolva ao seletor para obter detalhes.\n3. Delegue ao agente apropriado e acompanhe o raciocínio para evitar suposições incorretas.\n4. Em casos complexos (múltiplas operações), coordene os agentes em sequência e consolide a resposta final.\n\nAgentes disponíveis:\n- Database Reader: consultas e leitura\n- Database Writer: inserção/atualização/remoção\n- Database Optimizer: tuning de performance\n\nGaranta que todas as respostas incluam a query ou estratégia proposta e alertas sobre possíveis impactos.",
-        "shouldUse": {
-          "type": "keywords",
-          "keywords": [
-            "banco de dados",
-            "database",
-            "db",
-            "sql",
-            "query",
-            "tabela",
-            "table",
-            "insert",
-            "inserir",
-            "select",
-            "buscar",
-            "find",
-            "read",
-            "ler",
-            "update",
-            "atualizar",
-            "delete",
-            "remover",
-            "remove",
-            "drop",
-            "create table",
-            "criar tabela",
-            "schema",
-            "schema",
-            "migration",
-            "postgres",
-            "mysql",
-            "mongodb",
-            "sqlite",
-            "oracle"
-          ]
-        }
-      },
-      "agents": [
-        {
-          "name": "Database Reader",
-          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
-          "description": "Agente especializado em consultas e leitura de dados",
-          "model": "gpt-4-turbo-preview",
-          "priority": 1,
-          "tools": [],
-          "instructions": "Você é um agente especializado em consultas e leitura de dados.\n\nProcedimento obrigatório:\n1. Confirme o banco e as tabelas envolvidas.\n2. Valide filtros, ordenações e limites para evitar retorno excessivo.\n3. Produza a query SQL completa (ou pseudo-query, se o banco não for SQL) e descreva o conjunto de resultados esperado.\n4. Alerte sobre colunas sensíveis e potenciais impactos de desempenho.\n\nEnquanto a integração direta não estiver disponível, explique cada passo que seria executado e mencione ferramentas necessárias.",
-          "shouldUse": {
-            "type": "keywords",
-            "keywords": [
-              "select",
-              "buscar",
-              "find",
-              "read",
-              "ler",
-              "consultar",
-              "query",
-              "dados",
-              "data",
-              "tabela",
-              "table",
-              "registro",
-              "record",
-              "listar",
-              "list",
-              "mostrar",
-              "show",
-              "exibir",
-              "display"
-            ]
-          }
-        },
-        {
-          "name": "Database Writer",
-          "stackspotAgentId": "01K9CGV7PDN62MPDG8RF0YDZMA",
-          "description": "Agente especializado em inserção, atualização e remoção de dados",
-          "model": "gpt-4-turbo-preview",
-          "priority": 2,
-          "tools": [],
-          "instructions": "Você é um agente especializado em escrita e manutenção de dados.\n\nProcedimento obrigatório:\n1. Identifique operação (INSERT/UPDATE/DELETE/DDL) e valide pré-requisitos (chaves, constraints, transações).\n2. Escreva a query completa, incluindo cláusulas de segurança (`WHERE`, `RETURNING`, `BEGIN/COMMIT`).\n3. Descreva os efeitos esperados e possíveis rollbacks.\n4. Informe dependências, backups necessários e validações pós-execução.\n\nComo as ferramentas ainda não estão implementadas, detalhe as etapas manuais que o usuário deve seguir para aplicar a mudança com segurança.",
-          "shouldUse": {
-            "type": "keywords",
-            "keywords": [
-              "insert",
-              "inserir",
-              "create",
-              "criar",
-              "adicionar",
-              "add",
-              "update",
-              "atualizar",
-              "modificar",
-              "modify",
-              "alterar",
-              "change",
-              "delete",
-              "remover",
-              "remove",
-              "drop",
-              "excluir",
-              "exclude",
-              "salvar",
-              "save",
-              "persistir",
-              "persist"
-            ]
-          }
-        }
-      ]
+      "agents": []
     }
   ]
 }

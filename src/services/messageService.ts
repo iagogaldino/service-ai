@@ -4,7 +4,8 @@
 
 import { Socket } from 'socket.io';
 import { LLMAdapter } from '../llm/adapters/LLMAdapter';
-import { AgentManager } from '../agents/agentManager';
+import { AgentManager, executeTool } from '../agents/agentManager';
+import { findAgentConfigByName } from '../agents/config';
 import { fileSystemFunctions } from '../tools/fileSystemTools';
 import { TokenUsage } from '../types';
 import { getLLMAdapter, getCurrentLLMProvider } from './llmService';
@@ -16,17 +17,353 @@ import { saveConversationMessage } from '../storage/conversationStorage';
 import { calculateTokenCost } from '../utils/tokenCalculator';
 import { emitToMonitors } from './monitoringService';
 
+const ACTION_DETECTOR_AGENT_NAME = 'Action Intent Detector';
+
+interface ActionIntentResult {
+  action: string;
+  confidence?: number;
+  filePath?: string;
+  arguments?: Record<string, any>;
+}
+
+interface ActionIntentContext {
+  contextSnippet: string;
+  details?: Record<string, any>;
+}
+
+function parseActionDetectorResponse(rawResponse: string): ActionIntentResult | null {
+  if (!rawResponse) {
+    return null;
+  }
+
+  let cleaned = rawResponse.trim();
+
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[\w-]*\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+
+  const firstBraceIndex = cleaned.indexOf('{');
+  const lastBraceIndex = cleaned.lastIndexOf('}');
+
+  if (firstBraceIndex !== -1 && lastBraceIndex !== -1) {
+    cleaned = cleaned.slice(firstBraceIndex, lastBraceIndex + 1);
+  }
+
+  let parsed: any;
+
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  if (typeof parsed.action !== 'string') {
+    return null;
+  }
+
+  const result: ActionIntentResult = {
+    action: parsed.action.trim().toLowerCase(),
+    confidence: typeof parsed.confidence === 'number' ? parsed.confidence : undefined,
+    filePath: typeof parsed.filePath === 'string' ? parsed.filePath.trim() : undefined,
+    arguments: typeof parsed.arguments === 'object' && parsed.arguments !== null ? parsed.arguments : undefined,
+  };
+
+  if (!result.filePath && result.arguments && typeof result.arguments.filePath === 'string') {
+    result.filePath = result.arguments.filePath.trim();
+  }
+
+  return result;
+}
+
+async function detectActionIntent(message: string, llmAdapter: LLMAdapter): Promise<ActionIntentResult | null> {
+  try {
+    const actionAgentConfig = await findAgentConfigByName(ACTION_DETECTOR_AGENT_NAME);
+
+    if (!actionAgentConfig) {
+      console.warn('⚠️ Action Intent Detector não configurado. Consulte agents.json para habilitar essa função.');
+      return inferActionIntentHeuristics(message);
+    }
+
+    const agentId = await llmAdapter.getOrCreateAgent(actionAgentConfig);
+    const thread = await llmAdapter.createThread({ purpose: 'action_intent_detection' });
+
+    const detectorPrompt = [
+      'Analise a mensagem abaixo e retorne apenas o JSON solicitado nas instruções do agente.',
+      'Mensagem do usuário:',
+      message,
+    ].join('\n\n');
+
+    await llmAdapter.addMessage(thread.id, 'user', detectorPrompt);
+    const run = await llmAdapter.createRun(thread.id, agentId);
+    const { message: detectorResponse } = await llmAdapter.waitForRunCompletion(thread.id, run.id);
+
+    const parsed = parseActionDetectorResponse(detectorResponse);
+
+    if (!parsed) {
+      console.warn('⚠️ Resposta inválida do Action Intent Detector:', detectorResponse);
+      return inferActionIntentHeuristics(message);
+    }
+
+    if (parsed.action === 'none' || (parsed.confidence !== undefined && parsed.confidence < 0.4)) {
+      const heuristicIntent = inferActionIntentHeuristics(message);
+      if (heuristicIntent) {
+        return heuristicIntent;
+      }
+    }
+
+    return parsed;
+  } catch (error: any) {
+    console.warn('⚠️ Erro ao executar Action Intent Detector:', error?.message || error);
+    return inferActionIntentHeuristics(message);
+  }
+}
+
+function escapeForPowerShellSingleQuote(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function buildListDirectoryCommand(
+  dirPath: string,
+  extension?: string,
+  pattern?: string,
+  recursive: boolean = true
+): { command: string; workingDirectory?: string } {
+  const escapedDir = escapeForPowerShellSingleQuote(dirPath);
+
+  let filterClause = '';
+  if (pattern && pattern.trim()) {
+    filterClause = ` -Filter '${escapeForPowerShellSingleQuote(pattern.trim())}'`;
+  } else if (extension && extension.trim()) {
+    const normalizedExtension = extension.trim().replace(/^\./, '');
+    filterClause = ` -Filter '*.${escapeForPowerShellSingleQuote(normalizedExtension)}'`;
+  }
+
+  const recurseFlag = recursive ? ' -Recurse' : '';
+  const command = `powershell -NoProfile -Command "Get-ChildItem -Path '.'${filterClause}${recurseFlag} -File | Select-Object -ExpandProperty FullName"`;
+  return { command, workingDirectory: dirPath };
+}
+
+async function runCommandForIntent(
+  command: string,
+  workingDirectory: string | undefined,
+  socket: Socket
+): Promise<ActionIntentContext | null> {
+  try {
+    const startTime = Date.now();
+    const rawResult = await executeTool(
+      'execute_command',
+      { command, workingDirectory },
+      socket
+    );
+
+    const executionTimeMs = Date.now() - startTime;
+    const output =
+      typeof rawResult === 'string'
+        ? rawResult
+        : JSON.stringify(rawResult, null, 2);
+
+    const trimmedOutput =
+      output.length > 4000 ? `${output.slice(0, 4000)}\n... [resultado truncado]` : output;
+
+    const contextSnippet = [
+      '[Resultado de comando executado automaticamente]',
+      `Comando: ${command}`,
+      workingDirectory ? `Diretório de trabalho: ${workingDirectory}` : '',
+      `Duração: ${executionTimeMs}ms`,
+      '',
+      trimmedOutput
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    if (socket) {
+      const payload = {
+        command,
+        workingDirectory: workingDirectory || null,
+        durationMs: executionTimeMs,
+        output: trimmedOutput
+      };
+      socket.emit('command_executed', payload);
+      emitToMonitors(socket.id, 'command_executed', payload);
+    }
+
+    return {
+      contextSnippet,
+      details: {
+        command,
+        workingDirectory,
+        executionTimeMs
+      }
+    };
+  } catch (error: any) {
+    console.warn('⚠️ Erro ao executar comando detectado automaticamente:', error?.message || error);
+    if (socket) {
+      const payload = {
+        command,
+        workingDirectory: workingDirectory || null,
+        error: error?.message || 'Erro ao executar comando'
+      };
+      socket.emit('command_execution_failed', payload);
+      emitToMonitors(socket.id, 'command_execution_failed', payload);
+    }
+    return null;
+  }
+}
+
+async function enrichMessageWithActionIntent(
+  actionIntent: ActionIntentResult | null,
+  message: string,
+  socket: Socket
+): Promise<ActionIntentContext | null> {
+  if (!actionIntent) {
+    return null;
+  }
+
+  const args = actionIntent.arguments || {};
+
+  if (actionIntent.action === 'list_directory') {
+    const dirPath: string | undefined =
+      args.dirPath ||
+      args.path ||
+      args.startDir ||
+      actionIntent.filePath;
+
+    if (!dirPath) {
+      return null;
+    }
+
+    const recursive =
+      typeof args.recursive === 'boolean'
+        ? args.recursive
+        : /subdiretório|subdiretorio|subfolder|recurs/i.test(message);
+
+    const extension: string | undefined =
+      args.extension ||
+      (args.pattern && typeof args.pattern === 'string' && args.pattern.startsWith('*.')
+        ? args.pattern.slice(2)
+        : undefined);
+
+    const pattern: string | undefined = args.pattern;
+
+    const listCommand = buildListDirectoryCommand(dirPath, extension, pattern, recursive);
+    return await runCommandForIntent(listCommand.command, listCommand.workingDirectory, socket);
+  }
+
+  if (actionIntent.action === 'execute_command') {
+    const command: string | undefined = args.command || args.cmd;
+    if (!command) {
+      return null;
+    }
+    const workingDirectory: string | undefined =
+      args.workingDirectory ||
+      args.cwd ||
+      actionIntent.filePath;
+
+    return await runCommandForIntent(command, workingDirectory, socket);
+  }
+
+  return null;
+}
+
+function extractPathsFromMessage(message: string): string[] {
+  const pathPattern = /([A-Za-z]:[\\\/][^\s"']+|\.\.?[\\\/][^\s"']+)/g;
+  const matches = Array.from(message.matchAll(pathPattern)).map((match) => match[1]?.trim()).filter(Boolean);
+  return matches as string[];
+}
+
+function inferActionIntentHeuristics(message: string): ActionIntentResult | null {
+  const lowerMessage = message.toLowerCase();
+  const paths = extractPathsFromMessage(message);
+
+  const listKeywords = [
+    'listar', 'lista', 'list', 'mostrar', 'mostra', 'mostre', 'traga', 'trazer', 'me traga', 'quero ver', 'quais arquivos',
+    'listagem', 'files', 'arquivos', 'mostrar arquivos', 'listar arquivos'
+  ];
+
+  const hasListIntent = listKeywords.some((keyword) => lowerMessage.includes(keyword));
+
+  if (hasListIntent && paths.length > 0) {
+    const extensionMatch = lowerMessage.match(/\.([a-z0-9]{1,6})\b/);
+    const extension =
+      extensionMatch && extensionMatch[1] && !extensionMatch[1].includes('\\')
+        ? extensionMatch[1]
+        : undefined;
+
+    const recursive = /subdiretório|subdiretorio|subpasta|subfolder|todos os diretórios|todos os diretorios|recurs/i.test(
+      lowerMessage
+    );
+
+    return {
+      action: 'list_directory',
+      confidence: 0.65,
+      filePath: paths[0],
+      arguments: {
+        dirPath: paths[0],
+        extension,
+        recursive
+      }
+    };
+  }
+
+  const commandMatch = message.match(/(?:execute|rodar|rode|run|start|inicie|iniciar)\s+([^\n]+)/i);
+  if (commandMatch && commandMatch[1]) {
+    return {
+      action: 'execute_command',
+      confidence: 0.6,
+      arguments: {
+        command: commandMatch[1].trim(),
+        workingDirectory: paths[0]
+      }
+    };
+  }
+
+  return null;
+}
+
 /**
  * Detecta se a mensagem contém uma solicitação de leitura de arquivo
  */
 export function detectFileReadRequest(message: string): { detected: boolean; filePath?: string } {
-  const filePathPattern = /(?:ler|leia|read|conteúdo|conteudo|dados|o que tem|quais dados|mostre|mostrar|exiba|exibir|abrir|abre)\s+(?:o\s+)?(?:arquivo\s+)?([A-Za-z]:[\\\/][^\s]+|\.\.?[\\\/][^\s]+|[^\s]+\.[a-zA-Z0-9]+)/i;
-  const match = message.match(filePathPattern);
-  
-  if (match && match[1]) {
-    return { detected: true, filePath: match[1].trim() };
+  const lowerMessage = message.toLowerCase();
+
+  const triggerKeywords = [
+    'ler', 'leia', 'read', 'conteúdo', 'conteudo', 'dados', 'mostrar',
+    'mostre', 'abrir', 'abre', 'exibir', 'exiba', 'o que tem', 'quais dados',
+    'analise', 'analisa', 'analisar', 'explicar', 'explique'
+  ];
+
+  const keywordDetected = triggerKeywords.some(keyword => lowerMessage.includes(keyword));
+
+  const primaryPattern =
+    /(?:ler|leia|read|conteúdo|conteudo|dados|o que tem|quais dados|mostre|mostrar|exiba|exibir|abrir|abre|analise|analisa|analisar|explique|explicar)[^A-Za-z0-9]{0,40}(?:arquivo[^A-Za-z0-9]{0,10})?(?:is|é|do|da|deste|desse|desta|dessa|:|=|->)?\s*([A-Za-z]:[\\\/][^\s"']+|\.\.?[\\\/][^\s"']+|[^:\s"']+\.[A-Za-z0-9]+)/i;
+
+  const primaryMatch = message.match(primaryPattern);
+
+  if (primaryMatch && primaryMatch[1]) {
+    return { detected: true, filePath: primaryMatch[1].trim() };
   }
-  
+
+  if (keywordDetected) {
+    const fallbackPattern = /([A-Za-z]:[\\\/][^\s"']+|\.\.?[\\\/][^\s"']+|[^:\s"']+\.[A-Za-z0-9]+)/g;
+    const candidates = Array.from(message.matchAll(fallbackPattern))
+      .map(match => match[1]?.trim())
+      .filter(Boolean) as string[];
+
+    if (candidates.length > 0) {
+      const candidate = candidates.find(pathCandidate =>
+        /[\\\/]/.test(pathCandidate) || /\.[A-Za-z0-9]+$/.test(pathCandidate)
+      );
+
+      if (candidate) {
+        return { detected: true, filePath: candidate };
+      }
+    }
+  }
+
   return { detected: false };
 }
 
@@ -84,10 +421,40 @@ export async function processMessage(
 
     console.log(`📤 Mensagem recebida: "${message}"`);
     
+    // Detecta intenção geral de ação (ex.: leitura de arquivo, execução de comando)
+    const actionIntent = await detectActionIntent(message, llmAdapter);
+
+    if (actionIntent) {
+      const actionIntentData = {
+        action: actionIntent.action,
+        confidence: actionIntent.confidence ?? null,
+        filePath: actionIntent.filePath ?? null,
+        arguments: actionIntent.arguments ?? null,
+      };
+      socket.emit('action_intent_detected', actionIntentData);
+      emitToMonitors(socket.id, 'action_intent_detected', actionIntentData);
+    }
+
     // Detecta se o usuário está pedindo para ler um arquivo
-    const fileDetection = detectFileReadRequest(message);
+    let fileDetection: ReturnType<typeof detectFileReadRequest> = { detected: false };
+
+    if (actionIntent && actionIntent.action === 'read_file' && actionIntent.filePath) {
+      fileDetection = {
+        detected: true,
+        filePath: actionIntent.filePath,
+      };
+      console.log(`🎯 Action Intent Detector identificou leitura de arquivo: ${actionIntent.filePath}`);
+    } else {
+      fileDetection = detectFileReadRequest(message);
+    }
+
     let enhancedMessage = message;
     let fileContent = '';
+    const actionContext = await enrichMessageWithActionIntent(actionIntent, message, socket);
+
+    if (actionContext?.contextSnippet) {
+      enhancedMessage = `${enhancedMessage}\n\n${actionContext.contextSnippet}`;
+    }
     
     if (fileDetection.detected && fileDetection.filePath) {
       console.log(`📂 Detectado pedido de leitura de arquivo: ${fileDetection.filePath}`);

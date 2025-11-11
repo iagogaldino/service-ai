@@ -53,7 +53,8 @@ const ALLOWED_COMMANDS_PATTERNS = [
   /^vitest\s+/,
   /^cypress\s+/,
   /^playwright\s+/,
-  /^jasmine\s+/
+  /^jasmine\s+/,
+  /^powershell\s+-NoProfile\s+-Command\s+"?Get-ChildItem\b/i
 ];
 
 /**
