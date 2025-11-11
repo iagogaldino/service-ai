@@ -268,6 +268,28 @@ export async function upsertGroupOrchestrator(
 }
 
 /**
+ * Remove o orquestrador de um grupo.
+ */
+export async function deleteGroupOrchestrator(groupId: string): Promise<void> {
+  if (!groupId) {
+    throw new AgentCrudError('Parâmetro "groupId" é obrigatório.');
+  }
+
+  const data = await loadHierarchicalAgentsFile();
+  const group = findGroup(data.groups || [], groupId);
+
+  if (!group.orchestrator) {
+    throw new AgentCrudError(
+      `Grupo "${groupId}" não possui orquestrador configurado.`,
+      404,
+    );
+  }
+
+  delete group.orchestrator;
+  await persistAgentsFile(data);
+}
+
+/**
  * Remove um agente de um grupo.
  */
 export async function deleteAgent(

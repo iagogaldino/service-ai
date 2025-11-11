@@ -16,6 +16,7 @@ import {
   AgentUpdatePayload,
   createAgent,
   deleteAgent,
+  deleteGroupOrchestrator,
   getAgentsHierarchy,
   updateAgent,
   upsertFallbackAgent,
@@ -324,32 +325,42 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
       });
       
       // Organiza grupos
-      const formattedGroups = Array.from(groups.values()).map(group => ({
-        id: group.groupId,
-        name: group.groupName,
-        orchestrator: {
-          name: group.orchestrator.name,
-          description: group.orchestrator.description,
-          toolsCount: group.orchestrator.tools.length,
-          tools: group.orchestrator.tools.map((tool: any) => {
-            if (tool.type === 'function' && tool.function) {
-              return tool.function.name;
+      const formattedGroups = Array.from(groups.values()).map(group => {
+        const orchestratorData = group.orchestrator
+          ? {
+              name: group.orchestrator.name,
+              description: group.orchestrator.description,
+              toolsCount: group.orchestrator.tools.length,
+              tools: group.orchestrator.tools
+                .map((tool: any) => {
+                  if (tool.type === 'function' && tool.function) {
+                    return tool.function.name;
+                  }
+                  return 'unknown';
+                })
+                .filter(Boolean)
             }
-            return 'unknown';
-          }).filter(Boolean)
-        },
-        agents: group.agents.map(agent => ({
-          name: agent.name,
-          description: agent.description,
-          toolsCount: agent.tools.length,
-          tools: agent.tools.map((tool: any) => {
-            if (tool.type === 'function' && tool.function) {
-              return tool.function.name;
-            }
-            return 'unknown';
-          }).filter(Boolean)
-        }))
-      }));
+          : null;
+
+        return {
+          id: group.groupId,
+          name: group.groupName,
+          orchestrator: orchestratorData,
+          agents: group.agents.map(agent => ({
+            name: agent.name,
+            description: agent.description,
+            toolsCount: agent.tools.length,
+            tools: agent.tools
+              .map((tool: any) => {
+                if (tool.type === 'function' && tool.function) {
+                  return tool.function.name;
+                }
+                return 'unknown';
+              })
+              .filter(Boolean)
+          }))
+        };
+      });
       
       res.json({
         total: agents.length,
@@ -437,6 +448,19 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
         success: true,
         orchestrator,
       });
+    } catch (error) {
+      handleAgentError(res, error);
+    }
+  });
+
+  /**
+   * API: Remove o orquestrador de um grupo.
+   */
+  app.delete('/api/agents/groups/:groupId/orchestrator', async (req: Request, res: Response) => {
+    try {
+      const { groupId } = req.params;
+      await deleteGroupOrchestrator(groupId);
+      res.json({ success: true });
     } catch (error) {
       handleAgentError(res, error);
     }

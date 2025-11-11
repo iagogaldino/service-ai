@@ -51,7 +51,7 @@ export interface GroupConfig {
   id: string;
   name: string;
   description: string;
-  orchestrator: AgentJsonConfig;
+  orchestrator?: AgentJsonConfig;
   agents: AgentJsonConfig[];
 }
 
@@ -335,13 +335,17 @@ export async function loadAgentsFromJson(jsonPath?: string): Promise<AgentConfig
         for (const group of jsonData.groups) {
           console.log(`  📦 Grupo: "${group.name}" (ID: ${group.id})`);
 
-          // Adiciona orquestrador do grupo
-          const orchestratorConfig = convertAgentJsonToConfig(group.orchestrator, toolSets);
-          (orchestratorConfig as any).role = 'orchestrator';
-          (orchestratorConfig as any).groupId = group.id;
-          (orchestratorConfig as any).groupName = group.name;
-          allAgents.push(orchestratorConfig);
-          console.log(`    🎯 Orquestrador: "${group.orchestrator.name}"`);
+          // Adiciona orquestrador do grupo (se existir)
+          if (group.orchestrator) {
+            const orchestratorConfig = convertAgentJsonToConfig(group.orchestrator, toolSets);
+            (orchestratorConfig as any).role = 'orchestrator';
+            (orchestratorConfig as any).groupId = group.id;
+            (orchestratorConfig as any).groupName = group.name;
+            allAgents.push(orchestratorConfig);
+            console.log(`    🎯 Orquestrador: "${group.orchestrator.name}"`);
+          } else {
+            console.log('    ⚠️ Grupo sem orquestrador configurado');
+          }
 
           // Adiciona agentes do grupo
           for (const agent of group.agents) {
@@ -397,12 +401,12 @@ export async function loadAgentsFromJson(jsonPath?: string): Promise<AgentConfig
  * Obtém informações sobre grupos e orquestradores dos agentes carregados
  * 
  * @param {AgentConfig[]} agents - Array de agentes carregados
- * @returns {Map<string, {groupId: string, groupName: string, orchestrator: AgentConfig, agents: AgentConfig[]}>} Mapa de grupos
+ * @returns {Map<string, {groupId: string, groupName: string, orchestrator?: AgentConfig | null, agents: AgentConfig[]}>} Mapa de grupos
  */
 export function getGroupsInfo(agents: AgentConfig[]): Map<string, {
   groupId: string;
   groupName: string;
-  orchestrator: AgentConfig;
+  orchestrator?: AgentConfig | null;
   agents: AgentConfig[];
 }> {
   const groupsMap = new Map();
@@ -425,7 +429,7 @@ export function getGroupsInfo(agents: AgentConfig[]): Map<string, {
         groupsMap.set(groupId, {
           groupId: groupId,
           groupName: agentAny.groupName || groupId,
-          orchestrator: null as any,
+          orchestrator: null,
           agents: []
         });
       }

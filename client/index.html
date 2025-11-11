@@ -2203,6 +2203,7 @@
 
                             html += `<div class="agent-action-buttons" style="margin-top: 8px;">
                                 <button type="button" onclick="startEditOrchestrator('${encodedGroupId}')">Editar orquestrador</button>
+                                <button type="button" class="danger" onclick="deleteOrchestratorPrompt('${encodedGroupId}')">Remover orquestrador</button>
                             </div>
                         </div>`;
                         } else {
@@ -2910,6 +2911,46 @@
                 if (cancelBtn) {
                     cancelBtn.disabled = false;
                 }
+            }
+        }
+
+        async function deleteOrchestratorPrompt(groupIdEncoded) {
+            const groupId = decodeURIComponent(groupIdEncoded);
+
+            const confirmDelete = confirm(`Tem certeza de que deseja remover o orquestrador do grupo "${groupId}"? Esta ação não pode ser desfeita.`);
+            if (!confirmDelete) {
+                return;
+            }
+
+            setAgentFormMessage(`Removendo orquestrador do grupo "${groupId}"...`, 'info');
+
+            try {
+                const response = await fetch(`/api/agents/groups/${encodeURIComponent(groupId)}/orchestrator`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    let errorMessage = 'Falha ao remover o orquestrador.';
+                    try {
+                        const err = await response.json();
+                        if (err && err.error) {
+                            errorMessage = err.error;
+                        }
+                    } catch (parseErr) {
+                        // ignora
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                if (agentFormTarget === 'orchestrator' && agentFormEditing && agentFormEditing.groupId === groupId) {
+                    resetAgentForm(false);
+                }
+
+                await loadAgents();
+                setAgentFormMessage(`Orquestrador removido com sucesso do grupo "${groupId}".`, 'success');
+            } catch (error) {
+                console.error('Erro ao remover orquestrador:', error);
+                setAgentFormMessage(error.message || 'Erro ao remover orquestrador.', 'error');
             }
         }
 
