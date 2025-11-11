@@ -1,0 +1,9 @@
+{
+  "port": 3000,
+  "llmProvider": "stackspot",
+  "openaiApiKey": "",
+  "stackspotClientId": "<your-stackspot-client-id>",
+  "stackspotClientSecret": "<your-stackspot-client-secret>",
+  "stackspotRealm": "stackspot-freemium"
+}
+

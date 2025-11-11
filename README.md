@@ -96,7 +96,7 @@ npm start
 
 ## 4. Configuration (`config.json`)
 
-When the service starts for the first time it will create (or reuse) a `config.json` file in the working directory. The structure is:
+When the service starts for the first time it will create (or reuse) a `config.json` file in the working directory (ignored by git/npm). Use `config.example.json` as a template:
 
 ```json
 {

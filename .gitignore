@@ -8,4 +8,5 @@ tokens.json
 logs.json
 config.json
 conversations.json
+stackspot-sdk-log.json
 
