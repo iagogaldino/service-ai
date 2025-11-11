@@ -105,6 +105,14 @@ When the service starts for the first time it will create (or reuse) a `config.j
   "stackspotClientId": "",
   "stackspotClientSecret": "",
   "stackspotRealm": "stackspot-freemium",
+  "stackspotProxy": {
+    "https": {
+      "host": "proxy.corp.local",
+      "port": 8080,
+      "tunnel": true
+    },
+    "noProxy": ["*.intranet.local"]
+  },
   "port": 3000,
   "lastUpdated": "2024-01-01T12:00:00.000Z"
 }
@@ -113,10 +121,13 @@ When the service starts for the first time it will create (or reuse) a `config.j
 - `llmProvider`: `"openai"` or `"stackspot"`
 - `openaiApiKey`: optional unless provider is `openai`
 - `stackspot*`: optional unless provider is `stackspot`
+- `stackspotProxy`: optional proxy map forwarded to `stackspotdelsuc-sdk@^1.0.10`
 - `port`: HTTP port exposed by the server (default 3000)
 - `lastUpdated`: automatically populated
 
 You can configure everything through the UI: start the service, visit `http://localhost:3000`, click `⚙️ Config`, and submit the form. The API is also available at `POST /api/config`.
+
+- **Proxy support (StackSpot)**: starting with `1.1.0` you can optionally route StackSpot traffic through a corporate proxy. Supply the structure above via UI or `POST /api/config` and the adapter will pass it directly to `stackspotdelsuc-sdk`, supporting HTTPS tunneling, authentication, `NO_PROXY`, and custom strategies.
 
 ---
 
@@ -260,4 +271,6 @@ This project is licensed under the ISC License. See the `LICENSE` file for detai
 ---
 
 Need help or found a bug? Open an issue or reach out through the repository discussions. Happy building! 🚀
+
+
 

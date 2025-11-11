@@ -8,6 +8,7 @@ import { LLMAdapter, LLMThread, LLMMessage, LLMRun, TokenUsage } from './LLMAdap
 import { executeTool } from '../../agents/agentManager';
 import { emitToMonitors } from '../../services/monitoringService';
 import StackSpotSDK from 'stackspotdelsuc-sdk';
+import { StackSpotProxyConfig } from '../../types/stackspot';
 
 // Importação do StackSpot SDK via pacote npm
 const StackSpotClass: any = (StackSpotSDK as any)?.default ?? StackSpotSDK;
@@ -22,6 +23,7 @@ export interface StackSpotConfig {
   clientId: string;
   clientSecret: string;
   realm?: string;
+  proxy?: StackSpotProxyConfig;
 }
 
 export class StackSpotAdapter implements LLMAdapter {
@@ -39,13 +41,105 @@ export class StackSpotAdapter implements LLMAdapter {
       return await executeTool(functionName, args);
     };
     
+    const proxyConfig = StackSpotAdapter.sanitizeProxyConfig(config.proxy);
+
     this.stackspot = new StackSpotClass({
       clientId: config.clientId,
       clientSecret: config.clientSecret,
       realm: config.realm || 'stackspot-freemium',
       toolExecutor: toolExecutor, // Passa o executor para o SDK
       enableFunctionCalling: true, // Habilita function calling automático
+      proxy: proxyConfig,
     });
+  }
+
+  private static sanitizeProxyConfig(proxy?: StackSpotProxyConfig): StackSpotProxyConfig | undefined {
+    if (!proxy) {
+      return undefined;
+    }
+
+    const sanitized: StackSpotProxyConfig = {};
+
+    if (proxy.http?.host?.trim()) {
+      sanitized.http = {
+        host: proxy.http.host.trim(),
+        port: proxy.http.port,
+        username: proxy.http.username?.trim() || undefined,
+        password: proxy.http.password || undefined,
+      };
+      if (sanitized.http && !sanitized.http.username) {
+        delete sanitized.http.username;
+      }
+      if (sanitized.http && !sanitized.http.password) {
+        delete sanitized.http.password;
+      }
+      if (sanitized.http && sanitized.http.port !== undefined) {
+        if (typeof sanitized.http.port === 'string') {
+          const parsedPort = parseInt(sanitized.http.port, 10);
+          if (!Number.isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+            sanitized.http.port = parsedPort;
+          } else {
+            delete sanitized.http.port;
+          }
+        } else if (
+          typeof sanitized.http.port === 'number' &&
+          (!Number.isInteger(sanitized.http.port) ||
+            sanitized.http.port <= 0 ||
+            sanitized.http.port > 65535)
+        ) {
+          delete sanitized.http.port;
+        }
+      }
+    }
+
+    if (proxy.https?.host?.trim()) {
+      sanitized.https = {
+        host: proxy.https.host.trim(),
+        port: proxy.https.port,
+        username: proxy.https.username?.trim() || undefined,
+        password: proxy.https.password || undefined,
+        tunnel: proxy.https.tunnel,
+      };
+      if (sanitized.https && !sanitized.https.username) {
+        delete sanitized.https.username;
+      }
+      if (sanitized.https && !sanitized.https.password) {
+        delete sanitized.https.password;
+      }
+      if (sanitized.https && sanitized.https.tunnel === undefined) {
+        delete sanitized.https.tunnel;
+      }
+      if (sanitized.https && sanitized.https.port !== undefined) {
+        if (typeof sanitized.https.port === 'string') {
+          const parsedPort = parseInt(sanitized.https.port, 10);
+          if (!Number.isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+            sanitized.https.port = parsedPort;
+          } else {
+            delete sanitized.https.port;
+          }
+        } else if (
+          typeof sanitized.https.port === 'number' &&
+          (!Number.isInteger(sanitized.https.port) ||
+            sanitized.https.port <= 0 ||
+            sanitized.https.port > 65535)
+        ) {
+          delete sanitized.https.port;
+        }
+      }
+    }
+
+    if (Array.isArray(proxy.noProxy)) {
+      const entries = proxy.noProxy.map(entry => entry.trim()).filter(Boolean);
+      if (entries.length > 0) {
+        sanitized.noProxy = entries;
+      }
+    }
+
+    if (proxy.strategy?.trim()) {
+      sanitized.strategy = proxy.strategy.trim();
+    }
+
+    return Object.keys(sanitized).length > 0 ? sanitized : undefined;
   }
 
   isConfigured(): boolean {

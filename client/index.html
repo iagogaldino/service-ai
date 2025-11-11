@@ -936,7 +936,7 @@
                     <div id="agentFormMessage" class="agent-message"></div>
                     <form id="agentForm" onsubmit="submitAgentForm(event)">
                         <div class="agent-form-grid">
-                            <div>
+                            <div id="agentGroupWrapper">
                                 <label for="agentGroupSelect">Grupo</label>
                                 <select id="agentGroupSelect" required>
                                 </select>
@@ -1090,6 +1090,89 @@
                                     value="stackspot-freemium"
                                 >
                             </div>
+                            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(139, 92, 246, 0.2);">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+                                    <span class="config-label" style="margin: 0;">Proxy StackSpot (opcional)</span>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: var(--text-secondary); cursor: pointer;">
+                                        <input type="checkbox" id="stackspotProxyEnabled" style="transform: scale(1.1);">
+                                        <span>Ativar proxy</span>
+                                    </label>
+                                </div>
+                                <div id="stackspotProxyStatus" style="font-size: 0.85em; margin-bottom: 12px; color: var(--text-secondary);"></div>
+                                <div id="stackspotProxyFields" style="display: none; border: 1px dashed rgba(139, 92, 246, 0.4); border-radius: 8px; padding: 12px; background: rgba(139, 92, 246, 0.08);">
+                                    <div style="margin-bottom: 12px;">
+                                        <label class="config-label">Proxy HTTPS Host</label>
+                                        <input 
+                                            type="text" 
+                                            id="stackspotProxyHttpsHostInput" 
+                                            placeholder="proxy.corp.local" 
+                                            class="config-input"
+                                        >
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px;">
+                                        <div>
+                                            <label class="config-label">Porta</label>
+                                            <input 
+                                                type="number" 
+                                                id="stackspotProxyHttpsPortInput" 
+                                                placeholder="8080" 
+                                                class="config-input"
+                                                min="1"
+                                            >
+                                        </div>
+                                        <div>
+                                            <label class="config-label">Usuário (opcional)</label>
+                                            <input 
+                                                type="text" 
+                                                id="stackspotProxyHttpsUsernameInput" 
+                                                placeholder="usuario" 
+                                                class="config-input"
+                                            >
+                                        </div>
+                                    </div>
+                                    <div style="margin-bottom: 12px;">
+                                        <label class="config-label">Senha (opcional)</label>
+                                        <input 
+                                            type="password" 
+                                            id="stackspotProxyHttpsPasswordInput" 
+                                            placeholder="••••••••" 
+                                            class="config-input"
+                                        >
+                                        <div id="stackspotProxyHttpsPasswordInfo" style="margin-top: 6px; font-size: 0.8em; color: var(--text-secondary);"></div>
+                                        <label style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.8em; color: var(--text-secondary); cursor: pointer;">
+                                            <input type="checkbox" id="stackspotProxyHttpsClearPasswordInput" style="transform: scale(1.05);">
+                                            <span>Limpar senha armazenada</span>
+                                        </label>
+                                    </div>
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: var(--text-secondary); cursor: pointer;">
+                                            <input type="checkbox" id="stackspotProxyHttpsTunnelInput" style="transform: scale(1.05);">
+                                            <span>Usar modo tunneling (recomendado para HTTPS sobre HTTP)</span>
+                                        </label>
+                                    </div>
+                                    <div style="margin-bottom: 12px;">
+                                        <label class="config-label">No Proxy (domínios separados por vírgula)</label>
+                                        <input 
+                                            type="text" 
+                                            id="stackspotProxyNoProxyInput" 
+                                            placeholder="*.intranet.local, api.internal.local" 
+                                            class="config-input"
+                                        >
+                                    </div>
+                                    <div style="margin-bottom: 4px;">
+                                        <label class="config-label">Estratégia (opcional)</label>
+                                        <input 
+                                            type="text" 
+                                            id="stackspotProxyStrategyInput" 
+                                            placeholder="tunnel" 
+                                            class="config-input"
+                                        >
+                                    </div>
+                                    <div style="font-size: 0.78em; color: var(--text-secondary); line-height: 1.4;">
+                                        💡 Deixe campos vazios para manter valores atuais. Marque "Limpar senha" para remover a senha armazenada.
+                                    </div>
+                                </div>
+                            </div>
                             <div style="font-size: 0.85em; color: var(--text-secondary); line-height: 1.4;">
                                 Ainda não tem acesso? <a href="https://ai.stackspot.com/?campaignCode=01K8TQ5N0KJYQHJ01FYGP3WR53" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary); font-weight: 600; text-decoration: none;">Crie sua conta StackSpot aqui</a>.
                             </div>
@@ -1204,10 +1287,22 @@
         // Variável para armazenar o provider atual
         let currentLLMProvider = 'stackspot';
 
+        // Estado do proxy StackSpot
+        let stackspotProxyState = {
+            enabled: false,
+            httpsHasPassword: false,
+            httpHasPassword: false,
+            hadConfig: false
+        };
+        let stackspotProxyEventsBound = false;
+
         // Estado para gerenciamento de CRUD de agentes
         let agentHierarchyCache = null;
         let agentConfigMap = new Map();
+        let orchestratorConfigMap = new Map();
+        let fallbackAgentConfig = null;
         let agentFormMode = 'create';
+        let agentFormTarget = 'agent'; // 'agent' | 'orchestrator' | 'fallback'
         let agentFormEditing = null;
         let agentFormInitialized = false;
 
@@ -2023,12 +2118,19 @@
 
                 agentHierarchyCache = hierarchyData;
                 agentConfigMap = new Map();
+                orchestratorConfigMap = new Map();
+                fallbackAgentConfig = hierarchyData.fallbackAgent || null;
 
                 const groupsConfig = Array.isArray(hierarchyData.groups) ? hierarchyData.groups : [];
 
                 groupsConfig.forEach(group => {
                     if (!group || !Array.isArray(group.agents)) {
                         return;
+                    }
+                    if (group.orchestrator) {
+                        orchestratorConfigMap.set(group.id, group.orchestrator);
+                    } else {
+                        orchestratorConfigMap.set(group.id, null);
                     }
                     group.agents.forEach(agent => {
                         agentConfigMap.set(`${group.id}::${agent.name}`, { groupId: group.id, agent });
@@ -2073,23 +2175,46 @@
                     html += '<div style="margin-bottom: 15px;"><strong style="font-size: 1.1em;">📦 Grupos</strong></div>';
                     
                     summaryData.groups.forEach(group => {
+                        const encodedGroupId = encodeURIComponent(group.id);
+                        const orchestrator = group.orchestrator || null;
+
                         html += `<div style="margin-bottom: 15px; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; border-left: 4px solid var(--success);">
-                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--success);">${escapeHtml(group.name)}</div>
-                            
-                            <div style="margin-left: 15px; margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.1); border-radius: 5px;">
-                                <strong>🎯 Orquestrador:</strong> ${escapeHtml(group.orchestrator.name)}<br>
-                                <small style="color: var(--text-secondary);">${escapeHtml(group.orchestrator.description)}</small>`;
+                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--success);">${escapeHtml(group.name)}</div>`;
                         
-                        if (group.orchestrator.tools && group.orchestrator.tools.length > 0) {
-                            html += `<div style="margin-top: 6px; font-size: 0.85em;">
-                                <strong>🔧 Ferramentas (${group.orchestrator.tools.length}):</strong><br>
-                                <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
-                                    ${group.orchestrator.tools.map(tool => `<span style="background: rgba(102, 126, 234, 0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.75em;">${escapeHtml(tool)}</span>`).join('')}
+                        if (orchestrator) {
+                            html += `<div style="margin-left: 15px; margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.1); border-radius: 5px;">
+                                <strong>🎯 Orquestrador:</strong> ${escapeHtml(orchestrator.name || 'Sem nome')}<br>
+                                <small style="color: var(--text-secondary);">${escapeHtml(orchestrator.description || '')}</small>`;
+
+                            if (orchestrator.tools && orchestrator.tools.length > 0) {
+                                html += `<div style="margin-top: 6px; font-size: 0.85em;">
+                                    <strong>🔧 Ferramentas (${orchestrator.tools.length}):</strong><br>
+                                    <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+                                        ${orchestrator.tools.map(tool => `<span style="background: rgba(102, 126, 234, 0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.75em;">${escapeHtml(tool)}</span>`).join('')}
+                                    </div>
+                                </div>`;
+                            }
+
+                            if (orchestrator.stackspotAgentId) {
+                                html += `<div style="margin-top: 6px; font-size: 0.8em; color: var(--text-secondary);">
+                                    StackSpot ID: <code>${escapeHtml(orchestrator.stackspotAgentId)}</code>
+                                </div>`;
+                            }
+
+                            html += `<div class="agent-action-buttons" style="margin-top: 8px;">
+                                <button type="button" onclick="startEditOrchestrator('${encodedGroupId}')">Editar orquestrador</button>
+                            </div>
+                        </div>`;
+                        } else {
+                            html += `<div style="margin-left: 15px; margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.1); border-radius: 5px;">
+                                <strong>🎯 Orquestrador:</strong> Nenhum orquestrador configurado.
+                                <div class="agent-action-buttons" style="margin-top: 8px;">
+                                    <button type="button" onclick="startEditOrchestrator('${encodedGroupId}')">Criar orquestrador</button>
                                 </div>
                             </div>`;
                         }
                         
-                        html += `</div>
+                        html += `
                             <div style="margin-left: 15px;">
                                 <strong>🤖 Agentes (${group.agents.length}):</strong><br>`;
                         
@@ -2152,11 +2277,24 @@
                     }
                     
                     html += `<div style="margin-top: 15px; padding: 10px; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); color: var(--text-primary); border-radius: 8px;">
-                        <strong>🔄 Fallback Agent</strong><br>
+                        <strong>🔄 General Assistant</strong><br>
                         <div style="margin-top: 5px; font-size: 0.9em;">
                             <strong>${escapeHtml(summaryData.fallbackAgent.name)}</strong><br>
                             ${escapeHtml(summaryData.fallbackAgent.description)}
                             ${fallbackToolsHtml}
+                        </div>
+                        <div class="agent-action-buttons" style="margin-top: 8px;">
+                            <button type="button" onclick="startEditFallbackAgent()">Editar General Assistant</button>
+                        </div>
+                    </div>`;
+                } else {
+                    html += `<div style="margin-top: 15px; padding: 10px; background: rgba(251, 191, 36, 0.15); border: 1px dashed rgba(251, 191, 36, 0.6); color: var(--text-primary); border-radius: 8px;">
+                        <strong>🔄 General Assistant</strong><br>
+                        <div style="margin-top: 5px; font-size: 0.9em;">
+                            Nenhum General Assistant configurado.
+                        </div>
+                        <div class="agent-action-buttons" style="margin-top: 8px;">
+                            <button type="button" onclick="startEditFallbackAgent()">Configurar General Assistant</button>
                         </div>
                     </div>`;
                 }
@@ -2177,6 +2315,7 @@
 
         function renderAgentFormGroups(groups = []) {
             const groupSelect = document.getElementById('agentGroupSelect');
+            const groupWrapper = document.getElementById('agentGroupWrapper');
             const submitBtn = document.getElementById('agentFormSubmitBtn');
 
             if (!groupSelect) {
@@ -2219,7 +2358,13 @@
                 groupSelect.value = groups[0].id;
             }
 
-            groupSelect.disabled = agentFormMode === 'edit';
+            const isFallbackTarget = agentFormTarget === 'fallback';
+            groupSelect.disabled = agentFormMode === 'edit' || agentFormTarget === 'orchestrator' || isFallbackTarget;
+            groupSelect.required = !isFallbackTarget;
+
+            if (groupWrapper) {
+                groupWrapper.style.display = isFallbackTarget ? 'none' : '';
+            }
         }
 
         function setAgentFormMessage(message, type = 'info') {
@@ -2240,11 +2385,32 @@
             messageBox.textContent = message;
         }
 
+        function updateAgentFormLabels() {
+            const title = document.getElementById('agentFormTitle');
+            const submitBtn = document.getElementById('agentFormSubmitBtn');
+            if (!title || !submitBtn) {
+                return;
+            }
+
+            if (agentFormTarget === 'orchestrator') {
+                title.textContent = agentFormMode === 'edit' ? 'Editar orquestrador' : 'Criar orquestrador';
+                submitBtn.textContent = agentFormMode === 'edit' ? 'Salvar orquestrador' : 'Criar orquestrador';
+            } else if (agentFormTarget === 'fallback') {
+                title.textContent = agentFormMode === 'edit' ? 'Editar General Assistant' : 'Configurar General Assistant';
+                submitBtn.textContent = agentFormMode === 'edit' ? 'Salvar General Assistant' : 'Criar General Assistant';
+            } else {
+                title.textContent = agentFormMode === 'edit' ? 'Editar agente' : 'Criar novo agente';
+                submitBtn.textContent = agentFormMode === 'edit' ? 'Salvar agente' : 'Criar agente';
+            }
+        }
+
         function resetAgentForm(showDefaultMessage = true) {
             agentFormMode = 'create';
+            agentFormTarget = 'agent';
             agentFormEditing = null;
 
             const groupSelect = document.getElementById('agentGroupSelect');
+            const groupWrapper = document.getElementById('agentGroupWrapper');
             const nameInput = document.getElementById('agentName');
             const modelInput = document.getElementById('agentModel');
             const descriptionInput = document.getElementById('agentDescription');
@@ -2255,13 +2421,16 @@
             const stackspotInput = document.getElementById('agentStackspotId');
             const submitBtn = document.getElementById('agentFormSubmitBtn');
             const cancelBtn = document.getElementById('agentFormCancelBtn');
-            const title = document.getElementById('agentFormTitle');
 
             if (groupSelect) {
                 groupSelect.disabled = false;
+                groupSelect.required = true;
                 if (groupSelect.options.length > 0) {
                     groupSelect.selectedIndex = 0;
                 }
+            }
+            if (groupWrapper) {
+                groupWrapper.style.display = '';
             }
 
             if (nameInput) nameInput.value = '';
@@ -2277,7 +2446,6 @@
 
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Criar agente';
             }
 
             if (cancelBtn) {
@@ -2285,9 +2453,7 @@
                 cancelBtn.disabled = false;
             }
 
-            if (title) {
-                title.textContent = 'Criar novo agente';
-            }
+            updateAgentFormLabels();
 
             if (showDefaultMessage) {
                 setAgentFormMessage('Preencha os campos para criar um novo agente.', 'info');
@@ -2330,9 +2496,11 @@
             const agent = entry.agent;
 
             agentFormMode = 'edit';
+            agentFormTarget = 'agent';
             agentFormEditing = { groupId, originalName: agentName };
 
             const groupSelect = document.getElementById('agentGroupSelect');
+            const groupWrapper = document.getElementById('agentGroupWrapper');
             const nameInput = document.getElementById('agentName');
             const modelInput = document.getElementById('agentModel');
             const descriptionInput = document.getElementById('agentDescription');
@@ -2343,11 +2511,14 @@
             const stackspotInput = document.getElementById('agentStackspotId');
             const submitBtn = document.getElementById('agentFormSubmitBtn');
             const cancelBtn = document.getElementById('agentFormCancelBtn');
-            const title = document.getElementById('agentFormTitle');
 
             if (groupSelect) {
                 groupSelect.value = groupId;
                 groupSelect.disabled = true;
+                groupSelect.required = true;
+            }
+            if (groupWrapper) {
+                groupWrapper.style.display = '';
             }
             if (nameInput) nameInput.value = agent.name || '';
             if (modelInput) modelInput.value = agent.model || '';
@@ -2362,19 +2533,169 @@
                 const shouldUseValue = agent.shouldUse ? agent.shouldUse : { type: 'default' };
                 shouldUseInput.value = JSON.stringify(shouldUseValue, null, 2);
             }
+            updateAgentFormLabels();
+
             if (submitBtn) {
-                submitBtn.textContent = 'Salvar alterações';
                 submitBtn.disabled = false;
             }
             if (cancelBtn) {
                 cancelBtn.style.display = 'inline-flex';
                 cancelBtn.disabled = false;
             }
-            if (title) {
-                title.textContent = 'Editar agente';
-            }
 
             setAgentFormMessage(`Editando agente "${agent.name}" no grupo ${groupId}.`, 'info');
+        }
+
+        function startEditOrchestrator(groupIdEncoded) {
+            const groupId = decodeURIComponent(groupIdEncoded);
+            const orchestrator = orchestratorConfigMap.get(groupId) || null;
+
+            agentFormTarget = 'orchestrator';
+            agentFormMode = orchestrator ? 'edit' : 'create';
+            agentFormEditing = { groupId, originalName: orchestrator ? orchestrator.name : null };
+
+            const groupSelect = document.getElementById('agentGroupSelect');
+            const groupWrapper = document.getElementById('agentGroupWrapper');
+            const nameInput = document.getElementById('agentName');
+            const modelInput = document.getElementById('agentModel');
+            const descriptionInput = document.getElementById('agentDescription');
+            const instructionsInput = document.getElementById('agentInstructions');
+            const toolsInput = document.getElementById('agentTools');
+            const shouldUseInput = document.getElementById('agentShouldUse');
+            const priorityInput = document.getElementById('agentPriority');
+            const stackspotInput = document.getElementById('agentStackspotId');
+            const submitBtn = document.getElementById('agentFormSubmitBtn');
+            const cancelBtn = document.getElementById('agentFormCancelBtn');
+
+            if (groupSelect) {
+                groupSelect.value = groupId;
+                groupSelect.disabled = true;
+                groupSelect.required = true;
+            }
+            if (groupWrapper) {
+                groupWrapper.style.display = '';
+            }
+            if (nameInput) {
+                nameInput.value = orchestrator ? orchestrator.name || '' : '';
+            }
+            if (modelInput) {
+                modelInput.value = orchestrator ? orchestrator.model || '' : '';
+            }
+            if (descriptionInput) {
+                descriptionInput.value = orchestrator ? orchestrator.description || '' : '';
+            }
+            if (instructionsInput) {
+                instructionsInput.value = orchestrator ? orchestrator.instructions || '' : '';
+            }
+            if (toolsInput) {
+                toolsInput.value = formatToolsForForm(orchestrator ? orchestrator.tools : null);
+            }
+            if (priorityInput) {
+                if (orchestrator && typeof orchestrator.priority === 'number') {
+                    priorityInput.value = String(orchestrator.priority);
+                } else {
+                    priorityInput.value = '0';
+                }
+            }
+            if (stackspotInput) {
+                stackspotInput.value = orchestrator && orchestrator.stackspotAgentId ? orchestrator.stackspotAgentId : '';
+            }
+            if (shouldUseInput) {
+                const shouldUseValue = orchestrator && orchestrator.shouldUse
+                    ? orchestrator.shouldUse
+                    : { type: 'keywords', keywords: [] };
+                shouldUseInput.value = JSON.stringify(shouldUseValue, null, 2);
+            }
+
+            updateAgentFormLabels();
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+            if (cancelBtn) {
+                cancelBtn.style.display = 'inline-flex';
+                cancelBtn.disabled = false;
+            }
+
+            if (orchestrator) {
+                setAgentFormMessage(`Editando orquestrador "${orchestrator.name}" do grupo ${groupId}.`, 'info');
+            } else {
+                setAgentFormMessage(`Configure o orquestrador para o grupo ${groupId}.`, 'info');
+            }
+        }
+
+        function startEditFallbackAgent() {
+            const fallback = fallbackAgentConfig || null;
+
+            agentFormTarget = 'fallback';
+            agentFormMode = fallback ? 'edit' : 'create';
+            agentFormEditing = { originalName: fallback ? fallback.name : null };
+
+            const groupWrapper = document.getElementById('agentGroupWrapper');
+            const groupSelect = document.getElementById('agentGroupSelect');
+            const nameInput = document.getElementById('agentName');
+            const modelInput = document.getElementById('agentModel');
+            const descriptionInput = document.getElementById('agentDescription');
+            const instructionsInput = document.getElementById('agentInstructions');
+            const toolsInput = document.getElementById('agentTools');
+            const shouldUseInput = document.getElementById('agentShouldUse');
+            const priorityInput = document.getElementById('agentPriority');
+            const stackspotInput = document.getElementById('agentStackspotId');
+            const submitBtn = document.getElementById('agentFormSubmitBtn');
+            const cancelBtn = document.getElementById('agentFormCancelBtn');
+
+            if (groupWrapper) {
+                groupWrapper.style.display = 'none';
+            }
+            if (groupSelect) {
+                groupSelect.value = '';
+                groupSelect.disabled = true;
+                groupSelect.required = false;
+            }
+            if (nameInput) {
+                nameInput.value = fallback ? fallback.name || '' : '';
+            }
+            if (modelInput) {
+                modelInput.value = fallback ? fallback.model || '' : '';
+            }
+            if (descriptionInput) {
+                descriptionInput.value = fallback ? fallback.description || '' : '';
+            }
+            if (instructionsInput) {
+                instructionsInput.value = fallback ? fallback.instructions || '' : '';
+            }
+            if (toolsInput) {
+                toolsInput.value = formatToolsForForm(fallback ? fallback.tools : null);
+            }
+            if (priorityInput) {
+                const priorityValue = fallback && typeof fallback.priority === 'number' ? fallback.priority : 999;
+                priorityInput.value = String(priorityValue);
+            }
+            if (stackspotInput) {
+                stackspotInput.value = fallback && fallback.stackspotAgentId ? fallback.stackspotAgentId : '';
+            }
+            if (shouldUseInput) {
+                const shouldUseValue = fallback && fallback.shouldUse
+                    ? fallback.shouldUse
+                    : { type: 'default' };
+                shouldUseInput.value = JSON.stringify(shouldUseValue, null, 2);
+            }
+
+            updateAgentFormLabels();
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+            if (cancelBtn) {
+                cancelBtn.style.display = 'inline-flex';
+                cancelBtn.disabled = false;
+            }
+
+            if (fallback) {
+                setAgentFormMessage(`Editando o General Assistant "${fallback.name}".`, 'info');
+            } else {
+                setAgentFormMessage('Configure o General Assistant com as informações desejadas.', 'info');
+            }
         }
 
         function parseToolsInput(value) {
@@ -2412,13 +2733,20 @@
             const stackspotInput = document.getElementById('agentStackspotId');
             const submitBtn = document.getElementById('agentFormSubmitBtn');
             const cancelBtn = document.getElementById('agentFormCancelBtn');
+            const isOrchestrator = agentFormTarget === 'orchestrator';
+            const isFallback = agentFormTarget === 'fallback';
 
             if (!groupSelect || !nameInput || !modelInput || !descriptionInput || !instructionsInput || !shouldUseInput || !submitBtn) {
                 setAgentFormMessage('Formulário inválido ou incompleto.', 'error');
                 return;
             }
 
-            const targetGroupId = agentFormMode === 'edit' && agentFormEditing ? agentFormEditing.groupId : groupSelect.value.trim();
+            const humanLabel = isFallback ? 'General Assistant' : (isOrchestrator ? 'orquestrador' : 'agente');
+            const targetGroupId = isOrchestrator
+                ? (agentFormEditing ? agentFormEditing.groupId : null)
+                : (isFallback
+                    ? null
+                    : (agentFormMode === 'edit' && agentFormEditing ? agentFormEditing.groupId : groupSelect.value.trim()));
             const agentName = nameInput.value.trim();
             const agentDescription = descriptionInput.value.trim();
             const agentModel = modelInput.value.trim();
@@ -2428,28 +2756,28 @@
             const toolsRaw = toolsInput ? toolsInput.value : '';
             const shouldUseRaw = shouldUseInput.value.trim();
 
-            if (!targetGroupId) {
+            if (!isFallback && !targetGroupId) {
                 setAgentFormMessage('Selecione um grupo válido.', 'error');
                 return;
             }
 
             if (!agentName) {
-                setAgentFormMessage('Informe o nome do agente.', 'error');
+                setAgentFormMessage(`Informe o nome do ${humanLabel}.`, 'error');
                 return;
             }
 
             if (!agentDescription) {
-                setAgentFormMessage('Informe a descrição do agente.', 'error');
+                setAgentFormMessage(`Informe a descrição do ${humanLabel}.`, 'error');
                 return;
             }
 
             if (!agentModel) {
-                setAgentFormMessage('Informe o modelo do agente.', 'error');
+                setAgentFormMessage(`Informe o modelo do ${humanLabel}.`, 'error');
                 return;
             }
 
             if (!agentInstructions) {
-                setAgentFormMessage('Informe as instruções do agente.', 'error');
+                setAgentFormMessage(`Informe as instruções do ${humanLabel}.`, 'error');
                 return;
             }
 
@@ -2502,19 +2830,34 @@
 
             const originalButtonText = submitBtn.textContent;
             submitBtn.disabled = true;
-            submitBtn.textContent = agentFormMode === 'edit' ? 'Salvando...' : 'Criando...';
+            submitBtn.textContent = isOrchestrator
+                ? (agentFormMode === 'edit' ? 'Salvando orquestrador...' : 'Criando orquestrador...')
+                : (agentFormMode === 'edit' ? 'Salvando...' : 'Criando...');
             if (cancelBtn) {
                 cancelBtn.disabled = true;
             }
 
-            setAgentFormMessage(agentFormMode === 'edit' ? 'Salvando alterações...' : 'Criando agente...', 'info');
+            setAgentFormMessage(
+                agentFormMode === 'edit'
+                    ? `Salvando ${humanLabel}...`
+                    : `Criando ${humanLabel}...`,
+                'info'
+            );
 
             try {
-                const endpoint = agentFormMode === 'edit' && agentFormEditing
-                    ? `/api/agents/groups/${encodeURIComponent(agentFormEditing.groupId)}/agents/${encodeURIComponent(agentFormEditing.originalName)}`
-                    : `/api/agents/groups/${encodeURIComponent(targetGroupId)}/agents`;
+                const endpoint = isOrchestrator
+                    ? `/api/agents/groups/${encodeURIComponent(targetGroupId)}/orchestrator`
+                    : (isFallback
+                        ? '/api/agents/fallback'
+                        : (agentFormMode === 'edit' && agentFormEditing
+                            ? `/api/agents/groups/${encodeURIComponent(agentFormEditing.groupId)}/agents/${encodeURIComponent(agentFormEditing.originalName)}`
+                            : `/api/agents/groups/${encodeURIComponent(targetGroupId)}/agents`));
 
-                const method = agentFormMode === 'edit' ? 'PUT' : 'POST';
+                const method = isOrchestrator
+                    ? 'PUT'
+                    : (isFallback
+                        ? 'PUT'
+                        : (agentFormMode === 'edit' ? 'PUT' : 'POST'));
 
                 const response = await fetch(endpoint, {
                     method,
@@ -2526,8 +2869,8 @@
 
                 if (!response.ok) {
                     let errorMessage = agentFormMode === 'edit'
-                        ? 'Falha ao atualizar agente.'
-                        : 'Falha ao criar agente.';
+                        ? `Falha ao atualizar ${humanLabel}.`
+                        : `Falha ao criar ${humanLabel}.`;
                     try {
                         const err = await response.json();
                         if (err && err.error) {
@@ -2543,13 +2886,24 @@
 
                 await loadAgents();
                 resetAgentForm(false);
-                const successMessage = mode === 'edit'
-                    ? `Agente "${agentName}" atualizado com sucesso.`
-                    : `Agente "${agentName}" criado com sucesso.`;
+                let successMessage;
+                if (isOrchestrator) {
+                    successMessage = mode === 'edit'
+                        ? `Orquestrador "${agentName}" atualizado com sucesso.`
+                        : `Orquestrador "${agentName}" configurado com sucesso.`;
+                } else if (isFallback) {
+                    successMessage = mode === 'edit'
+                        ? `General Assistant "${agentName}" atualizado com sucesso.`
+                        : `General Assistant "${agentName}" configurado com sucesso.`;
+                } else {
+                    successMessage = mode === 'edit'
+                        ? `Agente "${agentName}" atualizado com sucesso.`
+                        : `Agente "${agentName}" criado com sucesso.`;
+                }
                 setAgentFormMessage(successMessage, 'success');
             } catch (error) {
-                console.error('Erro ao salvar agente:', error);
-                setAgentFormMessage(error.message || 'Erro ao salvar agente.', 'error');
+                console.error('Erro ao salvar agente/orquestrador:', error);
+                setAgentFormMessage(error.message || `Erro ao salvar ${humanLabel}.`, 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalButtonText;
@@ -3377,6 +3731,33 @@
             }
         });
 
+        function updateStackspotProxyVisibility() {
+            const proxyEnabledCheckbox = document.getElementById('stackspotProxyEnabled');
+            const proxyFields = document.getElementById('stackspotProxyFields');
+            if (proxyFields && proxyEnabledCheckbox) {
+                proxyFields.style.display = proxyEnabledCheckbox.checked ? 'block' : 'none';
+            }
+        }
+
+        function renderStackspotProxyStatus(proxySummary) {
+            const statusEl = document.getElementById('stackspotProxyStatus');
+            if (!statusEl) {
+                return;
+            }
+            if (proxySummary && proxySummary.enabled) {
+                const host = (proxySummary.https && proxySummary.https.host) || (proxySummary.http && proxySummary.http.host) || '';
+                const port = proxySummary.https && proxySummary.https.port !== undefined
+                    ? proxySummary.https.port
+                    : proxySummary.http && proxySummary.http.port !== undefined
+                        ? proxySummary.http.port
+                        : null;
+                const hostLabel = host ? `${host}${port ? `:${port}` : ''}` : '';
+                statusEl.innerHTML = `<span style="color: var(--success);">✅ Proxy configurado${hostLabel ? ` (${hostLabel})` : ''}</span>`;
+            } else {
+                statusEl.innerHTML = `<span style="color: var(--text-secondary);">Proxy desativado</span>`;
+            }
+        }
+
         // Carrega conteúdo inicial ao carregar a página
         window.onload = () => {
             messageInput.focus();
@@ -3398,6 +3779,16 @@
                 const stackspotClientSecretInput = document.getElementById('stackspotClientSecretInput');
                 const stackspotRealmInput = document.getElementById('stackspotRealmInput');
                 const stackspotClientIdStatus = document.getElementById('stackspotClientIdStatus');
+                const stackspotProxyEnabledCheckbox = document.getElementById('stackspotProxyEnabled');
+                const stackspotProxyHttpsHostInput = document.getElementById('stackspotProxyHttpsHostInput');
+                const stackspotProxyHttpsPortInput = document.getElementById('stackspotProxyHttpsPortInput');
+                const stackspotProxyHttpsUsernameInput = document.getElementById('stackspotProxyHttpsUsernameInput');
+                const stackspotProxyHttpsPasswordInput = document.getElementById('stackspotProxyHttpsPasswordInput');
+                const stackspotProxyHttpsPasswordInfo = document.getElementById('stackspotProxyHttpsPasswordInfo');
+                const stackspotProxyHttpsClearPasswordInput = document.getElementById('stackspotProxyHttpsClearPasswordInput');
+                const stackspotProxyHttpsTunnelInput = document.getElementById('stackspotProxyHttpsTunnelInput');
+                const stackspotProxyNoProxyInput = document.getElementById('stackspotProxyNoProxyInput');
+                const stackspotProxyStrategyInput = document.getElementById('stackspotProxyStrategyInput');
                 
                 // Define provider selecionado
                 if (providerSelect) {
@@ -3455,6 +3846,107 @@
                         stackspotClientIdStatus.innerHTML = `<span style="color: var(--error);">⚠️ Credenciais não configuradas</span>`;
                     }
                 }
+
+                const proxyData = data.stackspot?.proxy || { enabled: false };
+                stackspotProxyState = {
+                    enabled: Boolean(proxyData?.enabled),
+                    httpsHasPassword: Boolean(proxyData?.https?.hasPassword),
+                    httpHasPassword: Boolean(proxyData?.http?.hasPassword),
+                    hadConfig: Boolean(proxyData?.enabled)
+                };
+
+                if (stackspotProxyEnabledCheckbox) {
+                    stackspotProxyEnabledCheckbox.checked = stackspotProxyState.enabled;
+                }
+                if (stackspotProxyHttpsHostInput) {
+                    stackspotProxyHttpsHostInput.value = proxyData?.https?.host || '';
+                }
+                if (stackspotProxyHttpsPortInput) {
+                    const portValue = proxyData?.https?.port;
+                    stackspotProxyHttpsPortInput.value = typeof portValue === 'number' ? String(portValue) : '';
+                }
+                if (stackspotProxyHttpsUsernameInput) {
+                    stackspotProxyHttpsUsernameInput.value = proxyData?.https?.username || '';
+                }
+                if (stackspotProxyHttpsPasswordInput) {
+                    stackspotProxyHttpsPasswordInput.value = '';
+                }
+                if (stackspotProxyHttpsPasswordInfo) {
+                    stackspotProxyHttpsPasswordInfo.textContent = stackspotProxyState.httpsHasPassword
+                        ? 'Senha configurada (não exibida). Informe uma nova senha para atualizar.'
+                        : '';
+                }
+                if (stackspotProxyHttpsClearPasswordInput) {
+                    stackspotProxyHttpsClearPasswordInput.checked = false;
+                }
+                if (stackspotProxyHttpsTunnelInput) {
+                    stackspotProxyHttpsTunnelInput.checked = Boolean(proxyData?.https?.tunnel);
+                }
+                if (stackspotProxyNoProxyInput) {
+                    if (Array.isArray(proxyData?.noProxy) && proxyData.noProxy.length > 0) {
+                        stackspotProxyNoProxyInput.value = proxyData.noProxy.join(', ');
+                    } else {
+                        stackspotProxyNoProxyInput.value = '';
+                    }
+                }
+                if (stackspotProxyStrategyInput) {
+                    stackspotProxyStrategyInput.value = proxyData?.strategy || '';
+                }
+
+                if (!stackspotProxyEventsBound) {
+                    if (stackspotProxyEnabledCheckbox) {
+                        stackspotProxyEnabledCheckbox.addEventListener('change', () => {
+                            updateStackspotProxyVisibility();
+                            const statusEl = document.getElementById('stackspotProxyStatus');
+                            if (!statusEl) return;
+                            if (stackspotProxyEnabledCheckbox.checked) {
+                                statusEl.innerHTML = `<span style="color: var(--info);">Preencha os dados do proxy e salve para aplicar.</span>`;
+                            } else if (stackspotProxyState.enabled) {
+                                statusEl.innerHTML = `<span style="color: var(--info);">Proxy será desativado após salvar.</span>`;
+                            } else {
+                                renderStackspotProxyStatus({ enabled: false });
+                            }
+                        });
+                    }
+                    if (stackspotProxyHttpsPasswordInput && stackspotProxyHttpsClearPasswordInput) {
+                        stackspotProxyHttpsPasswordInput.addEventListener('input', () => {
+                            if (stackspotProxyHttpsPasswordInput.value.trim().length > 0) {
+                                stackspotProxyHttpsClearPasswordInput.checked = false;
+                            }
+                            if (stackspotProxyHttpsPasswordInfo) {
+                                if (stackspotProxyHttpsPasswordInput.value.trim().length > 0) {
+                                    stackspotProxyHttpsPasswordInfo.textContent = 'Uma nova senha será aplicada após salvar.';
+                                } else if (stackspotProxyState.httpsHasPassword) {
+                                    stackspotProxyHttpsPasswordInfo.textContent = 'Senha configurada (não exibida). Informe uma nova senha para atualizar.';
+                                } else {
+                                    stackspotProxyHttpsPasswordInfo.textContent = '';
+                                }
+                            }
+                        });
+                        stackspotProxyHttpsClearPasswordInput.addEventListener('change', () => {
+                            if (stackspotProxyHttpsClearPasswordInput.checked) {
+                                stackspotProxyHttpsPasswordInput.value = '';
+                                if (stackspotProxyHttpsPasswordInfo) {
+                                    stackspotProxyHttpsPasswordInfo.textContent = stackspotProxyState.httpsHasPassword
+                                        ? 'Senha atual será removida após salvar.'
+                                        : 'Nenhuma senha está configurada no momento.';
+                                }
+                            } else if (stackspotProxyHttpsPasswordInfo) {
+                                if (stackspotProxyHttpsPasswordInput.value.trim().length > 0) {
+                                    stackspotProxyHttpsPasswordInfo.textContent = 'Uma nova senha será aplicada após salvar.';
+                                } else if (stackspotProxyState.httpsHasPassword) {
+                                    stackspotProxyHttpsPasswordInfo.textContent = 'Senha configurada (não exibida). Informe uma nova senha para atualizar.';
+                                } else {
+                                    stackspotProxyHttpsPasswordInfo.textContent = '';
+                                }
+                            }
+                        });
+                    }
+                    stackspotProxyEventsBound = true;
+                }
+
+                updateStackspotProxyVisibility();
+                renderStackspotProxyStatus(proxyData);
                 
                 if (portInput) {
                     portInput.value = data.port || '3000';
@@ -3533,6 +4025,15 @@
             const stackspotClientIdInput = document.getElementById('stackspotClientIdInput');
             const stackspotClientSecretInput = document.getElementById('stackspotClientSecretInput');
             const stackspotRealmInput = document.getElementById('stackspotRealmInput');
+            const stackspotProxyEnabledCheckbox = document.getElementById('stackspotProxyEnabled');
+            const stackspotProxyHttpsHostInput = document.getElementById('stackspotProxyHttpsHostInput');
+            const stackspotProxyHttpsPortInput = document.getElementById('stackspotProxyHttpsPortInput');
+            const stackspotProxyHttpsUsernameInput = document.getElementById('stackspotProxyHttpsUsernameInput');
+            const stackspotProxyHttpsPasswordInput = document.getElementById('stackspotProxyHttpsPasswordInput');
+            const stackspotProxyHttpsClearPasswordInput = document.getElementById('stackspotProxyHttpsClearPasswordInput');
+            const stackspotProxyHttpsTunnelInput = document.getElementById('stackspotProxyHttpsTunnelInput');
+            const stackspotProxyNoProxyInput = document.getElementById('stackspotProxyNoProxyInput');
+            const stackspotProxyStrategyInput = document.getElementById('stackspotProxyStrategyInput');
             const configMessage = document.getElementById('configMessage');
             
             if (!providerSelect || !configMessage) return;
@@ -3545,6 +4046,15 @@
             const openaiApiKey = openaiApiKeyInput?.value.trim() || '';
             const stackspotClientId = stackspotClientIdInput?.value.trim() || '';
             const stackspotClientSecret = stackspotClientSecretInput?.value.trim() || '';
+            const stackspotProxyEnabled = !!stackspotProxyEnabledCheckbox?.checked;
+            const stackspotProxyHttpsHost = stackspotProxyHttpsHostInput?.value.trim() || '';
+            const stackspotProxyHttpsPort = stackspotProxyHttpsPortInput?.value.trim() || '';
+            const stackspotProxyHttpsUsername = stackspotProxyHttpsUsernameInput?.value.trim() || '';
+            const stackspotProxyHttpsPassword = stackspotProxyHttpsPasswordInput?.value || '';
+            const stackspotProxyHttpsClearPassword = !!stackspotProxyHttpsClearPasswordInput?.checked;
+            const stackspotProxyHttpsTunnel = !!stackspotProxyHttpsTunnelInput?.checked;
+            const stackspotProxyNoProxy = stackspotProxyNoProxyInput?.value.trim() || '';
+            const stackspotProxyStrategy = stackspotProxyStrategyInput?.value.trim() || '';
             
             // Se está configurando OpenAI e forneceu uma API key, valida
             if (provider === 'openai' && openaiApiKey) {
@@ -3569,6 +4079,28 @@
                     return;
                 }
             }
+
+            if (stackspotProxyEnabled) {
+                if (!stackspotProxyHttpsHost) {
+                    configMessage.style.display = 'block';
+                    configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                    configMessage.style.color = '#dc3545';
+                    configMessage.style.border = '1px solid #dc3545';
+                    configMessage.textContent = 'Informe o host do proxy StackSpot.';
+                    return;
+                }
+                if (stackspotProxyHttpsPort) {
+                    const parsedPort = Number(stackspotProxyHttpsPort);
+                    if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
+                        configMessage.style.display = 'block';
+                        configMessage.style.background = 'rgba(239, 68, 68, 0.15)';
+                        configMessage.style.color = '#dc3545';
+                        configMessage.style.border = '1px solid #dc3545';
+                        configMessage.textContent = 'Porta do proxy inválida. Utilize um número entre 1 e 65535.';
+                        return;
+                    }
+                }
+            }
             
             configMessage.style.display = 'block';
             configMessage.style.background = 'rgba(59, 130, 246, 0.15)';
@@ -3591,6 +4123,30 @@
                 body.stackspotClientId = stackspotClientId;
                 body.stackspotClientSecret = stackspotClientSecret;
                 body.stackspotRealm = stackspotRealmInput?.value.trim() || 'stackspot-freemium';
+            }
+
+            if (stackspotProxyEnabled) {
+                const proxyHttpsConfig = {
+                    host: stackspotProxyHttpsHost,
+                    port: stackspotProxyHttpsPort ? Number(stackspotProxyHttpsPort) : '',
+                    username: stackspotProxyHttpsUsername,
+                    tunnel: stackspotProxyHttpsTunnel
+                };
+
+                if (stackspotProxyHttpsPassword.length > 0) {
+                    proxyHttpsConfig['password'] = stackspotProxyHttpsPassword;
+                } else if (stackspotProxyHttpsClearPassword) {
+                    proxyHttpsConfig['clearPassword'] = true;
+                }
+
+                body.stackspotProxy = {
+                    enabled: true,
+                    https: proxyHttpsConfig,
+                    noProxy: stackspotProxyNoProxy,
+                    strategy: stackspotProxyStrategy
+                };
+            } else if (stackspotProxyState.enabled) {
+                body.stackspotProxy = { enabled: false };
             }
             
             try {

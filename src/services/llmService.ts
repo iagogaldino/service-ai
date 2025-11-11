@@ -33,6 +33,7 @@ export function initializeLLMAdapter(): void {
             clientId: config.stackspotClientId,
             clientSecret: config.stackspotClientSecret,
             realm: config.stackspotRealm || 'stackspot-freemium',
+            proxy: config.stackspotProxy,
           }
         : undefined,
     };

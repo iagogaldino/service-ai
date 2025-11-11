@@ -18,6 +18,8 @@ import {
   deleteAgent,
   getAgentsHierarchy,
   updateAgent,
+  upsertFallbackAgent,
+  upsertGroupOrchestrator,
 } from '../agents/agentCrudService';
 import { loadTokens } from '../storage/tokenStorage';
 import { loadLogs } from '../storage/logStorage';
@@ -31,6 +33,7 @@ import { LLMAdapter } from '../llm/adapters/LLMAdapter';
 import { AgentManager } from '../agents/agentManager';
 import { initializeAgents } from '../agents/config';
 import { setThreadId } from '../services/threadService';
+import { StackSpotProxyConfig, StackSpotProxyEndpoint } from '../types/stackspot';
 
 /**
  * Dependências necessárias para as rotas
@@ -58,6 +61,199 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
     }
     console.error('Erro inesperado ao manipular agentes:', error);
     return res.status(500).json({ error: 'Erro interno ao manipular agentes.' });
+  };
+
+  const buildStackspotProxySummary = (proxy?: StackSpotProxyConfig) => {
+    if (!proxy) {
+      return { enabled: false };
+    }
+
+    const summary: Record<string, any> = {
+      enabled:
+        Boolean(proxy.http) ||
+        Boolean(proxy.https) ||
+        Boolean(proxy.noProxy && proxy.noProxy.length > 0) ||
+        Boolean(proxy.strategy),
+    };
+
+    if (proxy.http) {
+      summary.http = {
+        host: proxy.http.host,
+        port: proxy.http.port ?? null,
+        username: proxy.http.username ?? '',
+        hasPassword: Boolean(proxy.http.password),
+      };
+    }
+
+    if (proxy.https) {
+      summary.https = {
+        host: proxy.https.host,
+        port: proxy.https.port ?? null,
+        username: proxy.https.username ?? '',
+        hasPassword: Boolean(proxy.https.password),
+        tunnel: proxy.https.tunnel ?? false,
+      };
+    }
+
+    if (proxy.noProxy && proxy.noProxy.length > 0) {
+      summary.noProxy = proxy.noProxy;
+    }
+
+    if (proxy.strategy) {
+      summary.strategy = proxy.strategy;
+    }
+
+    return summary;
+  };
+
+  const parseProxyEndpoint = (
+    input: any,
+    existing?: StackSpotProxyEndpoint
+  ): StackSpotProxyEndpoint | undefined => {
+    if (!input && !existing) {
+      return undefined;
+    }
+
+    const result: StackSpotProxyEndpoint = existing
+      ? { ...existing }
+      : { host: '' };
+
+    if (input) {
+      if (typeof input.host === 'string' && input.host.trim()) {
+        result.host = input.host.trim();
+      } else if (!result.host) {
+        return undefined;
+      }
+
+      if (input.port !== undefined) {
+        const rawPort =
+          typeof input.port === 'string' ? input.port.trim() : input.port;
+        if (rawPort === '' || rawPort === null) {
+          delete result.port;
+        } else if (rawPort !== undefined) {
+          const portNumber =
+            typeof rawPort === 'number' ? rawPort : parseInt(rawPort, 10);
+          if (!Number.isNaN(portNumber)) {
+            result.port = portNumber;
+          } else {
+            delete result.port;
+          }
+        }
+      }
+
+      if (input.username !== undefined) {
+        const username =
+          typeof input.username === 'string' ? input.username.trim() : '';
+        if (username) {
+          result.username = username;
+        } else {
+          delete result.username;
+        }
+      }
+
+      if (input.password !== undefined) {
+        if (typeof input.password === 'string' && input.password !== '') {
+          result.password = input.password;
+        } else {
+          delete result.password;
+        }
+      } else if (input.clearPassword) {
+        delete result.password;
+      }
+
+      if (input.tunnel !== undefined) {
+        result.tunnel = Boolean(input.tunnel);
+      }
+    }
+
+    if (!result.host) {
+      return undefined;
+    }
+
+    if (!result.username) {
+      delete result.username;
+    }
+
+    if (!result.password) {
+      delete result.password;
+    }
+
+    if (result.tunnel === undefined) {
+      delete result.tunnel;
+    }
+
+    return result;
+  };
+
+  const mergeStackspotProxyConfig = (
+    payload: any,
+    existing?: StackSpotProxyConfig
+  ): StackSpotProxyConfig | undefined => {
+    if (payload === undefined) {
+      return existing;
+    }
+
+    if (payload === null || payload.enabled === false) {
+      return undefined;
+    }
+
+    const merged: StackSpotProxyConfig = {};
+
+    const httpEndpoint = parseProxyEndpoint(payload.http, existing?.http);
+    if (httpEndpoint) {
+      merged.http = httpEndpoint;
+    }
+
+    const httpsEndpoint = parseProxyEndpoint(payload.https, existing?.https);
+    if (httpsEndpoint) {
+      if (payload.https && typeof payload.https.tunnel === 'boolean') {
+        httpsEndpoint.tunnel = payload.https.tunnel;
+      } else if (
+        httpsEndpoint.tunnel === undefined &&
+        existing?.https?.tunnel !== undefined
+      ) {
+        httpsEndpoint.tunnel = existing.https.tunnel;
+      }
+      if (httpsEndpoint.tunnel === undefined) {
+        delete httpsEndpoint.tunnel;
+      }
+      merged.https = httpsEndpoint;
+    }
+
+    if (payload.noProxy !== undefined) {
+      const entries = Array.isArray(payload.noProxy)
+        ? payload.noProxy
+        : typeof payload.noProxy === 'string'
+        ? payload.noProxy.split(',').map((item: string) => item.trim())
+        : [];
+      const filtered = entries.filter(Boolean);
+      merged.noProxy = filtered;
+    } else if (Array.isArray(existing?.noProxy)) {
+      merged.noProxy = [...existing.noProxy];
+    }
+
+    let strategyProvided = false;
+    if (payload.strategy !== undefined) {
+      strategyProvided = true;
+      if (typeof payload.strategy === 'string' && payload.strategy.trim()) {
+        merged.strategy = payload.strategy.trim();
+      }
+    }
+
+    if (!strategyProvided && existing?.strategy) {
+      merged.strategy = existing.strategy;
+    }
+
+    if (
+      !merged.http &&
+      !merged.https &&
+      (!merged.noProxy || merged.noProxy.length === 0) &&
+      !merged.strategy
+    ) {
+      return undefined;
+    }
+
+    return merged;
   };
 
   /**
@@ -230,6 +426,39 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
   });
 
   /**
+   * API: Cria ou atualiza o orquestrador de um grupo.
+   */
+  app.put('/api/agents/groups/:groupId/orchestrator', async (req: Request, res: Response) => {
+    try {
+      const { groupId } = req.params;
+      const payload = req.body as AgentCreatePayload;
+      const orchestrator = await upsertGroupOrchestrator(groupId, payload);
+      res.json({
+        success: true,
+        orchestrator,
+      });
+    } catch (error) {
+      handleAgentError(res, error);
+    }
+  });
+
+  /**
+   * API: Atualiza o agente fallback (General Assistant).
+   */
+  app.put('/api/agents/fallback', async (req: Request, res: Response) => {
+    try {
+      const payload = req.body as AgentUpdatePayload;
+      const fallbackAgent = await upsertFallbackAgent(payload);
+      res.json({
+        success: true,
+        fallbackAgent,
+      });
+    } catch (error) {
+      handleAgentError(res, error);
+    }
+  });
+
+  /**
    * API: Remove um agente de um grupo.
    */
   app.delete('/api/agents/groups/:groupId/agents/:agentName', async (req: Request, res: Response) => {
@@ -349,18 +578,23 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
       }
       
       // Prepara resposta com informações de StackSpot
-      let stackspotConfig: any = {
-        configured: false,
-        clientIdPreview: null,
-        realm: 'stackspot-freemium'
-      };
+      const stackspotProxySummary = buildStackspotProxySummary(config?.stackspotProxy);
+      let stackspotConfig: any;
       
       if (config?.stackspotClientId && config?.stackspotClientSecret) {
         const maskedClientId = config.stackspotClientId.substring(0, 8) + '...' + config.stackspotClientId.substring(config.stackspotClientId.length - 4);
         stackspotConfig = {
           configured: true,
           clientIdPreview: maskedClientId,
-          realm: config.stackspotRealm || 'stackspot-freemium'
+          realm: config.stackspotRealm || 'stackspot-freemium',
+          proxy: stackspotProxySummary
+        };
+      } else {
+        stackspotConfig = {
+          configured: false,
+          clientIdPreview: null,
+          realm: 'stackspot-freemium',
+          proxy: stackspotProxySummary
         };
       }
       
@@ -383,7 +617,15 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
    */
   app.post('/api/config', async (req: Request, res: Response) => {
     try {
-      const { llmProvider, openaiApiKey, stackspotClientId, stackspotClientSecret, stackspotRealm, port } = req.body;
+      const {
+        llmProvider,
+        openaiApiKey,
+        stackspotClientId,
+        stackspotClientSecret,
+        stackspotRealm,
+        stackspotProxy,
+        port
+      } = req.body;
       
       // Valida provider
       if (!llmProvider || (llmProvider !== 'openai' && llmProvider !== 'stackspot')) {
@@ -447,6 +689,15 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
         }
         // Mantém credenciais do OpenAI se existirem
         // (não remove mais)
+      }
+
+      if (stackspotProxy !== undefined) {
+        const mergedProxy = mergeStackspotProxyConfig(stackspotProxy, existingConfig.stackspotProxy);
+        if (mergedProxy) {
+          newConfig.stackspotProxy = mergedProxy;
+        } else {
+          delete newConfig.stackspotProxy;
+        }
       }
       
       // Valida credenciais antes de salvar e reinicializar

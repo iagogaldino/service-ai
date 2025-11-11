@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { StackSpotProxyConfig } from '../types/stackspot';
 
 /**
  * Configuração e carregamento de variáveis de ambiente
@@ -21,6 +22,7 @@ export interface AppConfig {
   stackspotClientId?: string;
   stackspotClientSecret?: string;
   stackspotRealm?: string;
+  stackspotProxy?: StackSpotProxyConfig;
   
   // Outras configurações
   port?: number;

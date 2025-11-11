@@ -1,6 +1,6 @@
 {
   "name": "delsuc-ia",
-  "version": "1.0.4",
+  "version": "1.1.2",
   "description": "Serviço Node.js com TypeScript, Socket.IO e integração OpenAI",
   "main": "dist/server.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "express": "^4.18.2",
     "openai": "^4.20.1",
     "socket.io": "^4.6.1",
-    "stackspotdelsuc-sdk": "^1.0.0"
+    "stackspotdelsuc-sdk": "^1.0.10"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

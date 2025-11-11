@@ -58,7 +58,14 @@ async function loadHierarchicalAgentsFile(): Promise<AgentsJsonFileHierarchical>
 /**
  * Normaliza e valida o payload do agente.
  */
-function normalizeAgentPayload(input: AgentCreatePayload | AgentJsonConfig): AgentJsonConfig {
+interface NormalizeOptions {
+  defaultPriority?: number;
+}
+
+function normalizeAgentPayload(
+  input: AgentCreatePayload | AgentJsonConfig,
+  options: NormalizeOptions = {},
+): AgentJsonConfig {
   const base = input as AgentJsonConfig & Record<string, any>;
   const {
     name,
@@ -71,13 +78,15 @@ function normalizeAgentPayload(input: AgentCreatePayload | AgentJsonConfig): Age
     ...rest
   } = base;
 
+  const defaultPriority = options.defaultPriority ?? 999;
+
   const normalized: AgentJsonConfig = {
     name,
     description,
     instructions,
     model,
     shouldUse,
-    priority: typeof priority === 'number' ? priority : 999,
+    priority: typeof priority === 'number' ? priority : defaultPriority,
     tools: Array.isArray(tools)
       ? tools.filter(Boolean)
       : tools
@@ -204,6 +213,58 @@ export async function updateAgent(
   await persistAgentsFile(data);
 
   return merged;
+}
+
+/**
+ * Cria ou atualiza o agente fallback (General Assistant).
+ */
+export async function upsertFallbackAgent(
+  payload: AgentCreatePayload | AgentUpdatePayload,
+): Promise<AgentJsonConfig> {
+  const data = await loadHierarchicalAgentsFile();
+  const existingFallback = data.fallbackAgent;
+
+  let normalizedFallback: AgentJsonConfig;
+
+  if (existingFallback) {
+    const mergedPayload: AgentJsonConfig = normalizeAgentPayload({
+      ...existingFallback,
+      ...payload,
+      name: (payload as AgentUpdatePayload).name ?? existingFallback.name,
+    });
+    normalizedFallback = mergedPayload;
+  } else {
+    normalizedFallback = normalizeAgentPayload(payload as AgentCreatePayload);
+  }
+
+  data.fallbackAgent = normalizedFallback;
+  await persistAgentsFile(data);
+
+  return normalizedFallback;
+}
+
+/**
+ * Cria ou atualiza o orquestrador de um grupo.
+ */
+export async function upsertGroupOrchestrator(
+  groupId: string,
+  orchestratorPayload: AgentCreatePayload,
+): Promise<AgentJsonConfig> {
+  if (!groupId) {
+    throw new AgentCrudError('Parâmetro "groupId" é obrigatório.');
+  }
+
+  const data = await loadHierarchicalAgentsFile();
+  const group = findGroup(data.groups || [], groupId);
+
+  const normalizedOrchestrator = normalizeAgentPayload(orchestratorPayload, {
+    defaultPriority: 0,
+  });
+
+  group.orchestrator = normalizedOrchestrator;
+  await persistAgentsFile(data);
+
+  return normalizedOrchestrator;
 }
 
 /**
