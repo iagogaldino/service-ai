@@ -23,10 +23,26 @@ export interface ComponentDefinition {
   color: string;
 }
 
+export interface IfElseCondition {
+  id: string;
+  caseName?: string;
+  condition: string;
+}
+
+export interface IfElseConfig {
+  conditions: IfElseCondition[];
+  elseLabel?: string;
+}
+
+export interface UserApprovalConfig {
+  name: string;
+  message?: string;
+}
+
 export interface CustomNodeData {
   label: string;
   type: ComponentType;
-  config?: AgentConfig;
+  config?: AgentConfig | IfElseConfig | UserApprovalConfig;
 }
 
 /**

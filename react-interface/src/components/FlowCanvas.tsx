@@ -52,6 +52,22 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   activeEdgeId,
   completedEdgeIds = new Set(),
 }) => {
+  const [showControls, setShowControls] = useState(() => {
+    const saved = localStorage.getItem('showFlowControls');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    const handleVisibilityChange = (event: CustomEvent) => {
+      setShowControls(event.detail.showControls);
+    };
+
+    window.addEventListener('flowControlsVisibilityChanged', handleVisibilityChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('flowControlsVisibilityChanged', handleVisibilityChange as EventListener);
+    };
+  }, []);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   
   // Nós iniciais: usa os passados como prop ou cria nó "start" padrão
@@ -698,15 +714,17 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         <Background color="#1a1a1a" gap={16} />
-        <Controls
-          style={{
-            button: {
-              backgroundColor: '#1a1a1a',
-              border: '1px solid #2a2a2a',
-              color: '#e0e0e0',
-            },
-          }}
-        />
+        {showControls && (
+          <Controls
+            style={{
+              button: {
+                backgroundColor: '#1a1a1a',
+                border: '1px solid #2a2a2a',
+                color: '#e0e0e0',
+              },
+            }}
+          />
+        )}
       </ReactFlow>
     </div>
   );

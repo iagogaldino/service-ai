@@ -14,7 +14,7 @@ import {
   RefreshCw,
   MousePointer2
 } from 'lucide-react';
-import { CustomNodeData, ComponentType } from '../types';
+import { CustomNodeData, ComponentType, IfElseConfig, UserApprovalConfig } from '../types';
 
 const iconMap: Record<ComponentType, React.ReactNode> = {
   start: <Play size={14} fill="white" />,
@@ -53,6 +53,8 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
   const icon = iconMap[data.type];
   const isActive = data.isActive || false;
   const [isHovered, setIsHovered] = useState(false);
+  const ifElseConfig = data.type === 'if-else' ? (data.config as IfElseConfig | undefined) : undefined;
+  const userApprovalConfig = data.type === 'user-approval' ? (data.config as UserApprovalConfig | undefined) : undefined;
 
   return (
     <div
@@ -62,7 +64,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
         backgroundColor: '#1a1a1a',
         border: `1px solid ${selected ? color : '#3a3a3a'}`,
         borderRadius: '10px',
-        padding: '12px 14px',
+        padding: data.type === 'user-approval' ? '0 14px 12px 14px' : '12px 14px',
         minWidth: '160px',
         transition: 'all 0.2s',
         boxShadow: selected ? `0 0 0 1px ${color}` : 'none',
@@ -121,54 +123,270 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
           }}
         />
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
-        <div style={{
-          width: '32px',
-          height: '32px',
-          backgroundColor: color,
-          borderRadius: '8px',
+      {/* Header especial para user-approval */}
+      {data.type === 'user-approval' ? (
+        <div style={{ 
+          backgroundColor: '#f97316', 
+          borderRadius: '8px 8px 0 0',
+          margin: '-12px -14px 12px -14px',
+          padding: '12px 14px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
+          gap: '12px',
+          position: 'relative',
+          zIndex: 1,
         }}>
-          {icon}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#ffffff',
-            marginBottom: data.type === 'agent' ? '2px' : '0',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            width: '32px',
+            height: '32px',
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            {data.label}
+            {icon}
           </div>
-          {data.type === 'agent' && (
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: '12px',
-              color: '#9ca3af',
-              fontWeight: 400,
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#ffffff',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}>
-              Agent
+              {userApprovalConfig?.name || data.label}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            backgroundColor: color,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            {icon}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#ffffff',
+              marginBottom: data.type === 'agent' ? '2px' : '0',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
+              {data.label}
+            </div>
+            {data.type === 'agent' && (
+              <div style={{
+                fontSize: '12px',
+                color: '#9ca3af',
+                fontWeight: 400,
+              }}>
+                Agent
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Exibir condições do if/else */}
+      {data.type === 'if-else' && ifElseConfig && ifElseConfig.conditions.length > 0 && (
+        <div style={{ marginTop: '12px', position: 'relative', zIndex: 1 }}>
+          {ifElseConfig.conditions.map((condition, index) => {
+            // Calcula a posição vertical do handle baseado na posição do slot
+            // Header: ~60px, gap: 12px, cada slot: ~32px (8px padding * 2 + ~16px altura)
+            const slotTop = 60 + 12 + (index * (32 + 6)); // 60 (header) + 12 (marginTop) + index * (altura slot + margin)
+            const handleTop = `${slotTop + 16}px`; // Centro do slot
+            
+            return (
+              <div
+                key={condition.id}
+                style={{
+                  backgroundColor: '#0a0a0a',
+                  borderRadius: '6px',
+                  padding: '8px',
+                  marginBottom: index < ifElseConfig.conditions.length - 1 ? '6px' : '0',
+                  border: '1px solid #2a2a2a',
+                  position: 'relative',
+                }}
+              >
+                <div style={{
+                  fontSize: '11px',
+                  color: '#9ca3af',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {condition.caseName || `If ${index + 1}`}
+                </div>
+                <Handle
+                  type="source"
+                  id={`source-${condition.id}`}
+                  position={Position.Right}
+                  style={{
+                    background: '#555',
+                    width: '12px',
+                    height: '12px',
+                    border: '2px solid #1a1a1a',
+                    opacity: isHovered ? 1 : 0,
+                    transition: 'opacity 0.2s',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    right: '-6px',
+                  }}
+                />
+              </div>
+            );
+          })}
+          {ifElseConfig.conditions.length > 0 && (
+            <div
+              style={{
+                backgroundColor: '#0a0a0a',
+                borderRadius: '6px',
+                padding: '8px',
+                marginTop: '6px',
+                border: '1px solid #2a2a2a',
+                position: 'relative',
+              }}
+            >
+              <div style={{
+                fontSize: '11px',
+                color: '#9ca3af',
+              }}>
+                {ifElseConfig.elseLabel || 'Else'}
+              </div>
+              <Handle
+                type="source"
+                id="source-else"
+                position={Position.Right}
+                style={{
+                  background: '#555',
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid #1a1a1a',
+                  opacity: isHovered ? 1 : 0,
+                  transition: 'opacity 0.2s',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  right: '-6px',
+                }}
+              />
             </div>
           )}
         </div>
-      </div>
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{
-          background: '#555',
-          width: '12px',
-          height: '12px',
-          border: '2px solid #1a1a1a',
-          opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.2s',
-        }}
-      />
+      )}
+      {/* Exibir slots do user-approval */}
+      {data.type === 'user-approval' && (
+        <div style={{ marginTop: '12px', position: 'relative', zIndex: 1 }}>
+          {/* Slot Approve */}
+          <div
+            style={{
+              backgroundColor: '#0a0a0a',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '6px',
+              border: '1px solid #2a2a2a',
+              position: 'relative',
+            }}
+          >
+            <div style={{
+              fontSize: '11px',
+              color: '#9ca3af',
+            }}>
+              Approve
+            </div>
+            <Handle
+              type="source"
+              id="source-approve"
+              position={Position.Right}
+              style={{
+                background: '#555',
+                width: '12px',
+                height: '12px',
+                border: '2px solid #1a1a1a',
+                opacity: isHovered ? 1 : 0,
+                transition: 'opacity 0.2s',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                right: '-6px',
+              }}
+            />
+          </div>
+          {/* Slot Reject */}
+          <div
+            style={{
+              backgroundColor: '#0a0a0a',
+              borderRadius: '6px',
+              padding: '8px',
+              border: '1px solid #2a2a2a',
+              position: 'relative',
+            }}
+          >
+            <div style={{
+              fontSize: '11px',
+              color: '#9ca3af',
+            }}>
+              Reject
+            </div>
+            <Handle
+              type="source"
+              id="source-reject"
+              position={Position.Right}
+              style={{
+                background: '#555',
+                width: '12px',
+                height: '12px',
+                border: '2px solid #1a1a1a',
+                opacity: isHovered ? 1 : 0,
+                transition: 'opacity 0.2s',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                right: '-6px',
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {/* Handle de saída padrão para outros tipos de nós */}
+      {data.type !== 'if-else' && data.type !== 'user-approval' && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{
+            background: '#555',
+            width: '12px',
+            height: '12px',
+            border: '2px solid #1a1a1a',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.2s',
+          }}
+        />
+      )}
+      {/* Handle de saída padrão para if/else sem configuração */}
+      {data.type === 'if-else' && (!ifElseConfig || ifElseConfig.conditions.length === 0) && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{
+            background: '#555',
+            width: '12px',
+            height: '12px',
+            border: '2px solid #1a1a1a',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.2s',
+          }}
+        />
+      )}
       <style>{`
         @keyframes skeleton-loading {
           0% {

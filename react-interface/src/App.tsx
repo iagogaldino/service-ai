@@ -5,12 +5,15 @@ import BottomBar from './components/BottomBar';
 import FlowCanvas from './components/FlowCanvas';
 import AgentConfigPanel from './components/AgentConfigPanel';
 import EdgeConfigPanel from './components/EdgeConfigPanel';
+import IfElseConfigPanel from './components/IfElseConfigPanel';
+import UserApprovalConfigPanel from './components/UserApprovalConfigPanel';
 import WorkflowSelector from './components/WorkflowSelector';
 import TestWorkflowPanel from './components/TestWorkflowPanel';
 import ProjectModal from './components/ProjectModal';
 import ProjectSelector from './components/ProjectSelector';
+import SettingsMenu from './components/SettingsMenu';
 import { Node, Edge } from 'reactflow';
-import { CustomNodeData, ComponentDefinition, AgentConfig } from './types';
+import { CustomNodeData, ComponentDefinition, AgentConfig, IfElseConfig, UserApprovalConfig } from './types';
 import { loadAgentsFromBackend, transformAgentForBackend, findExistingAgent, validateAgentConfig } from './utils/agentTransformer';
 import { getAgentsConfig, createAgent, updateAgent, deleteAgent, ApiError, AgentsFile } from './services/apiService';
 import { saveWorkflow, loadWorkflow, mergeWorkflowWithBackendAgents, loadEdges } from './utils/workflowStorage';
@@ -37,6 +40,7 @@ function App() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [showProjectSelector, setShowProjectSelector] = useState(true);
   const [isCheckingProject, setIsCheckingProject] = useState(true);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   
   // Estados para rastreamento visual do workflow
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
@@ -53,6 +57,37 @@ function App() {
       setShowProjectSelector(false);
       setIsCheckingProject(false);
       console.log('✅ Projeto selecionado:', project.name);
+    } catch (err) {
+      console.error('Erro ao selecionar projeto:', err);
+    }
+  };
+
+  const handleProjectChanged = async (project: Project) => {
+    try {
+      setCurrentProject(project);
+      setShowProjectSelector(false);
+      setIsCheckingProject(false);
+      console.log('✅ Projeto alterado:', project.name);
+      
+      // Recarrega workflows do novo projeto
+      const { loadProjectWorkflows } = await import('./services/projectService');
+      const { workflows, activeWorkflowId } = await loadProjectWorkflows();
+      
+      if (workflows.length > 0) {
+        // Carrega o workflow ativo ou o primeiro
+        const workflowToLoad = workflows.find(w => w.id === activeWorkflowId) || workflows[0];
+        if (workflowToLoad) {
+          setSelectedWorkflow(workflowToLoad);
+        }
+      } else {
+        setSelectedWorkflow(null);
+        // Limpa os nós e edges quando não há workflows
+        setAllNodes([]);
+        setAllEdges([]);
+      }
+      
+      // Força recarregamento dos agentes e workflows através do useEffect
+      // Isso será feito automaticamente quando currentProject mudar
     } catch (err) {
       console.error('Erro ao carregar projeto selecionado:', err);
     }
@@ -239,13 +274,13 @@ function App() {
         return;
       }
       
-      // Se houver um agente selecionado, fecha o painel
-      if (selectedNode && selectedNode.data.type === 'agent') {
+      // Se houver um nó selecionado (agent, if-else ou user-approval), fecha o painel
+      if (selectedNode && (selectedNode.data.type === 'agent' || selectedNode.data.type === 'if-else' || selectedNode.data.type === 'user-approval')) {
         setSelectedNode(null);
       }
     };
 
-    if (selectedNode && selectedNode.data.type === 'agent') {
+    if (selectedNode && (selectedNode.data.type === 'agent' || selectedNode.data.type === 'if-else' || selectedNode.data.type === 'user-approval')) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
@@ -291,7 +326,7 @@ function App() {
     }
   }, [selectedEdge]);
 
-  const handleUpdateNode = useCallback((nodeId: string, config: AgentConfig) => {
+  const handleUpdateNode = useCallback((nodeId: string, config: AgentConfig | IfElseConfig | UserApprovalConfig) => {
     // Atualizar o nó na lista de nós
     setAllNodes((nds) =>
       nds.map((node) =>
@@ -301,7 +336,7 @@ function App() {
               data: {
                 ...node.data,
                 config,
-                label: config.name,
+                label: 'name' in config ? config.name : node.data.label,
               },
             }
           : node
@@ -663,13 +698,243 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <TopBar 
-        onDeploy={handleDeploy} 
-        isDeploying={isDeploying}
-        onToggleWorkflowSelector={() => setShowWorkflowSelector(!showWorkflowSelector)}
-        showWorkflowSelector={showWorkflowSelector}
-        onTestWorkflow={async () => {
+            <TopBar
+              isDeploying={isDeploying}
+              onToggleWorkflowSelector={() => setShowWorkflowSelector(!showWorkflowSelector)}
+              showWorkflowSelector={showWorkflowSelector}
+              onSettingsClick={() => setShowSettingsMenu(true)}
+              currentProject={currentProject}
+              onProjectChanged={handleProjectChanged}
+              onTestWorkflow={async () => {
           if (!showTestWorkflow) {
+            // Executa o deploy antes de abrir o modo de teste
+            try {
+              setIsDeploying(true);
+              setDeployError(null);
+              setDeploySuccess(null);
+              
+              // 1. Coletar todos os nós do tipo "agent"
+              const agentNodes = allNodes.filter(node => node.data.type === 'agent');
+              
+              if (agentNodes.length === 0) {
+                setDeployError('Nenhum agente encontrado para deploy');
+                setIsDeploying(false);
+                return;
+              }
+              
+              // 2. Buscar estrutura atual do backend
+              let agentsFile: AgentsFile;
+              try {
+                agentsFile = await getAgentsConfig();
+              } catch (error) {
+                console.error('Erro ao buscar estrutura do backend:', error);
+                agentsFile = {
+                  agents: [],
+                  toolSets: {},
+                };
+                console.warn('⚠️ Não foi possível buscar estrutura do backend, tentando deploy mesmo assim...');
+              }
+              
+              // 3. Validar configurações
+              const validationErrors: Array<{ agent: string; errors: string[] }> = [];
+              for (const node of agentNodes) {
+                const config = node.data.config;
+                if (!config) {
+                  validationErrors.push({
+                    agent: node.data.label || node.id,
+                    errors: ['Configuração do agente não encontrada'],
+                  });
+                  continue;
+                }
+                
+                const errors = validateAgentConfig(config);
+                if (errors.length > 0) {
+                  validationErrors.push({
+                    agent: config.name || node.id,
+                    errors,
+                  });
+                }
+              }
+              
+              if (validationErrors.length > 0) {
+                const errorMessages = validationErrors.map(
+                  ({ agent, errors }) => `${agent}: ${errors.join(', ')}`
+                ).join('\n');
+                setDeployError(`Erros de validação:\n${errorMessages}`);
+                setIsDeploying(false);
+                return;
+              }
+              
+              // 4. Identificar agentes que devem ser deletados
+              const agentsInCanvas = new Set(
+                agentNodes.map(node => {
+                  const config = node.data.config;
+                  if (!config) return null;
+                  return config.name;
+                }).filter(Boolean) as string[]
+              );
+              
+              const agentsToDelete: string[] = [];
+              for (const agent of agentsFile.agents) {
+                if (!agentsInCanvas.has(agent.name)) {
+                  agentsToDelete.push(agent.name);
+                }
+              }
+              
+              // 5. Para cada agente: criar ou atualizar
+              const results: Array<{ type: 'created' | 'updated' | 'deleted'; agent: string }> = [];
+              const errors: Array<{ agent: string; error: string }> = [];
+              
+              for (const node of agentNodes) {
+                const config = node.data.config!;
+                
+                try {
+                  const backendAgent = transformAgentForBackend(config);
+                  const existing = findExistingAgent(backendAgent.name, agentsFile!);
+                  
+                  if (existing) {
+                    await updateAgent(backendAgent.name, backendAgent);
+                    results.push({ type: 'updated', agent: backendAgent.name });
+                  } else {
+                    await createAgent(backendAgent);
+                    results.push({ type: 'created', agent: backendAgent.name });
+                  }
+                } catch (error) {
+                  console.error(`Erro ao processar agente ${config.name}:`, error);
+                  errors.push({
+                    agent: config.name || node.id,
+                    error: error instanceof ApiError ? error.message : 'Erro desconhecido',
+                  });
+                }
+              }
+              
+              // 6. Deletar agentes que não estão mais no canvas
+              for (const name of agentsToDelete) {
+                try {
+                  await deleteAgent(name);
+                  results.push({ type: 'deleted', agent: name });
+                } catch (error) {
+                  console.error(`Erro ao deletar agente ${name}:`, error);
+                  errors.push({
+                    agent: name,
+                    error: error instanceof ApiError ? error.message : 'Erro desconhecido',
+                  });
+                }
+              }
+              
+              // 7. Salvar workflow no backend
+              try {
+                const workflowData = convertReactFlowToWorkflow(
+                  allNodes,
+                  allEdges,
+                  'Workflow Principal',
+                  'Workflow salvo antes de teste'
+                );
+                
+                let activeWorkflow: Workflow | null = null;
+                try {
+                  activeWorkflow = await getActiveWorkflow();
+                } catch (error: any) {
+                  if (error?.status !== 404) {
+                    console.error('Erro ao buscar workflow ativo:', error);
+                  }
+                }
+                
+                let savedWorkflow: Workflow;
+                if (activeWorkflow) {
+                  savedWorkflow = await updateWorkflow(activeWorkflow.id, {
+                    ...workflowData,
+                    active: true,
+                  });
+                } else {
+                  const workflows = await listWorkflows();
+                  const existingWorkflow = workflows.find(w => w.name === workflowData.name);
+                  
+                  if (existingWorkflow) {
+                    savedWorkflow = await updateWorkflow(existingWorkflow.id, {
+                      ...workflowData,
+                      active: true,
+                    });
+                  } else {
+                    savedWorkflow = await createWorkflow({
+                      ...workflowData,
+                      active: true,
+                    });
+                  }
+                }
+                
+                // Salva também no projeto ativo
+                try {
+                  const { saveProjectWorkflows } = await import('./services/projectService');
+                  const allWorkflows = await listWorkflows();
+                  await saveProjectWorkflows(allWorkflows, savedWorkflow.id);
+                } catch (projectError) {
+                  console.error('⚠️ Erro ao salvar workflow no projeto:', projectError);
+                }
+                
+                saveWorkflow(allNodes, allEdges);
+              } catch (workflowError) {
+                console.error('⚠️ Erro ao salvar workflow:', workflowError);
+                saveWorkflow(allNodes, allEdges);
+              }
+              
+              // 8. Recarrega agentes do backend após deploy
+              try {
+                const currentEdges = allEdges;
+                const backendNodes = await loadAgentsFromBackend(getAgentsConfig, allNodes);
+                
+                const startNode: Node<CustomNodeData> = {
+                  id: 'start',
+                  type: 'custom',
+                  position: { x: 100, y: 300 },
+                  data: { label: 'Start', type: 'start' },
+                };
+                
+                const { nodes: mergedNodes, edges: validEdges } = mergeWorkflowWithBackendAgents(
+                  [startNode, ...backendNodes],
+                  currentEdges
+                );
+                
+                setAllNodes(mergedNodes);
+                setAllEdges(validEdges);
+              } catch (reloadError) {
+                console.error('⚠️ Erro ao recarregar agentes após deploy:', reloadError);
+              }
+              
+              // Mostra feedback do deploy
+              const createdCount = results.filter(r => r.type === 'created').length;
+              const updatedCount = results.filter(r => r.type === 'updated').length;
+              const deletedCount = results.filter(r => r.type === 'deleted').length;
+              const errorCount = errors.length;
+              
+              if (errorCount > 0) {
+                const errorMessages = errors.map(({ agent, error }) => `${agent}: ${error}`).join('\n');
+                setDeployError(`${errorCount} erro(s):\n${errorMessages}`);
+              }
+              
+              if (createdCount > 0 || updatedCount > 0 || deletedCount > 0) {
+                const parts = [];
+                if (createdCount > 0) parts.push(`${createdCount} criado(s)`);
+                if (updatedCount > 0) parts.push(`${updatedCount} atualizado(s)`);
+                if (deletedCount > 0) parts.push(`${deletedCount} deletado(s)`);
+                setDeploySuccess(
+                  `Deploy concluído! ${parts.join(', ')}.`
+                );
+              }
+              
+            } catch (error) {
+              console.error('Erro no deploy:', error);
+              setDeployError(
+                error instanceof ApiError 
+                  ? error.message 
+                  : 'Erro ao fazer deploy. Verifique se o backend está rodando.'
+              );
+              setIsDeploying(false);
+              return;
+            } finally {
+              setIsDeploying(false);
+            }
+            
             // Reseta os efeitos visuais antes de abrir o painel de teste
             setActiveNodeId(null);
             setCompletedNodeIds(new Set());
@@ -709,86 +974,7 @@ function App() {
               })
             );
             
-            // Salva o workflow antes de abrir o painel de teste
-            try {
-              console.log('💾 Salvando workflow antes de testar...');
-              
-              // Converte nodes e edges para formato de workflow
-              const workflowData = convertReactFlowToWorkflow(
-                allNodes,
-                allEdges,
-                'Workflow Principal',
-                'Workflow salvo antes de teste'
-              );
-              
-              // Verifica se já existe um workflow ativo
-              let activeWorkflow: Workflow | null = null;
-              try {
-                activeWorkflow = await getActiveWorkflow();
-              } catch (error: any) {
-                if (error?.status !== 404) {
-                  console.error('Erro ao buscar workflow ativo:', error);
-                }
-              }
-              
-              let savedWorkflow: Workflow;
-              if (activeWorkflow) {
-                // Atualiza workflow existente
-                console.log(`📝 Atualizando workflow existente: ${activeWorkflow.id}`);
-                savedWorkflow = await updateWorkflow(activeWorkflow.id, {
-                  ...workflowData,
-                  active: true,
-                });
-              } else {
-                // Verifica se existe algum workflow com o mesmo nome
-                const workflows = await listWorkflows();
-                const existingWorkflow = workflows.find(w => w.name === workflowData.name);
-                
-                if (existingWorkflow) {
-                  // Atualiza workflow existente
-                  console.log(`📝 Atualizando workflow existente: ${existingWorkflow.id}`);
-                  savedWorkflow = await updateWorkflow(existingWorkflow.id, {
-                    ...workflowData,
-                    active: true,
-                  });
-                } else {
-                  // Cria novo workflow
-                  console.log('✨ Criando novo workflow no backend...');
-                  savedWorkflow = await createWorkflow({
-                    ...workflowData,
-                    active: true,
-                  });
-                }
-              }
-              
-              console.log('✅ Workflow salvo no backend:', {
-                id: savedWorkflow.id,
-                nodes: savedWorkflow.nodes.length,
-                edges: savedWorkflow.edges.length,
-              });
-              
-              // Salva também no projeto ativo
-              try {
-                const { saveProjectWorkflows } = await import('./services/projectService');
-                const allWorkflows = await listWorkflows();
-                await saveProjectWorkflows(allWorkflows, savedWorkflow.id);
-                console.log('✅ Workflow salvo também no projeto ativo');
-              } catch (projectError) {
-                console.error('⚠️ Erro ao salvar workflow no projeto:', projectError);
-              }
-              
-              // Salva também no localStorage como backup
-              saveWorkflow(allNodes, allEdges);
-              console.log('✅ Workflow salvo também no localStorage como backup');
-              
-            } catch (workflowError) {
-              console.error('⚠️ Erro ao salvar workflow antes de testar:', workflowError);
-              // Não bloqueia a abertura do painel de teste, apenas loga o erro
-              // Mas ainda salva no localStorage como backup
-              saveWorkflow(allNodes, allEdges);
-            }
-            
-            // Abre o painel de teste após salvar
+            // Abre o painel de teste após deploy
             setShowTestWorkflow(true);
           }
         }}
@@ -932,6 +1118,22 @@ function App() {
             onDelete={handleDeleteNode}
           />
         )}
+        {selectedNode && selectedNode.data.type === 'if-else' && (
+          <IfElseConfigPanel
+            node={selectedNode}
+            onUpdate={handleUpdateNode}
+            onClose={() => setSelectedNode(null)}
+            onDelete={handleDeleteNode}
+          />
+        )}
+        {selectedNode && selectedNode.data.type === 'user-approval' && (
+          <UserApprovalConfigPanel
+            node={selectedNode}
+            onUpdate={handleUpdateNode}
+            onClose={() => setSelectedNode(null)}
+            onDelete={handleDeleteNode}
+          />
+        )}
         {selectedEdge && (
           <EdgeConfigPanel
             edge={selectedEdge}
@@ -942,6 +1144,12 @@ function App() {
           />
         )}
       </div>
+      
+      {/* Menu de Configurações */}
+      <SettingsMenu
+        isOpen={showSettingsMenu}
+        onClose={() => setShowSettingsMenu(false)}
+      />
       
       {/* ProjectModal removido - agora é gerenciado pelo ProjectSelector */}
       {/* Mensagens de feedback */}
