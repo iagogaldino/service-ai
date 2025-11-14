@@ -1,0 +1,87 @@
+<section class="flow-builder">
+  <aside class="flow-builder__sidebar">
+    <header>
+      <h2>Flow Builder</h2>
+      <p>Monte fluxos visuais conectando agentes e ferramentas.</p>
+    </header>
+
+    <ul>
+      @for (item of palette; track item.type) {
+        <li
+          draggable="true"
+          (dragstart)="handleDragStart(item.type, $event)"
+          (dragend)="handleDragEnd()"
+        >
+          <span class="flow-builder__icon">{{ item.icon }}</span>
+          <div>
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.description }}</small>
+          </div>
+        </li>
+      }
+    </ul>
+  </aside>
+
+  <div
+    class="flow-builder__canvas"
+    #canvas
+    (dragover)="allowDrop($event)"
+    (drop)="handleDrop($event)"
+  >
+    <div class="flow-builder__placeholder">
+      Carregando editor de fluxo...
+    </div>
+  </div>
+
+  <aside class="flow-builder__inspector">
+    @if (selectedNode(); as selection) {
+      <header class="flow-builder__inspector-header">
+        <div>
+          <h3>Configuração do nó</h3>
+          <p>{{ inspectorTitle() }}</p>
+        </div>
+        <button type="button" (click)="closeInspector()" aria-label="Fechar inspector">
+          ✕
+        </button>
+      </header>
+
+      <form class="flow-builder__inspector-form" [formGroup]="inspectorForm" (ngSubmit)="applyInspectorChanges()">
+        <label class="flow-builder__field">
+          <span>Nome exibido</span>
+          <input type="text" formControlName="label" />
+        </label>
+
+        <label class="flow-builder__field">
+          <span>Tipo</span>
+          <select formControlName="type">
+            @for (option of nodeTypeOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="flow-builder__tips">
+          <p>
+            Ajuste o tipo para alterar as entradas/saídas do nó. Conexões existentes serão removidas
+            automaticamente caso fiquem incompatíveis.
+          </p>
+        </div>
+
+        <div class="flow-builder__inspector-actions">
+          <button type="submit" [disabled]="inspectorForm.pristine">
+            Salvar alterações
+          </button>
+          <button type="button" class="danger" (click)="removeSelectedNode()">
+            Remover nó
+          </button>
+        </div>
+      </form>
+    } @else {
+      <div class="flow-builder__inspector-empty">
+        <h3>Configuração</h3>
+        <p>Selecione um nó do fluxo para editar suas propriedades.</p>
+      </div>
+    }
+  </aside>
+</section>
+

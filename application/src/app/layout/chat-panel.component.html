@@ -1,0 +1,72 @@
+<div class="chat-panel">
+  <header class="chat-panel__header">
+    <div>
+      <h2>Chat</h2>
+      <p>Converse com seus agentes em tempo real.</p>
+    </div>
+    <div class="chat-panel__header-actions">
+      <span
+        class="chat-panel__status"
+        [class.chat-panel__status--connected]="isConnected()"
+        [class.chat-panel__status--disconnected]="!isConnected()"
+      >
+        {{ statusLabel() }}
+      </span>
+      <button
+        class="chat-panel__clear"
+        type="button"
+        (click)="clearConversation()"
+        [disabled]="messages().length === 0"
+      >
+        Limpar
+      </button>
+    </div>
+  </header>
+
+  <div class="chat-panel__messages" id="chat">
+    @if (messages().length === 0) {
+      <div class="chat-panel__empty">
+        <p>A conversa ainda não começou.</p>
+        <p>Envie a primeira mensagem para seu agente.</p>
+      </div>
+    } @else {
+      <div #messagesList class="chat-panel__messages-scroll">
+        @for (message of messages(); track trackByMessage($index, message)) {
+          <article class="chat-message" [ngClass]="'chat-message--' + message.role">
+            <header class="chat-message__header">
+              <span class="chat-message__sender">{{ message.sender }}</span>
+              <time class="chat-message__time">
+                {{ message.timestamp | date: 'HH:mm' }}
+              </time>
+            </header>
+            <pre class="chat-message__content">{{ message.content }}</pre>
+          </article>
+        }
+      </div>
+    }
+  </div>
+
+  <footer class="chat-panel__footer">
+    <textarea
+      class="chat-panel__input"
+      [formControl]="messageControl"
+      placeholder="Digite sua mensagem e pressione Enter..."
+      rows="3"
+      (keydown)="handleKeydown($event)"
+      [disabled]="!isConnected()"
+    ></textarea>
+    <button
+      class="chat-panel__send"
+      type="button"
+      (click)="sendMessage()"
+      [disabled]="!isConnected() || isSending() || !messageControl.value.trim()"
+    >
+      @if (isSending()) {
+        <span class="chat-panel__spinner"></span>
+      } @else {
+        Enviar
+      }
+    </button>
+  </footer>
+</div>
+

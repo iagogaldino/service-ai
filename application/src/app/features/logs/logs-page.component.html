@@ -1,0 +1,152 @@
+<section class="logs">
+  <header class="logs__header">
+    <div>
+      <h2>Histórico de Logs</h2>
+      <p>Investigue eventos registrados pelo ServiceIA em tempo real.</p>
+    </div>
+    <div class="logs__provider-switch">
+      @for (provider of providers; track provider) {
+        <button
+          type="button"
+          class="logs__provider"
+          [class.logs__provider--active]="selectedProvider() === provider"
+          (click)="changeProvider(provider)"
+        >
+          {{ provider === 'stackspot' ? 'StackSpot' : 'OpenAI' }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (state().loading) {
+    <div class="logs__loading">Carregando logs...</div>
+  } @else {
+    @if (state().error) {
+      <div class="logs__error">{{ state().error }}</div>
+    }
+
+    @if (state().data) {
+      <section class="logs__summary">
+        <article class="logs__card">
+          <h3>Conexões</h3>
+          <div class="logs__metric">
+            <strong>{{ statistics()?.totalConnections || 0 }}</strong>
+            <span>Conexões registradas</span>
+          </div>
+        </article>
+        <article class="logs__card">
+          <h3>Mensagens</h3>
+          <div class="logs__metric">
+            <strong>{{ statistics()?.totalMessages || 0 }}</strong>
+            <span>Enviadas/recebidas</span>
+          </div>
+        </article>
+        <article class="logs__card">
+          <h3>Execuções de tools</h3>
+          <div class="logs__metric">
+            <strong>{{ statistics()?.totalToolExecutions || 0 }}</strong>
+            <span>Sucessos registrados</span>
+          </div>
+        </article>
+        <article class="logs__card">
+          <h3>Erros</h3>
+          <div class="logs__metric">
+            <strong>{{ statistics()?.totalErrors || 0 }}</strong>
+            <span>Ocorrências</span>
+          </div>
+        </article>
+        <article class="logs__card">
+          <h3>Tokens</h3>
+          <div class="logs__metric">
+            <strong>{{ formatTokens(statistics()?.totalTokens) }}</strong>
+            <span>Processados</span>
+          </div>
+        </article>
+        <article class="logs__card">
+          <h3>Custos estimados</h3>
+          <div class="logs__metric">
+            <strong>{{ formatCost(statistics()?.totalCost) }}</strong>
+            <span>Total aproximado</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="logs__table">
+        <header>
+          <h3>Entradas recentes</h3>
+          <span>{{ entries().length }} registro(s)</span>
+        </header>
+
+        @if (entries().length === 0) {
+          <div class="logs__empty">Nenhum log encontrado para o provider selecionado.</div>
+        } @else {
+          <div class="logs__table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Tipo</th>
+                  <th>Agente</th>
+                  <th>Detalhes</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (entry of entries(); track entry.id) {
+                  <tr>
+                    <td>
+                      <div>{{ entry.timestamp | date: 'shortDate' }}</div>
+                      <small>{{ entry.timestamp | date: 'shortTime' }}</small>
+                    </td>
+                    <td>
+                      <span class="logs__badge" [class.logs__badge--error]="entry.type === 'error'">
+                        {{ formatType(entry.type) }}
+                      </span>
+                    </td>
+                    <td>
+                      <strong>{{ entry.agentName || '—' }}</strong>
+                      <small *ngIf="entry.threadId">Thread: {{ entry.threadId }}</small>
+                    </td>
+                    <td>
+                      <div class="logs__detail" *ngIf="entry.message">
+                        <strong>Mensagem:</strong> {{ entry.message }}
+                      </div>
+                      <div class="logs__detail" *ngIf="entry.response">
+                        <strong>Resposta:</strong> {{ entry.response }}
+                      </div>
+                      <div class="logs__detail" *ngIf="entry.toolName">
+                        <strong>Tool:</strong> {{ entry.toolName }}
+                        <small *ngIf="entry.toolExecutionTime">
+                          ({{ entry.toolExecutionTime }} ms)
+                        </small>
+                      </div>
+                      <div class="logs__detail" *ngIf="entry.toolResult">
+                        <strong>Resultado:</strong>
+                        <span class="logs__detail-pre">{{ entry.toolResult }}</span>
+                      </div>
+                      <div class="logs__detail" *ngIf="entry.error">
+                        <strong>Erro:</strong>
+                        <span class="logs__detail-pre logs__detail-pre--error">{{ entry.error }}</span>
+                      </div>
+                      <div class="logs__detail" *ngIf="entry.tokenUsage">
+                        <strong>Tokens:</strong>
+                        {{ formatTokens(entry.tokenUsage.totalTokens) }}
+                        <small>
+                          (Prompt: {{ formatTokens(entry.tokenUsage.promptTokens) }} · Completion:
+                          {{ formatTokens(entry.tokenUsage.completionTokens) }})
+                        </small>
+                      </div>
+                      <div class="logs__detail" *ngIf="entry.tokenCost">
+                        <strong>Custos:</strong> {{ formatCost(entry.tokenCost.totalCost) }}
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+  }
+</section>
+

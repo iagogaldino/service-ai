@@ -1,0 +1,109 @@
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.navbar {
+  background: var(--bg-card);
+  border-bottom: 2px solid var(--border-color);
+  padding: 15px 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 64px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.navbar__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.menu-sidebar {
+  width: 240px;
+  background: var(--bg-card);
+  border-right: 2px solid var(--border-color);
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.chat-area {
+  width: 380px;
+  background: var(--bg-card);
+  border-right: 2px solid var(--border-color);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.content-area {
+  flex: 1;
+  background: var(--bg-card);
+  overflow-y: auto;
+  min-height: 0;
+  padding: 20px;
+}
+
+.footer {
+  background: var(--bg-card);
+  border-top: 2px solid var(--border-color);
+  padding: 12px 20px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.footer a {
+  color: var(--accent-primary);
+}
+
+@media (max-width: 1280px) {
+  .chat-area {
+    width: 320px;
+  }
+
+  .menu-sidebar {
+    width: 200px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .menu-sidebar,
+  .chat-area {
+    width: 100%;
+    border-right: none;
+  }
+
+  .menu-sidebar {
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .chat-area {
+    border-bottom: 2px solid var(--border-color);
+  }
+}
+

@@ -1,0 +1,122 @@
+<section class="monitor">
+  <header class="monitor__header">
+    <div>
+      <h2>Monitoramento em tempo real</h2>
+      <p>Selecione uma conexão ativa para acompanhar as mensagens e eventos emitidos.</p>
+    </div>
+    <div class="monitor__header-actions">
+      <div class="monitor__legend">
+        <span class="monitor__legend-dot"></span>
+        Socket atual: <strong>{{ socketId() || '—' }}</strong>
+      </div>
+      <button type="button" (click)="loadConnections()">↻ Atualizar</button>
+    </div>
+  </header>
+
+  @if (loadingConnections()) {
+    <div class="monitor__loading">Carregando conexões ativas...</div>
+  } @else {
+    @if (connectionError()) {
+      <div class="monitor__error">{{ connectionError() }}</div>
+    }
+
+    <div class="monitor__layout">
+      <aside class="monitor__connections">
+        <header>
+          <h3>Conexões ativas</h3>
+          <span>{{ connections().length }} conexão(ões)</span>
+        </header>
+        @if (connections().length === 0) {
+          <div class="monitor__empty">
+            Nenhuma conexão ativa no momento.
+          </div>
+        } @else {
+          <ul>
+            @for (connection of connections(); track connection.socketId) {
+              <li
+                [class.monitor__connection--active]="selectedConnection()?.socketId === connection.socketId"
+                (click)="selectConnection(connection)"
+              >
+                <div class="monitor__connection-header">
+                  <strong>{{ connection.socketId }}</strong>
+                  <span>{{ connection.threadId || 'Sem thread' }}</span>
+                </div>
+                <div class="monitor__connection-meta">
+                  <span>{{ connection.connectedAt | date: 'short' }}</span>
+                  <span>{{ formatConnectionInfo(connection) }}</span>
+                </div>
+                <div class="monitor__connection-aux">
+                  <span>{{ connection.userAgent || 'Sem user agent' }}</span>
+                  <span>{{ connection.ipAddress || '—' }}</span>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </aside>
+
+      <section class="monitor__events">
+        <header>
+          <div>
+            <h3>Eventos monitorados</h3>
+            @if (selectedConnection()) {
+              <small>
+                Monitorando: <strong>{{ selectedConnection()?.socketId }}</strong>
+              </small>
+            } @else {
+              <small>Selecione uma conexão para iniciar o monitoramento.</small>
+            }
+          </div>
+          <div class="monitor__actions">
+            <span
+              class="monitor__status"
+              [class.monitor__status--active]="monitoringActive()"
+            >
+              {{ monitoringActive() ? 'Monitorando' : 'Inativo' }}
+            </span>
+            <button
+              type="button"
+              class="ghost"
+              [disabled]="!monitoringActive()"
+              (click)="stopMonitoring()"
+            >
+              Parar
+            </button>
+          </div>
+        </header>
+
+        @if (monitorError()) {
+          <div class="monitor__error">{{ monitorError() }}</div>
+        }
+
+        @if (!selectedConnection()) {
+          <div class="monitor__empty monitor__empty--center">
+            Selecione uma conexão na lista para iniciar o monitoramento.
+          </div>
+        } @else {
+          @if (events().length === 0) {
+            <div class="monitor__empty monitor__empty--center">
+              Aguardando novos eventos desta conexão...
+            </div>
+          } @else {
+            <div class="monitor__events-scroll">
+              @for (event of events(); track trackEvent($index, event)) {
+                <article class="monitor-event {{ 'monitor-event--' + resolveEventClass(event.event) }}">
+                  <header>
+                    <div>
+                      <span class="monitor-event__icon">{{ resolveEventIcon(event.event) }}</span>
+                      <strong>{{ resolveEventLabel(event.event) }}</strong>
+                    </div>
+                    <time>{{ event.timestamp | date: 'shortTime' }}</time>
+                  </header>
+                  <pre>{{ (event.data | json) }}</pre>
+                </article>
+              }
+            </div>
+          }
+        }
+      </section>
+    </div>
+  }
+</section>
+

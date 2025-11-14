@@ -1,0 +1,16 @@
+<nav class="sidebar">
+  <div class="sidebar__section">
+    @for (item of menuItems(); track item.route) {
+      <a
+        routerLinkActive="active"
+        class="menu-button"
+        [routerLink]="item.route"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        <span class="menu-button__icon">{{ item.icon }}</span>
+        <span class="menu-button__label">{{ item.label }}</span>
+      </a>
+    }
+  </div>
+</nav>
+

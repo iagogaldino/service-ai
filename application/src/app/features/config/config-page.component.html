@@ -1,0 +1,297 @@
+<section class="config-page" [class.config-page--loading]="loading()">
+  <header class="config-page__header">
+    <div>
+      <h2>⚙️ Configuração</h2>
+      <p>Gerencie providers, credenciais e proxy usados pelo ServiceIA.</p>
+    </div>
+
+    <div class="config-page__header-actions">
+      <div class="config-page__timestamp" *ngIf="lastUpdated() as updated">
+        Última atualização: {{ updated | date: 'short' }}
+      </div>
+      <button type="button" class="ghost-button" (click)="reload()" [disabled]="loading()">
+        Recarregar dados
+      </button>
+    </div>
+  </header>
+
+  <form class="config-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+    <section class="config-card">
+      <h3 class="config-card__title">Provider ativo</h3>
+      <p class="config-card__subtitle">
+        Escolha qual LLM provider o ServiceIA deve utilizar neste momento. Você pode deixar credenciais salvas
+        para ambos e alternar quando quiser.
+      </p>
+
+      <div class="provider-select">
+        <label
+          class="provider-option"
+          [class.provider-option--active]="provider() === 'stackspot'"
+        >
+          <input type="radio" formControlName="llmProvider" value="stackspot" />
+          <div>
+            <strong>StackSpot</strong>
+            <span>Recomendado para produção</span>
+          </div>
+        </label>
+        <label
+          class="provider-option"
+          [class.provider-option--active]="provider() === 'openai'"
+        >
+          <input type="radio" formControlName="llmProvider" value="openai" />
+          <div>
+            <strong>OpenAI</strong>
+            <span>Use se preferir conectar direto na OpenAI</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="provider-status">
+        <div>
+          <span class="provider-status__title">StackSpot</span>
+          <span
+            class="status-chip"
+            [class.status-chip--configured]="stackspotConfigured()"
+            [class.status-chip--missing]="!stackspotConfigured()"
+          >
+            {{ stackspotConfigured() ? 'Configurado' : 'Pendente' }}
+          </span>
+          <p class="provider-status__details">
+            <ng-container *ngIf="stackspotConfigured(); else stackspotMissing">
+              Client ID configurado:
+              <strong>{{ stackspotPreview() }}</strong>
+            </ng-container>
+            <ng-template #stackspotMissing>
+              Informe Client ID e Client Secret para utilizar o StackSpot.
+            </ng-template>
+          </p>
+        </div>
+
+        <div>
+          <span class="provider-status__title">OpenAI</span>
+          <span
+            class="status-chip"
+            [class.status-chip--configured]="openaiConfigured()"
+            [class.status-chip--missing]="!openaiConfigured()"
+          >
+            {{ openaiConfigured() ? 'Configurado' : 'Pendente' }}
+          </span>
+          <p class="provider-status__details">
+            <ng-container *ngIf="openaiConfigured(); else openaiMissing">
+              API Key configurada:
+              <strong>{{ openaiPreview() }}</strong>
+            </ng-container>
+            <ng-template #openaiMissing>
+              Cadastre uma chave que comece com <code>sk-</code>.
+            </ng-template>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="config-card" *ngIf="provider() === 'openai'">
+      <h3 class="config-card__title">Credenciais OpenAI</h3>
+      <p class="config-card__subtitle">
+        Informe uma nova API key para atualizar a configuração. A chave atual não é exibida por segurança.
+      </p>
+
+      <div class="form-control">
+        <label for="openai-api-key">OpenAI API Key</label>
+        <input
+          id="openai-api-key"
+          type="password"
+          placeholder="sk-..."
+          formControlName="openaiApiKey"
+          autocomplete="off"
+        />
+        <small>
+          A chave deve começar com <code>sk-</code>. Ela só é enviada se você preencher este campo.
+        </small>
+      </div>
+    </section>
+
+    <section class="config-card" formGroupName="stackspot" *ngIf="provider() === 'stackspot'">
+      <h3 class="config-card__title">Credenciais StackSpot</h3>
+      <p class="config-card__subtitle">
+        Informe Client ID e Client Secret obtidos no StackSpot. Ao salvar, as credenciais são armazenadas com segurança no backend.
+      </p>
+
+      <div class="form-grid">
+        <div class="form-control">
+          <label for="stackspot-client-id">Client ID</label>
+          <input
+            id="stackspot-client-id"
+            type="text"
+            placeholder="Seu Client ID"
+            formControlName="clientId"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-control">
+          <label for="stackspot-client-secret">Client Secret</label>
+          <input
+            id="stackspot-client-secret"
+            type="password"
+            placeholder="Seu Client Secret"
+            formControlName="clientSecret"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-control">
+          <label for="stackspot-realm">Realm (opcional)</label>
+          <input
+            id="stackspot-realm"
+            type="text"
+            formControlName="realm"
+            placeholder="stackspot-freemium"
+          />
+        </div>
+      </div>
+
+      <div class="info-box">
+        Ainda não tem acesso? <a href="https://ai.stackspot.com/?campaignCode=01K8TQ5N0KJYQHJ01FYGP3WR53" target="_blank" rel="noopener noreferrer">Crie sua conta StackSpot aqui</a>.
+      </div>
+
+      <div class="proxy-section">
+        <div class="proxy-section__header">
+          <div>
+            <h4>Proxy StackSpot (opcional)</h4>
+            <p>Configure um proxy corporativo para as requisições StackSpot, se necessário.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" formControlName="proxyEnabled" />
+            <span>Ativar proxy</span>
+          </label>
+        </div>
+
+        <div
+          class="proxy-fields"
+          [class.proxy-fields--disabled]="!proxyEnabled()"
+        >
+          <div class="form-control">
+            <label for="proxy-https-host">Proxy HTTPS Host</label>
+            <input
+              id="proxy-https-host"
+              type="text"
+              placeholder="proxy.corp.local"
+              formControlName="proxyHttpsHost"
+              [disabled]="!proxyEnabled()"
+            />
+          </div>
+
+          <div class="form-grid form-grid--compact">
+            <div class="form-control">
+              <label for="proxy-https-port">Porta</label>
+              <input
+                id="proxy-https-port"
+                type="number"
+                formControlName="proxyHttpsPort"
+                placeholder="8080"
+                min="1"
+                [disabled]="!proxyEnabled()"
+              />
+            </div>
+            <div class="form-control">
+              <label for="proxy-https-username">Usuário (opcional)</label>
+              <input
+                id="proxy-https-username"
+                type="text"
+                formControlName="proxyHttpsUsername"
+                placeholder="usuario"
+                [disabled]="!proxyEnabled()"
+              />
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label for="proxy-https-password">Senha (opcional)</label>
+            <input
+              id="proxy-https-password"
+              type="password"
+              formControlName="proxyHttpsPassword"
+              placeholder="••••••••"
+              [disabled]="!proxyEnabled()"
+            />
+            <small>{{ proxyPasswordInfo }}</small>
+          </div>
+
+          <label class="switch switch--small">
+            <input
+              type="checkbox"
+              formControlName="proxyHttpsClearPassword"
+              [disabled]="!proxyEnabled()"
+            />
+            <span>Limpar senha armazenada</span>
+          </label>
+
+          <label class="switch switch--small">
+            <input
+              type="checkbox"
+              formControlName="proxyHttpsTunnel"
+              [disabled]="!proxyEnabled()"
+            />
+            <span>Usar modo tunneling (recomendado para HTTPS sobre HTTP)</span>
+          </label>
+
+          <div class="form-control">
+            <label for="proxy-no-proxy">No Proxy (domínios separados por vírgula)</label>
+            <input
+              id="proxy-no-proxy"
+              type="text"
+              formControlName="proxyNoProxy"
+              placeholder="*.intranet.local, api.internal.local"
+              [disabled]="!proxyEnabled()"
+            />
+          </div>
+
+          <div class="form-control">
+            <label for="proxy-strategy">Estratégia (opcional)</label>
+            <input
+              id="proxy-strategy"
+              type="text"
+              formControlName="proxyStrategy"
+              placeholder="tunnel"
+              [disabled]="!proxyEnabled()"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="config-card">
+      <h3 class="config-card__title">Servidor local</h3>
+      <p class="config-card__subtitle">
+        Opcionalmente defina a porta que o backend deve utilizar ao reiniciar.
+      </p>
+
+      <div class="form-control form-control--small">
+        <label for="port">Porta</label>
+        <input
+          id="port"
+          type="number"
+          formControlName="port"
+          placeholder="3000"
+          min="1"
+        />
+      </div>
+
+      <div class="info-box">
+        💡 Você pode configurar ambos os providers e alternar entre eles quando quiser. As credenciais são preservadas.
+      </div>
+    </section>
+
+    <div class="config-actions">
+      <button type="submit" class="primary-button" [disabled]="saving()">
+        <span *ngIf="saving(); else saveLabel" class="spinner"></span>
+        <ng-template #saveLabel>💾 Salvar configuração</ng-template>
+      </button>
+    </div>
+
+    <div *ngIf="message() as msg" class="config-message" [ngClass]="'config-message--' + msg.type">
+      {{ msg.text }}
+    </div>
+  </form>
+</section>
+

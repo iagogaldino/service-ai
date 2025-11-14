@@ -1,0 +1,37 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page__header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.page__header p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.page__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.placeholder-card {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+}
+
+.placeholder-card h3 {
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+}
+

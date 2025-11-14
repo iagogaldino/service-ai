@@ -16,14 +16,13 @@ import cors from 'cors';
 import OpenAI from 'openai';
 import path from 'path';
 import { AgentManager } from './agents/agentManager';
-import { loadEnvironmentVariables, validateRequiredEnvVars, getEnvAsNumber, logEnvironmentInfo, loadConfigFromJson } from './config/env';
+import { loadEnvironmentVariables, validateRequiredEnvVars, getEnvAsNumber, logEnvironmentInfo } from './config/env';
 import { isRunningUnderNodemon, getShutdownConfig, gracefulShutdown as performGracefulShutdown } from './utils/serverHelpers';
 import { initializeAgents } from './agents/config';
 import { LLMAdapter } from './llm/adapters/LLMAdapter';
 import { initializeLLMAdapter, getLLMAdapter } from './services/llmService';
 import { initializeSocketHandlers, updateAdapterAndManager } from './handlers/socketHandlers';
 import { setupApiRoutes, ApiRoutesDependencies } from './routes/apiRoutes';
-import { ServiceInitializationInfo } from './types';
 
 // ============================================================================
 // CONFIGURAÇÃO DE AMBIENTE
@@ -36,11 +35,6 @@ logEnvironmentInfo(['OPENAI_API_KEY']);
 // ============================================================================
 // INICIALIZAÇÃO DE SERVIÇOS
 // ============================================================================
-
-const WORKING_DIRECTORY = process.cwd();
-const CONFIG_PATH = path.join(WORKING_DIRECTORY, 'config.json');
-const AGENTS_PATH = path.join(__dirname, 'agents', 'agents.json');
-const initialConfigSnapshot = loadConfigFromJson();
 
 const app = express();
 const httpServer = createServer(app);
@@ -242,40 +236,15 @@ let isStarting = false;
  * @param {number} delay - Delay entre tentativas em milissegundos
  * @returns {Promise<void>} Promise que resolve quando o servidor iniciar
  */
-function buildInitializationInfo(): ServiceInitializationInfo {
-  const config = initialConfigSnapshot || loadConfigFromJson();
-
-  return {
-    port: PORT,
-    serverUrl: `http://localhost:${PORT}`,
-    configPath: CONFIG_PATH,
-    agentsPath: AGENTS_PATH,
-    llmProvider: config?.llmProvider || 'stackspot',
-    openaiApiKeyConfigured: Boolean(config?.openaiApiKey),
-    stackspotCredentialsConfigured: Boolean(config?.stackspotClientId && config?.stackspotClientSecret),
-    workingDirectory: WORKING_DIRECTORY,
-    configLastUpdated: config?.lastUpdated,
-  };
-}
-
-async function startServer(retries = 5, delay = isNodemon ? 3000 : 2000): Promise<ServiceInitializationInfo> {
+async function startServer(retries = 5, delay = isNodemon ? 3000 : 2000): Promise<void> {
   if (isStarting) {
     console.log('⏳ Servidor já está iniciando, aguardando...');
-    return new Promise((resolve) => {
-      const check = () => {
-        if (!isStarting && httpServer.listening) {
-          resolve(buildInitializationInfo());
-        } else {
-          setTimeout(check, 200);
-        }
-      };
-      check();
-    });
+    return;
   }
 
   isStarting = true;
 
-  return new Promise<ServiceInitializationInfo>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     // Se o servidor já está escutando, fecha primeiro
     if (httpServer.listening) {
       console.log('🔄 Fechando instância anterior do servidor...');
@@ -290,18 +259,25 @@ async function startServer(retries = 5, delay = isNodemon ? 3000 : 2000): Promis
     }
 
     function startNewServer() {
-      const onError = async (err: NodeJS.ErrnoException) => {
+      httpServer.listen(PORT, () => {
+        console.log(`✅ Servidor rodando na porta ${PORT}`);
+        console.log(`🌐 Acesse http://localhost:${PORT} para testar`);
         isStarting = false;
+        resolve();
+      });
 
+      httpServer.on('error', async (err: NodeJS.ErrnoException) => {
+        isStarting = false;
+        
         if (err.code === 'EADDRINUSE') {
           console.error(`\n❌ Erro: A porta ${PORT} já está em uso.`);
-
+          
           if (retries > 0) {
             console.log(`🔄 Tentando novamente em ${delay / 1000} segundos... (${retries} tentativas restantes)`);
-            await new Promise(resolveDelay => setTimeout(resolveDelay, delay));
+            await new Promise(resolve => setTimeout(resolve, delay));
             return startServer(retries - 1, delay).then(resolve).catch(reject);
           }
-
+          
           console.error(`\nPara resolver, você pode:`);
           console.error(`1. Parar o processo que está usando a porta ${PORT}:`);
           console.error(`   Windows: netstat -ano | findstr :${PORT} e depois taskkill /PID <PID> /F`);
@@ -315,27 +291,13 @@ async function startServer(retries = 5, delay = isNodemon ? 3000 : 2000): Promis
           console.error(`\n❌ Erro ao iniciar o servidor:`, err);
           reject(err);
         }
-      };
-
-      httpServer.once('error', onError);
-
-      httpServer.listen(PORT, () => {
-        console.log(`✅ Servidor rodando na porta ${PORT}`);
-        console.log(`🌐 Acesse http://localhost:${PORT} para testar`);
-        httpServer.removeListener('error', onError);
-        isStarting = false;
-        resolve(buildInitializationInfo());
       });
     }
   });
 }
 
-// Inicia o servidor e expõe promessa de inicialização
-export const serviceInitialization = startServer();
-
-serviceInitialization.catch((err) => {
+// Inicia o servidor
+startServer().catch((err) => {
   console.error('Falha ao iniciar o servidor após várias tentativas:', err);
   process.exit(1);
 });
-
-export default serviceInitialization;

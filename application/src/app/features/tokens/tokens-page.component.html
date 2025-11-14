@@ -1,0 +1,143 @@
+<section class="tokens">
+  <header class="tokens__header">
+    <div>
+      <h2>Uso de Tokens & Custos</h2>
+      <p>Acompanhe o consumo de tokens e os custos acumulados por provider.</p>
+    </div>
+    <div class="tokens__provider-switch">
+      @for (provider of providers; track provider) {
+        <button
+          type="button"
+          class="tokens__provider"
+          [class.tokens__provider--active]="selectedProvider() === provider"
+          (click)="changeProvider(provider)"
+        >
+          {{ provider === 'stackspot' ? 'StackSpot' : 'OpenAI' }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (state().loading) {
+    <div class="tokens__loading">Carregando histórico de tokens...</div>
+  } @else {
+    @if (state().error) {
+      <div class="tokens__error">{{ state().error }}</div>
+    }
+
+    @if (state().data) {
+      <section class="tokens__summary">
+        <article class="tokens__card">
+          <h3>Total de tokens</h3>
+          <div class="tokens__metric">
+            <strong>{{ formatTokens(totals().tokens.totalTokens) }}</strong>
+            <span>Total</span>
+          </div>
+          <div class="tokens__metric-group">
+            <div>
+              <strong>{{ formatTokens(totals().tokens.promptTokens) }}</strong>
+              <span>Prompt</span>
+            </div>
+            <div>
+              <strong>{{ formatTokens(totals().tokens.completionTokens) }}</strong>
+              <span>Completion</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="tokens__card">
+          <h3>Total em dólares</h3>
+          <div class="tokens__metric">
+            <strong>{{ formatCost(totals().cost.totalCost) }}</strong>
+            <span>Custo acumulado</span>
+          </div>
+          <div class="tokens__metric-group">
+            <div>
+              <strong>{{ formatCost(totals().cost.promptCost) }}</strong>
+              <span>Prompt</span>
+            </div>
+            <div>
+              <strong>{{ formatCost(totals().cost.completionCost) }}</strong>
+              <span>Completion</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="tokens__card tokens__card--info">
+          <h3>Última atualização</h3>
+          <p *ngIf="lastUpdated(); else noUpdate">
+            {{ lastUpdated() | date: 'short' }}
+          </p>
+          <ng-template #noUpdate>
+            <p>Sem registros ainda.</p>
+          </ng-template>
+          <small>Provider atual: {{ selectedProvider() }}</small>
+        </article>
+      </section>
+
+      <section class="tokens__table">
+        <header>
+          <h3>Histórico de interações</h3>
+          <span>{{ entries().length }} registro(s)</span>
+        </header>
+        @if (entries().length === 0) {
+          <div class="tokens__empty">
+            Nenhum registro encontrado para o provider selecionado.
+          </div>
+        } @else {
+          <div class="tokens__table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Agente</th>
+                  <th>Tokens</th>
+                  <th>Custo</th>
+                  <th>Modelo</th>
+                  <th>Mensagem</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (entry of entries(); track entry.timestamp + entry.threadId) {
+                  <tr>
+                    <td>
+                      <div>{{ entry.timestamp | date: 'shortDate' }}</div>
+                      <small>{{ entry.timestamp | date: 'shortTime' }}</small>
+                    </td>
+                    <td>
+                      <strong>{{ entry.agentName || '—' }}</strong>
+                      <small>{{ entry.threadId }}</small>
+                    </td>
+                    <td>
+                      <div class="tokens__badge">
+                        Total: {{ formatTokens(entry.tokenUsage.totalTokens) }}
+                      </div>
+                      <small>
+                        Prompt: {{ formatTokens(entry.tokenUsage.promptTokens) }} · Completion:
+                        {{ formatTokens(entry.tokenUsage.completionTokens) }}
+                      </small>
+                    </td>
+                    <td>
+                      <div class="tokens__badge tokens__badge--cost">
+                        {{ formatCost(entry.cost?.totalCost) }}
+                      </div>
+                      <small>
+                        Prompt: {{ formatCost(entry.cost?.promptCost) }} · Completion:
+                        {{ formatCost(entry.cost?.completionCost) }}
+                      </small>
+                    </td>
+                    <td>{{ entry.model || '—' }}</td>
+                    <td>
+                      <div class="tokens__message">{{ entry.message }}</div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+  }
+</section>
+

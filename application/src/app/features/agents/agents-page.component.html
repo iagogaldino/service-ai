@@ -1,0 +1,272 @@
+<section class="agents">
+  <header class="agents__header">
+    <div>
+      <h2>Gestão de Agentes</h2>
+      <p>Crie, edite e organize seus agentes, orquestradores e fallback.</p>
+    </div>
+    <div class="agents__header-actions">
+      <button type="button" class="agents__refresh" (click)="loadData()">↻ Recarregar</button>
+    </div>
+  </header>
+
+  @if (vm().loading) {
+    <div class="agents__loading">Carregando informações dos agentes...</div>
+  } @else {
+    @if (vm().error) {
+      <div class="agents__error">
+        {{ vm().error }}
+      </div>
+    }
+
+    <div class="agents__layout">
+      <aside class="agents__sidebar">
+        @if (mainSelector(); as selector) {
+          <section class="agents__card agents__card--info">
+            <header>
+              <h3>🎯 Main Selector</h3>
+              <small>{{ selector.model }}</small>
+            </header>
+            <p>{{ selector.description }}</p>
+            <div class="agents__tools" *ngIf="selector.tools?.length">
+              @for (tool of selector.tools; track tool) {
+                <span>{{ tool }}</span>
+              }
+            </div>
+          </section>
+        }
+
+        <section class="agents__card agents__card--fallback">
+          <header>
+            <div>
+              <h3>🛟 Fallback</h3>
+              <small *ngIf="fallbackInfo()">Configurado</small>
+              <small *ngIf="!fallbackInfo()">Não configurado</small>
+            </div>
+            <button type="button" (click)="selectFallback()">Editar</button>
+          </header>
+          @if (fallbackInfo(); as fallback) {
+            <p>{{ fallback.description }}</p>
+            <div class="agents__tools" *ngIf="fallback.tools?.length">
+              @for (tool of fallback.tools; track tool) {
+                <span>{{ tool }}</span>
+              }
+            </div>
+          } @else {
+            <p>Nenhum agente fallback configurado.</p>
+          }
+        </section>
+
+        <section class="agents__card agents__card--groups">
+          <header>
+            <div>
+              <h3>🧭 Grupos</h3>
+              <small>{{ groups().length }} grupo(s)</small>
+            </div>
+            <button type="button" (click)="selectCreateAgent()">Novo agente</button>
+          </header>
+
+          @if (groups().length === 0) {
+            <p>Não há grupos configurados no arquivo <code>agents.json</code>.</p>
+          } @else {
+            <ul class="agents__groups">
+              @for (group of groups(); track group.id) {
+                <li class="agents__group">
+                  <div class="agents__group-header">
+                    <div>
+                      <strong>{{ group.name }}</strong>
+                      <small>ID: {{ group.id }}</small>
+                    </div>
+                    <button type="button" (click)="selectCreateAgent(group.id)">Adicionar agente</button>
+                  </div>
+
+                  <div class="agents__group-block">
+                    <header>
+                      <h4>🤖 Orquestrador</h4>
+                      <div class="agents__group-actions">
+                        <button type="button" (click)="selectOrchestrator(group.id, group.orchestrator ?? null)">
+                          {{ group.orchestrator ? 'Editar' : 'Criar' }}
+                        </button>
+                        <button
+                          type="button"
+                          class="danger"
+                          *ngIf="group.orchestrator"
+                          (click)="deleteOrchestrator(group.id)"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </header>
+                    @if (group.orchestrator) {
+                      <p>{{ group.orchestrator.description }}</p>
+                      <div class="agents__tools" *ngIf="group.orchestrator.tools?.length">
+                        @for (tool of group.orchestrator.tools; track tool) {
+                          <span>{{ tool }}</span>
+                        }
+                      </div>
+                    } @else {
+                      <p>Nenhum orquestrador configurado.</p>
+                    }
+                  </div>
+
+                  <div class="agents__group-block">
+                    <header>
+                      <h4>🧠 Agentes ({{ group.agents.length }})</h4>
+                    </header>
+                    @if (group.agents.length === 0) {
+                      <p>Nenhum agente cadastrado.</p>
+                    } @else {
+                      <ul class="agents__agents">
+                        @for (agent of group.agents; track agent.name) {
+                          <li>
+                            <div>
+                              <strong>{{ agent.name }}</strong>
+                              <small>{{ agent.model }}</small>
+                              <p>{{ agent.description }}</p>
+                            </div>
+                            <div class="agents__agent-actions">
+                              <button type="button" (click)="selectAgent(group.id, agent)">Editar</button>
+                              <button type="button" class="danger" (click)="selectAgent(group.id, agent); deleteSelectedAgent()">
+                                Remover
+                              </button>
+                            </div>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </aside>
+
+      <section class="agents__form-area" (click)="resetMessage()">
+        @if (message()) {
+          <div class="agents__message agents__message--success">
+            {{ message() }}
+          </div>
+        }
+        @if (errorMessage()) {
+          <div class="agents__message agents__message--error">
+            {{ errorMessage() }}
+          </div>
+        }
+
+        <form class="agents__form" [formGroup]="agentForm" (ngSubmit)="submit()">
+          <header>
+            <div>
+              @if (selection().target === 'agent') {
+                <h3>
+                  {{ selection().mode === 'edit' ? 'Editar agente' : 'Criar novo agente' }}
+                </h3>
+              } @else if (selection().target === 'orchestrator') {
+                <h3>Configurar orquestrador</h3>
+              } @else {
+                <h3>Configurar fallback</h3>
+              }
+              <p>
+                @if (selection().target === 'agent') {
+                  Use o formulário para definir os detalhes do agente.
+                } @else if (selection().target === 'orchestrator') {
+                  O orquestrador decide qual agente do grupo deve responder.
+                } @else {
+                  O fallback é acionado quando nenhum agente atende ao contexto.
+                }
+              </p>
+            </div>
+            <div class="agents__form-actions agents__form-actions--top">
+              <button type="button" (click)="selectCreateAgent()">Novo agente</button>
+              <button type="button" (click)="selectFallback()">Editar fallback</button>
+            </div>
+          </header>
+
+          <div class="agents__form-grid">
+            @if (!isTarget('fallback')) {
+              <label class="agents__field">
+                <span>Grupo</span>
+                <select formControlName="groupId" [required]="!isTarget('fallback')">
+                  @for (group of groups(); track group.id) {
+                    <option [value]="group.id">{{ group.name }}</option>
+                  }
+                </select>
+                <small *ngIf="groups().length === 0">
+                  Nenhum grupo disponível. Configure o arquivo <code>agents.json</code>.
+                </small>
+              </label>
+            }
+
+            <label class="agents__field">
+              <span>Nome</span>
+              <input type="text" formControlName="name" required />
+            </label>
+
+            <label class="agents__field">
+              <span>Modelo</span>
+              <input type="text" formControlName="model" required />
+            </label>
+
+            <label class="agents__field">
+              <span>Prioridade</span>
+              <input type="number" formControlName="priority" />
+              <small>Valores menores têm prioridade maior. Padrão: 999.</small>
+            </label>
+
+            <label class="agents__field">
+              <span>StackSpot Agent ID</span>
+              <input type="text" formControlName="stackspotAgentId" />
+            </label>
+
+            <label class="agents__field agents__field--full">
+              <span>Descrição</span>
+              <textarea rows="3" formControlName="description" required></textarea>
+            </label>
+
+            <label class="agents__field agents__field--full">
+              <span>Instruções</span>
+              <textarea rows="4" formControlName="instructions" required></textarea>
+            </label>
+
+            <label class="agents__field agents__field--full">
+              <span>Ferramentas / Conjuntos</span>
+              <textarea
+                rows="3"
+                formControlName="toolsRaw"
+                placeholder='["fileSystem", "terminal"] ou valores separados por vírgula'
+              ></textarea>
+              <small>
+                Você pode fornecer uma lista JSON ou valores separados por vírgula. Conjuntos disponíveis:
+                @for (toolSet of (toolSets() | keyvalue); track toolSet.key) {
+                  <code>{{ toolSet.key }}</code>
+                }
+              </small>
+            </label>
+
+            <label class="agents__field agents__field--full">
+              <span>Regra shouldUse (JSON)</span>
+              <textarea rows="6" formControlName="shouldUseRaw" required></textarea>
+              <small>Informe o objeto JSON que define como o agente deve ser acionado.</small>
+            </label>
+          </div>
+
+          <footer class="agents__form-footer">
+            <div class="agents__form-actions">
+              <button type="submit">
+                {{ selection().mode === 'edit' ? 'Salvar alterações' : 'Criar' }}
+              </button>
+              <button
+                type="button"
+                class="danger"
+                *ngIf="selection().target === 'agent' && selection().mode === 'edit'"
+                (click)="deleteSelectedAgent()"
+              >
+                Remover agente
+              </button>
+            </div>
+          </footer>
+        </form>
+      </section>
+    </div>
+  }
+</section>
+
