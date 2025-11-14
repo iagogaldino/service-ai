@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Book, Trash2, Plus, Pencil, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { AgentConfig, CustomNode, ShouldUseRule } from '../types';
+import VariableAutocomplete from './VariableAutocomplete';
 // Removido: useGroups - não há mais grupos
 
 interface AgentConfigPanelProps {
@@ -275,22 +276,11 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               </button>
             </div>
           </div>
-          <textarea
+          <VariableAutocomplete
             value={config.instructions}
-            onChange={(e) => handleChange('instructions', e.target.value)}
-            placeholder="Se o usuário pedir para analisar o curriculum, analise o file search"
-            style={{
-              width: '100%',
-              minHeight: '120px',
-              padding: '10px 12px',
-              backgroundColor: 'transparent',
-              border: '1px solid #2a2a2a',
-              borderRadius: '6px',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              resize: 'vertical',
-            }}
+            onChange={(value) => handleChange('instructions', value)}
+            placeholder="Se o usuário pedir para analisar o curriculum, analise o file search. Use {{ input_user }} para acessar a mensagem do usuário."
+            minHeight="120px"
           />
           </div>
 
