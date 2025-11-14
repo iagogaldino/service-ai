@@ -98,37 +98,33 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         const updatedNode = { ...node };
         
         if (isActive) {
-          // Nó ativo: destaque com cor azul e animação
-          updatedNode.style = {
-            ...node.style,
-            border: '2px solid #3b82f6',
-            boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)',
-            backgroundColor: node.style?.backgroundColor || '#1a1a1a',
-          };
+          // Nó ativo: apenas efeito de skeleton, sem borda destacada
+          // Remove estilos de borda para manter o design original
+          const { border, boxShadow, ...restStyle } = node.style || {};
+          updatedNode.style = restStyle;
           updatedNode.data = {
             ...node.data,
             isActive: true,
           };
         } else if (isCompleted) {
-          // Nó completado: destaque com cor verde
-          updatedNode.style = {
-            ...node.style,
-            border: '2px solid #10b981',
-            backgroundColor: node.style?.backgroundColor || '#1a1a1a',
-            opacity: 0.8,
-          };
+          // Nó completado: volta ao estilo original, sem borda destacada
+          const { border, boxShadow, opacity, backgroundColor, ...restStyle } = node.style || {};
+          updatedNode.style = restStyle;
           updatedNode.data = {
             ...node.data,
+            isActive: false, // Remove efeito de skeleton quando completado
             isCompleted: true,
           };
         } else {
-          // Remove estados visuais se não estiver ativo ou completado
-          updatedNode.style = {
-            ...node.style,
-            border: node.style?.border || '1px solid #2a2a2a',
-            boxShadow: undefined,
-            opacity: 1,
-          };
+          // Remove completamente os estados visuais se não estiver ativo ou completado
+          // Remove border, boxShadow e opacity customizados para voltar ao estado padrão
+          const { border, boxShadow, opacity, backgroundColor, ...restStyle } = node.style || {};
+          // Se não há outros estilos, remove completamente o objeto style
+          if (Object.keys(restStyle).length === 0) {
+            updatedNode.style = undefined;
+          } else {
+            updatedNode.style = restStyle;
+          }
           updatedNode.data = {
             ...node.data,
             isActive: false,
@@ -175,13 +171,20 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
             color: '#10b981',
           };
         } else {
-          // Remove estados visuais
-          updatedEdge.style = {
-            ...edge.style,
-            stroke: edge.style?.stroke || '#4a5568',
-            strokeWidth: edge.style?.strokeWidth || 1,
-          };
-          updatedEdge.animated = edge.animated || false;
+          // Remove completamente os estados visuais
+          // Remove stroke, strokeWidth e markerEnd customizados para voltar ao estado padrão
+          const { stroke, strokeWidth, ...restStyle } = edge.style || {};
+          // Se não há outros estilos, remove completamente o objeto style
+          if (Object.keys(restStyle).length === 0) {
+            updatedEdge.style = undefined;
+          } else {
+            updatedEdge.style = restStyle;
+          }
+          updatedEdge.animated = false;
+          // Remove markerEnd customizado se existir
+          if (edge.markerEnd && (edge.markerEnd as any).color) {
+            updatedEdge.markerEnd = undefined;
+          }
         }
         
         return updatedEdge;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { 
   Play, 
@@ -51,9 +51,13 @@ const colorMap: Record<ComponentType, string> = {
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id }) => {
   const color = colorMap[data.type];
   const icon = iconMap[data.type];
+  const isActive = data.isActive || false;
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         backgroundColor: '#1a1a1a',
         border: `1px solid ${selected ? color : '#3a3a3a'}`,
@@ -67,19 +71,57 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
         display: 'block',
         visibility: 'visible',
         opacity: 1,
+        overflow: 'hidden',
       }}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{
-          background: '#555',
-          width: '8px',
-          height: '8px',
-          border: '2px solid #1a1a1a',
-        }}
-      />
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* Efeito de skeleton loading quando ativo */}
+      {isActive && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '-100%',
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent)',
+              animation: 'skeleton-loading 1.5s infinite',
+              pointerEvents: 'none',
+              zIndex: 2,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.1) 50%, transparent 100%)',
+              backgroundSize: '200% 100%',
+              animation: 'skeleton-shimmer 2s infinite',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+        </>
+      )}
+      {/* Handle de entrada - não aparece no nó start */}
+      {data.type !== 'start' && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{
+            background: '#555',
+            width: '12px',
+            height: '12px',
+            border: '2px solid #1a1a1a',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.2s',
+          }}
+        />
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
         <div style={{
           width: '32px',
           height: '32px',
@@ -120,11 +162,31 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
         position={Position.Right}
         style={{
           background: '#555',
-          width: '8px',
-          height: '8px',
+          width: '12px',
+          height: '12px',
           border: '2px solid #1a1a1a',
+          opacity: isHovered ? 1 : 0,
+          transition: 'opacity 0.2s',
         }}
       />
+      <style>{`
+        @keyframes skeleton-loading {
+          0% {
+            left: -100%;
+          }
+          100% {
+            left: 100%;
+          }
+        }
+        @keyframes skeleton-shimmer {
+          0% {
+            background-position: -200% 0;
+          }
+          100% {
+            background-position: 200% 0;
+          }
+        }
+      `}</style>
     </div>
   );
 };

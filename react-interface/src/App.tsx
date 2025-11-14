@@ -670,6 +670,45 @@ function App() {
         showWorkflowSelector={showWorkflowSelector}
         onTestWorkflow={async () => {
           if (!showTestWorkflow) {
+            // Reseta os efeitos visuais antes de abrir o painel de teste
+            setActiveNodeId(null);
+            setCompletedNodeIds(new Set());
+            setActiveEdgeId(null);
+            setCompletedEdgeIds(new Set());
+            
+            // Força uma atualização dos nós e edges para remover estilos visuais
+            // Remove estilos customizados dos nós
+            setAllNodes((nodes) =>
+              nodes.map((node) => {
+                const { border, boxShadow, opacity, backgroundColor, ...restStyle } = node.style || {};
+                const newNode = { ...node };
+                if (Object.keys(restStyle).length === 0) {
+                  newNode.style = undefined;
+                } else {
+                  newNode.style = restStyle;
+                }
+                return newNode;
+              })
+            );
+            
+            // Remove estilos customizados das edges
+            setAllEdges((edges) =>
+              edges.map((edge) => {
+                const { stroke, strokeWidth, ...restStyle } = edge.style || {};
+                const newEdge = { ...edge };
+                if (Object.keys(restStyle).length === 0) {
+                  newEdge.style = undefined;
+                } else {
+                  newEdge.style = restStyle;
+                }
+                newEdge.animated = false;
+                if (edge.markerEnd && (edge.markerEnd as any).color) {
+                  newEdge.markerEnd = undefined;
+                }
+                return newEdge;
+              })
+            );
+            
             // Salva o workflow antes de abrir o painel de teste
             try {
               console.log('💾 Salvando workflow antes de testar...');
