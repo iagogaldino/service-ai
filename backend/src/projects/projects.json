@@ -1,0 +1,137 @@
+{
+  "projects": [
+    {
+      "id": "f4738ddf-d1a4-4706-a9c0-612cfd8e1c05",
+      "name": "Delsuc",
+      "description": "Delsuc test",
+      "agents": {
+        "toolSets": {},
+        "agents": [
+          {
+            "name": "Agent",
+            "description": "Seu",
+            "instructions": "Responda apenas com emóticons",
+            "model": "gpt-4-turbo-preview",
+            "shouldUse": {
+              "type": "default"
+            },
+            "priority": 999,
+            "tools": []
+          },
+          {
+            "name": "Guinho",
+            "description": "Agente Agent criado no React Flow",
+            "instructions": "Deixe essa mensagem {{ input_user }} em ingles e adicione {{ agent_response }} no final",
+            "model": "gpt-4-turbo-preview",
+            "shouldUse": {
+              "type": "default"
+            },
+            "priority": 999,
+            "tools": []
+          }
+        ]
+      },
+      "createdAt": "2025-11-14T15:53:37.958Z",
+      "updatedAt": "2025-11-14T17:50:23.342Z",
+      "workflows": [
+        {
+          "name": "Workflow Principal",
+          "description": "Workflow salvo antes de teste",
+          "nodes": [
+            {
+              "id": "start",
+              "type": "start",
+              "position": {
+                "x": -57,
+                "y": 188.80911901081916
+              },
+              "data": {
+                "label": "Start",
+                "type": "start"
+              }
+            },
+            {
+              "id": "agent-Agent-1763140824100-0",
+              "type": "agent",
+              "agentName": "Agent",
+              "position": {
+                "x": 150.38172231229487,
+                "y": 185.147692060989
+              },
+              "data": {
+                "label": "Agent",
+                "type": "agent",
+                "config": {
+                  "name": "Agent",
+                  "description": "Seu",
+                  "instructions": "Responda apenas com emóticons",
+                  "includeChatHistory": true,
+                  "model": "gpt-4-turbo-preview",
+                  "tools": [],
+                  "outputFormat": "text",
+                  "shouldUse": {
+                    "type": "default"
+                  }
+                }
+              }
+            },
+            {
+              "id": "agent-Guinho-1763140824100-1",
+              "type": "agent",
+              "agentName": "Guinho",
+              "position": {
+                "x": 391.1576090315141,
+                "y": 185.06959750481087
+              },
+              "data": {
+                "label": "Guinho",
+                "type": "agent",
+                "config": {
+                  "name": "Guinho",
+                  "description": "Agente Agent criado no React Flow",
+                  "instructions": "Deixe essa mensagem {{ input_user }} em ingles e adicione {{ agent_response }} no final",
+                  "includeChatHistory": true,
+                  "model": "gpt-4-turbo-preview",
+                  "tools": [],
+                  "outputFormat": "text",
+                  "shouldUse": {
+                    "type": "default"
+                  }
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "reactflow__edge-start-agent-Agent-1763140530475-0",
+              "source": "start",
+              "target": "agent-Agent-1763140824100-0",
+              "animated": false,
+              "style": {
+                "stroke": "#2a2a2a",
+                "strokeWidth": 2
+              }
+            },
+            {
+              "id": "reactflow__edge-agent-Agent-1763140824100-0-agent-Guinho-1763140824100-1",
+              "source": "agent-Agent-1763140824100-0",
+              "target": "agent-Guinho-1763140824100-1",
+              "animated": false,
+              "style": {
+                "stroke": "#2a2a2a",
+                "strokeWidth": 2
+              }
+            }
+          ],
+          "active": true,
+          "id": "workflow-principal-1763134738796",
+          "createdAt": "2025-11-14T15:38:58.796Z",
+          "updatedAt": "2025-11-14T17:50:23.332Z"
+        }
+      ],
+      "activeWorkflowId": "workflow-principal-1763134738796"
+    }
+  ],
+  "activeProjectId": "f4738ddf-d1a4-4706-a9c0-612cfd8e1c05",
+  "updatedAt": "2025-11-14T17:50:23.342Z"
+}

@@ -1,0 +1,38 @@
+{
+  "name": "delsuc-ia",
+  "version": "1.0.0",
+  "description": "Serviço Node.js com TypeScript, Socket.IO e integração OpenAI",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "nodemon",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "socket.io",
+    "openai",
+    "typescript",
+    "node"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/uuid": "^9.0.8",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "openai": "^4.20.1",
+    "socket.io": "^4.6.1",
+    "stackspotdelsuc-sdk": "^1.0.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}

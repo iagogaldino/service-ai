@@ -1,0 +1,27 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": [
+    "src/**/*.spec.ts",
+    "node_modules",
+    "src/projects/projects.json",
+    "src/agents/agents.json",
+    "src/workflows/workflows.json",
+    "src/storage/*.json",
+    "src/storage/**/*.json",
+    "frontend-logs.json",
+    "*.json"
+  ],
+  "exec": "ts-node src/server.ts",
+  "env": {
+    "NODE_ENV": "development",
+    "NODEMON": "true"
+  },
+  "delay": 2500,
+  "verbose": true,
+  "restartable": "rs",
+  "signal": "SIGTERM",
+  "killTimeout": 5000,
+  "wait": true
+}
+

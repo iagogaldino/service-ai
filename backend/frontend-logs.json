@@ -1,0 +1,1138 @@
+{
+  "entries": [
+    {
+      "id": "frontend_1763135430671_oj9ccm7l2",
+      "timestamp": "2025-11-14T15:50:30.658Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135292468",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135292468",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135430678_zctv61x69",
+      "timestamp": "2025-11-14T15:50:30.659Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135292468 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135292468",
+        "source": "start",
+        "target": "agent-1763135292468",
+        "nodeIds": [
+          "start"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135620068_obbtupa8h",
+      "timestamp": "2025-11-14T15:53:40.058Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-filesystem-terminal-Agent-1763135503620-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135433328",
+        "source": "start",
+        "target": "agent-filesystem-terminal-Agent-1763135503620-0",
+        "nodeIds": [
+          "start"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135620078_sqvvlmpy9",
+      "timestamp": "2025-11-14T15:53:40.057Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-filesystem-terminal-Agent-1763135503620-0",
+      "data": {
+        "source": "start",
+        "target": "agent-filesystem-terminal-Agent-1763135503620-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135651268_1f8tx2b3d",
+      "timestamp": "2025-11-14T15:54:11.222Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135649460-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135645959-0",
+            "agent-filesystem-terminal-Agent-1763135649460-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135649460-0",
+            "agent-filesystem-terminal-Agent-1763135649460-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135651281_23i1m8c85",
+      "timestamp": "2025-11-14T15:54:11.223Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135649460-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135651289_za1l2356c",
+      "timestamp": "2025-11-14T15:54:11.224Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135649469-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135645959-0",
+            "agent-filesystem-terminal-Agent-1763135649469-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135649469-0",
+            "agent-filesystem-terminal-Agent-1763135649469-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135651294_hpsw79lu6",
+      "timestamp": "2025-11-14T15:54:11.225Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135649469-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135653993_t8ly33t6s",
+      "timestamp": "2025-11-14T15:54:13.981Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135651869-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135649460-0",
+            "agent-filesystem-terminal-Agent-1763135651869-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135651869-0",
+            "agent-filesystem-terminal-Agent-1763135651869-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135653999_5gkinbxgz",
+      "timestamp": "2025-11-14T15:54:13.982Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135651869-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135654005_wmtg9klaj",
+      "timestamp": "2025-11-14T15:54:13.983Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135651885-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135649460-0",
+            "agent-filesystem-terminal-Agent-1763135651885-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135651885-0",
+            "agent-filesystem-terminal-Agent-1763135651885-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135654010_pn1xjq4rp",
+      "timestamp": "2025-11-14T15:54:13.984Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135651885-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135701911_s7zv10rtz",
+      "timestamp": "2025-11-14T15:55:01.894Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135699722-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135651869-0",
+            "agent-filesystem-terminal-Agent-1763135699722-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135699722-0",
+            "agent-filesystem-terminal-Agent-1763135699722-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135701922_7myu6nowx",
+      "timestamp": "2025-11-14T15:55:01.895Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135699722-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135701931_gwzsw15se",
+      "timestamp": "2025-11-14T15:55:01.897Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135699763-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135701940_6oiqngz7k",
+      "timestamp": "2025-11-14T15:55:01.896Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135699763-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135651869-0",
+            "agent-filesystem-terminal-Agent-1763135699763-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135699763-0",
+            "agent-filesystem-terminal-Agent-1763135699763-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135707256_ae7bt2j3r",
+      "timestamp": "2025-11-14T15:55:07.242Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135705099-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135699722-0",
+            "agent-filesystem-terminal-Agent-1763135705099-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135705099-0",
+            "agent-filesystem-terminal-Agent-1763135705099-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135707267_i8w7s6naa",
+      "timestamp": "2025-11-14T15:55:07.244Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135705099-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135707277_b5d2l85it",
+      "timestamp": "2025-11-14T15:55:07.245Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-1763135621648",
+      "data": {
+        "source": "start",
+        "target": "agent-1763135621648",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135705115-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135699722-0",
+            "agent-filesystem-terminal-Agent-1763135705115-0"
+          ],
+          [
+            "agent-filesystem-terminal-Agent-1763135705115-0",
+            "agent-filesystem-terminal-Agent-1763135705115-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763135707286_sbc5ef9tu",
+      "timestamp": "2025-11-14T15:55:07.246Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-1763135621648 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-1763135621648",
+        "source": "start",
+        "target": "agent-1763135621648",
+        "nodeIds": [
+          "start",
+          "agent-filesystem-terminal-Agent-1763135705115-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763138136944_tzgcglozv",
+      "timestamp": "2025-11-14T16:35:36.938Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-filesystem-terminal-Agent-1763135989806-0",
+      "data": {
+        "source": "start",
+        "target": "agent-filesystem-terminal-Agent-1763135989806-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763138136948_dm9vedwvx",
+      "timestamp": "2025-11-14T16:35:36.939Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-filesystem-terminal-Agent-1763135989806-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-filesystem-terminal-Agent-1763135705099-0",
+        "source": "start",
+        "target": "agent-filesystem-terminal-Agent-1763135989806-0",
+        "nodeIds": [
+          "start"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763138500836_c03eu56pm",
+      "timestamp": "2025-11-14T16:41:40.832Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: agent-Agent-1763138158871-0->start",
+      "data": {
+        "source": "agent-Agent-1763138158871-0",
+        "target": "start",
+        "sourceEncontrado": false,
+        "targetEncontrado": true,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763138498820-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763138174457-0",
+            "agent-Agent-1763138498820-0"
+          ],
+          [
+            "agent-Agent-1763138498820-0",
+            "agent-Agent-1763138498820-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763138500838_xjj90jmms",
+      "timestamp": "2025-11-14T16:41:40.832Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: agent-Agent-1763138158871-0->start (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-agent-Agent-1763138158871-0-start",
+        "source": "agent-Agent-1763138158871-0",
+        "target": "start",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763138498820-0"
+        ],
+        "sourceExists": false,
+        "targetExists": true
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763138906333_s4vi0upr2",
+      "timestamp": "2025-11-14T16:48:26.330Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763138778618-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763138778618-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763138904308-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763138806708-0",
+            "agent-Agent-1763138904308-0"
+          ],
+          [
+            "agent-Agent-1763138904308-0",
+            "agent-Agent-1763138904308-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763138906336_1n8b0omdw",
+      "timestamp": "2025-11-14T16:48:26.330Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763138778618-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763138778618-0",
+        "source": "start",
+        "target": "agent-Agent-1763138778618-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763138904308-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139076714_1pmydawvj",
+      "timestamp": "2025-11-14T16:51:16.710Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763138921256-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763139074686-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763139071240-0",
+            "agent-Agent-1763139074686-0"
+          ],
+          [
+            "agent-Agent-1763139074686-0",
+            "agent-Agent-1763139074686-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139076717_zhm0f0zn8",
+      "timestamp": "2025-11-14T16:51:16.710Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763138921256-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763138921256-0",
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763139074686-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139117537_wfnjt772p",
+      "timestamp": "2025-11-14T16:51:57.526Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763138921256-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763139114546-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763139074686-0",
+            "agent-Agent-1763139114546-0"
+          ],
+          [
+            "agent-Agent-1763139114546-0",
+            "agent-Agent-1763139114546-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139117544_4gy89qi1k",
+      "timestamp": "2025-11-14T16:51:57.527Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763138921256-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763138921256-0",
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763139114546-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139127529_ldjlxw4zt",
+      "timestamp": "2025-11-14T16:52:07.524Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763138921256-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763139124547-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763139114546-0",
+            "agent-Agent-1763139124547-0"
+          ],
+          [
+            "agent-Agent-1763139124547-0",
+            "agent-Agent-1763139124547-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139127533_l4ncvivug",
+      "timestamp": "2025-11-14T16:52:07.525Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763138921256-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763138921256-0",
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763139124547-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139148867_a9nj6sxdt",
+      "timestamp": "2025-11-14T16:52:28.864Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763138921256-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763139146839-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763139124547-0",
+            "agent-Agent-1763139146839-0"
+          ],
+          [
+            "agent-Agent-1763139146839-0",
+            "agent-Agent-1763139146839-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763139148870_1ga8e3ue5",
+      "timestamp": "2025-11-14T16:52:28.864Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763138921256-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763138921256-0",
+        "source": "start",
+        "target": "agent-Agent-1763138921256-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763139146839-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140417533_4tgef5bre",
+      "timestamp": "2025-11-14T17:13:37.530Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763140377671-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763140377671-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763140392092-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763140392092-0",
+            "agent-Agent-1763140392092-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140417536_gh2re199s",
+      "timestamp": "2025-11-14T17:13:37.530Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763140377671-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763140234187-0",
+        "source": "start",
+        "target": "agent-Agent-1763140377671-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763140392092-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140464463_rmky4g0wm",
+      "timestamp": "2025-11-14T17:14:24.460Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763140377671-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763140377671-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763140462444-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763140392092-0",
+            "agent-Agent-1763140462444-0"
+          ],
+          [
+            "agent-Agent-1763140462444-0",
+            "agent-Agent-1763140462444-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140464465_jne4gm2qz",
+      "timestamp": "2025-11-14T17:14:24.461Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763140377671-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763140234187-0",
+        "source": "start",
+        "target": "agent-Agent-1763140377671-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763140462444-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140532507_jb5wanf4w",
+      "timestamp": "2025-11-14T17:15:32.504Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763140377671-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763140377671-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763140530475-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763140462444-0",
+            "agent-Agent-1763140530475-0"
+          ],
+          [
+            "agent-Agent-1763140530475-0",
+            "agent-Agent-1763140530475-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140532512_31yqygz59",
+      "timestamp": "2025-11-14T17:15:32.504Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763140377671-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763140234187-0",
+        "source": "start",
+        "target": "agent-Agent-1763140377671-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763140530475-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140547467_inoemo3bl",
+      "timestamp": "2025-11-14T17:15:47.460Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763140530475-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763140530475-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763140545437-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763140541089-0",
+            "agent-Agent-1763140545437-0"
+          ],
+          [
+            "agent-Agent-1763140545437-0",
+            "agent-Agent-1763140545437-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140547469_9ixm1gfy7",
+      "timestamp": "2025-11-14T17:15:47.462Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763140530475-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763140530475-0",
+        "source": "start",
+        "target": "agent-Agent-1763140530475-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763140545437-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140560918_vpfspbs0s",
+      "timestamp": "2025-11-14T17:16:00.914Z",
+      "level": "warn",
+      "message": "[Workflow] Edge não mapeada: start->agent-Agent-1763140530475-0",
+      "data": {
+        "source": "start",
+        "target": "agent-Agent-1763140530475-0",
+        "sourceEncontrado": true,
+        "targetEncontrado": false,
+        "nodeIdsFinais": [
+          "start",
+          "agent-Agent-1763140558892-0"
+        ],
+        "nodeIdMapEntries": [
+          [
+            "start",
+            "start"
+          ],
+          [
+            "agent-Agent-1763140545437-0",
+            "agent-Agent-1763140558892-0"
+          ],
+          [
+            "agent-Agent-1763140558892-0",
+            "agent-Agent-1763140558892-0"
+          ]
+        ]
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    },
+    {
+      "id": "frontend_1763140560920_m5zpwb0tz",
+      "timestamp": "2025-11-14T17:16:00.914Z",
+      "level": "warn",
+      "message": "[Workflow] Edge inválida removida: start->agent-Agent-1763140530475-0 (nós não encontrados)",
+      "data": {
+        "edgeId": "reactflow__edge-start-agent-Agent-1763140530475-0",
+        "source": "start",
+        "target": "agent-Agent-1763140530475-0",
+        "nodeIds": [
+          "start",
+          "agent-Agent-1763140558892-0"
+        ],
+        "sourceExists": true,
+        "targetExists": false
+      },
+      "source": "react-frontend",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "ip": "::1"
+    }
+  ],
+  "totalEntries": 44,
+  "lastUpdated": "2025-11-14T17:16:00.921Z"
+}

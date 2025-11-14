@@ -48,7 +48,7 @@ const colorMap: Record<ComponentType, string> = {
   'set-state': '#a855f7',
 };
 
-const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected }) => {
+const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id }) => {
   const color = colorMap[data.type];
   const icon = iconMap[data.type];
 
@@ -62,6 +62,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected }) => 
         minWidth: '160px',
         transition: 'all 0.2s',
         boxShadow: selected ? `0 0 0 1px ${color}` : 'none',
+        position: 'relative',
+        zIndex: 1,
+        display: 'block',
+        visibility: 'visible',
+        opacity: 1,
       }}
     >
       <Handle

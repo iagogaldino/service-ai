@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Book, Trash2, Plus, Pencil, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { AgentConfig, CustomNode } from '../types';
+import { AgentConfig, CustomNode, ShouldUseRule } from '../types';
+// Removido: useGroups - não há mais grupos
 
 interface AgentConfigPanelProps {
   node: CustomNode | null;
@@ -22,11 +23,15 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   const [config, setConfig] = useState<AgentConfig>(
     node.data.config || {
       name: node.data.label || 'Agent',
+      description: '',
       instructions: '',
       includeChatHistory: true,
-      model: 'gpt-4.1',
+      model: 'gpt-4-turbo-preview',
       tools: [],
       outputFormat: 'text',
+      shouldUse: {
+        type: 'default',
+      },
     }
   );
   const [showMore, setShowMore] = useState(false);
@@ -50,6 +55,8 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
     setConfig(newConfig);
     onUpdate(node.id, newConfig);
   };
+  
+  // Removido: useEffect para grupos - não há mais grupos
 
   const handleDelete = () => {
     if (window.confirm('Tem certeza que deseja deletar este agente?')) {
@@ -59,23 +66,27 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   };
 
   return (
-    <div style={{
-      position: 'absolute',
-      right: 0,
-      top: 0,
-      width: '400px',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      paddingTop: '24px',
-      paddingBottom: '96px',
-      paddingLeft: '16px',
-      paddingRight: '16px',
-      boxSizing: 'border-box',
-      pointerEvents: 'none',
-    }}>
+    <div 
+      data-agent-panel
+      style={{
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        width: '400px',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        paddingTop: '24px',
+        paddingBottom: '96px',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+        zIndex: 999,
+      }}>
       <div 
         className="sidebar-scroll"
+        data-agent-panel
         style={{
           width: '100%',
           flex: 1,
@@ -189,6 +200,37 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
             }}
           />
           </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#ffffff',
+              marginBottom: '8px',
+            }}>
+              Description
+          </label>
+          <textarea
+            value={config.description || ''}
+            onChange={(e) => handleChange('description', e.target.value)}
+            placeholder="Descrição breve do propósito do agente"
+            style={{
+              width: '100%',
+              minHeight: '60px',
+              padding: '10px 12px',
+              backgroundColor: 'transparent',
+              border: '1px solid #2a2a2a',
+              borderRadius: '6px',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              resize: 'vertical',
+            }}
+          />
+          </div>
+
+          {/* Removido: Campo de grupo - não há mais grupos */}
 
           <div style={{ marginBottom: '24px' }}>
           <div style={{
@@ -316,7 +358,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               cursor: 'pointer',
             }}
           >
-            <option value="gpt-4.1">gpt-4.1</option>
+            <option value="gpt-4-turbo-preview">gpt-4-turbo-preview</option>
             <option value="gpt-4">gpt-4</option>
             <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
           </select>
@@ -381,6 +423,120 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
             <option value="structured">Structured</option>
           </select>
           </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#ffffff',
+              marginBottom: '8px',
+            }}>
+              Should Use Rule Type
+          </label>
+          <select
+            value={config.shouldUse?.type || 'default'}
+            onChange={(e) => {
+              const type = e.target.value as ShouldUseRule['type'];
+              handleChange('shouldUse', {
+                ...config.shouldUse,
+                type,
+                // Limpa campos não relevantes quando muda o tipo
+                ...(type === 'keywords' && { keywords: config.shouldUse?.keywords || [] }),
+                ...(type === 'regex' && { pattern: config.shouldUse?.pattern || '' }),
+                ...(type === 'default' && {}),
+              });
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: 'transparent',
+              border: '1px solid #2a2a2a',
+              borderRadius: '6px',
+              color: '#ffffff',
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="default">Default</option>
+            <option value="keywords">Keywords</option>
+            <option value="regex">Regex</option>
+            <option value="complex">Complex</option>
+          </select>
+          </div>
+
+          {config.shouldUse?.type === 'keywords' && (
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#ffffff',
+                marginBottom: '8px',
+              }}>
+                Keywords (separadas por vírgula)
+          </label>
+              <input
+                type="text"
+                value={config.shouldUse?.keywords?.join(', ') || ''}
+                onChange={(e) => {
+                  const keywords = e.target.value
+                    .split(',')
+                    .map(k => k.trim())
+                    .filter(k => k.length > 0);
+                  handleChange('shouldUse', {
+                    ...config.shouldUse,
+                    keywords,
+                  });
+                }}
+                placeholder="ex: criar, create, código, code"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+          )}
+
+          {config.shouldUse?.type === 'regex' && (
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#ffffff',
+                marginBottom: '8px',
+              }}>
+                Regex Pattern
+          </label>
+              <input
+                type="text"
+                value={config.shouldUse?.pattern || ''}
+                onChange={(e) => {
+                  handleChange('shouldUse', {
+                    ...config.shouldUse,
+                    pattern: e.target.value,
+                  });
+                }}
+                placeholder="ex: (npm|node)\\s+[^\\s]"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                }}
+              />
+            </div>
+          )}
 
           {/* More Section */}
           {showMore && (
