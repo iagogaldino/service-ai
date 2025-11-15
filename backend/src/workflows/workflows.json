@@ -8,8 +8,8 @@
           "id": "start",
           "type": "start",
           "position": {
-            "x": -57,
-            "y": 188.80911901081916
+            "x": 102.42799185826357,
+            "y": -64.8834914842731
           },
           "data": {
             "label": "Start",
@@ -17,20 +17,45 @@
           }
         },
         {
-          "id": "agent-Agent-1763140824100-0",
+          "id": "agent-Tradutor-1763209950289-0",
+          "type": "agent",
+          "agentName": "Tradutor",
+          "position": {
+            "x": 144.8257014251102,
+            "y": 19.124670718250584
+          },
+          "data": {
+            "label": "Tradutor",
+            "type": "agent",
+            "config": {
+              "name": "Tradutor",
+              "description": "Objetivo de deixar o texto em ingles",
+              "instructions": "Deixe esse texto em ingles: {{ input_user }}",
+              "includeChatHistory": true,
+              "model": "gpt-4-turbo-preview",
+              "tools": [],
+              "outputFormat": "text",
+              "shouldUse": {
+                "type": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "agent-Agent-1763209950289-1",
           "type": "agent",
           "agentName": "Agent",
           "position": {
-            "x": 150.38172231229487,
-            "y": 185.147692060989
+            "x": 374.6407272111857,
+            "y": 25.843070772482307
           },
           "data": {
             "label": "Agent",
             "type": "agent",
             "config": {
               "name": "Agent",
-              "description": "Seu",
-              "instructions": "Responda apenas com emóticons",
+              "description": "Agente Agent criado no React Flow",
+              "instructions": "Adicione emoticons nesse: {{ agent_response }}",
               "includeChatHistory": true,
               "model": "gpt-4-turbo-preview",
               "tools": [],
@@ -42,59 +67,49 @@
           }
         },
         {
-          "id": "agent-Guinho-1763140824100-1",
-          "type": "agent",
-          "agentName": "Guinho",
+          "id": "end-1763207851031",
+          "type": "end",
           "position": {
-            "x": 391.1576090315141,
-            "y": 185.06959750481087
+            "x": 595.5578017311666,
+            "y": 25.547482636175758
           },
           "data": {
-            "label": "Guinho",
-            "type": "agent",
-            "config": {
-              "name": "Guinho",
-              "description": "Agente Agent criado no React Flow",
-              "instructions": "Deixe essa mensagem {{ input_user }} em ingles e adicione {{ agent_response }} no final",
-              "includeChatHistory": true,
-              "model": "gpt-4-turbo-preview",
-              "tools": [],
-              "outputFormat": "text",
-              "shouldUse": {
-                "type": "default"
-              }
-            }
+            "label": "End",
+            "type": "end",
+            "isActive": false,
+            "isCompleted": false
           }
         }
       ],
       "edges": [
         {
-          "id": "reactflow__edge-start-agent-Agent-1763140530475-0",
+          "id": "reactflow__edge-start-agent-Agent love-1763144898123-1",
           "source": "start",
-          "target": "agent-Agent-1763140824100-0",
+          "target": "agent-Tradutor-1763209950289-0",
           "animated": false,
-          "style": {
-            "stroke": "#2a2a2a",
-            "strokeWidth": 2
-          }
+          "style": {}
         },
         {
-          "id": "reactflow__edge-agent-Agent-1763140824100-0-agent-Guinho-1763140824100-1",
-          "source": "agent-Agent-1763140824100-0",
-          "target": "agent-Guinho-1763140824100-1",
+          "id": "reactflow__edge-agent-Tradutor-1763207777775-0-agent-1763207825565",
+          "source": "agent-Tradutor-1763209950289-0",
+          "target": "agent-Agent-1763209950289-1",
           "animated": false,
-          "style": {
-            "stroke": "#2a2a2a",
-            "strokeWidth": 2
-          }
+          "style": {}
+        },
+        {
+          "id": "reactflow__edge-agent-1763207825565-end-1763207851031",
+          "source": "agent-Agent-1763209950289-1",
+          "target": "end-1763207851031",
+          "animated": false,
+          "style": {}
         }
       ],
       "active": true,
       "id": "workflow-principal-1763134738796",
       "createdAt": "2025-11-14T15:38:58.796Z",
-      "updatedAt": "2025-11-14T17:50:23.332Z"
+      "updatedAt": "2025-11-15T12:32:32.277Z"
     }
   ],
   "activeWorkflowId": null,
-  "updatedAt": "2025-11-14T17:50:23.332Z"
+  "updatedAt": "2025-11-15T12:32:32.277Z"
 }

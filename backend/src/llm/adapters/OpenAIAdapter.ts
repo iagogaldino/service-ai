@@ -10,10 +10,17 @@ import { executeTool } from '../../agents/agentManager';
 import { emitToMonitors } from '../../services/monitoringService';
 import { formatActionMessage } from '../../utils/functionDescriptions';
 
+interface CachedAgent {
+  id: string;
+  instructions: string;
+  tools: any[];
+  model: string;
+}
+
 export class OpenAIAdapter implements LLMAdapter {
   readonly provider = 'openai';
   private openai: OpenAI;
-  private agentCache: Map<string, string> = new Map();
+  private agentCache: Map<string, CachedAgent> = new Map();
 
   constructor(apiKey: string) {
     if (!apiKey) {
@@ -26,19 +33,53 @@ export class OpenAIAdapter implements LLMAdapter {
     return !!this.openai;
   }
 
+  /**
+   * Compara se duas configurações de tools são iguais
+   */
+  private toolsEqual(tools1: any[], tools2: any[]): boolean {
+    if (tools1.length !== tools2.length) return false;
+    const tools1Str = JSON.stringify(tools1.sort((a, b) => (a.type || '').localeCompare(b.type || '')));
+    const tools2Str = JSON.stringify(tools2.sort((a, b) => (a.type || '').localeCompare(b.type || '')));
+    return tools1Str === tools2Str;
+  }
+
   async getOrCreateAgent(config: AgentConfig): Promise<string> {
     // Verifica cache
     if (this.agentCache.has(config.name)) {
-      const cachedId = this.agentCache.get(config.name)!;
-      try {
-        await this.openai.beta.assistants.update(cachedId, {
-          tools: config.tools,
-          instructions: config.instructions,
-        });
-        return cachedId;
-      } catch (error) {
-        this.agentCache.delete(config.name);
+      const cached = this.agentCache.get(config.name)!;
+      
+      // Compara instruções, tools e model antes de atualizar
+      const instructionsChanged = cached.instructions !== config.instructions;
+      const toolsChanged = !this.toolsEqual(cached.tools || [], config.tools || []);
+      const modelChanged = cached.model !== config.model;
+      
+      // Só atualiza se algo realmente mudou
+      if (instructionsChanged || toolsChanged || modelChanged) {
+        try {
+          await this.openai.beta.assistants.update(cached.id, {
+            tools: config.tools,
+            instructions: config.instructions,
+            model: config.model,
+          });
+          // Atualiza cache com novos valores
+          this.agentCache.set(config.name, {
+            id: cached.id,
+            instructions: config.instructions,
+            tools: config.tools || [],
+            model: config.model,
+          });
+          console.log(`🔄 Agente "${config.name}" atualizado (${instructionsChanged ? 'instruções' : ''} ${toolsChanged ? 'tools' : ''} ${modelChanged ? 'model' : ''} mudaram)`);
+        } catch (error) {
+          console.error(`❌ Erro ao atualizar agente "${config.name}":`, error);
+          this.agentCache.delete(config.name);
+        }
+      } else {
+        // Nada mudou, retorna do cache sem fazer chamada à API
+        console.log(`✅ Agente "${config.name}" encontrado em cache (sem mudanças)`);
+        return cached.id;
       }
+      
+      return cached.id;
     }
 
     // Busca na API
@@ -47,11 +88,38 @@ export class OpenAIAdapter implements LLMAdapter {
       const existing = assistants.data.find((a) => a.name === config.name);
 
       if (existing) {
-        await this.openai.beta.assistants.update(existing.id, {
-          tools: config.tools,
+        // Compara antes de atualizar (existing vem da API, pode ter formato diferente)
+        const existingTools = (existing.tools || []).map((t: any) => ({
+          type: t.type,
+          function: t.function ? { name: t.function.name, description: t.function.description } : undefined
+        }));
+        const configTools = (config.tools || []).map((t: any) => ({
+          type: t.type,
+          function: t.function ? { name: t.function.name, description: t.function.description } : undefined
+        }));
+        
+        const needsUpdate = 
+          existing.instructions !== config.instructions ||
+          !this.toolsEqual(existingTools, configTools) ||
+          existing.model !== config.model;
+        
+        if (needsUpdate) {
+          await this.openai.beta.assistants.update(existing.id, {
+            tools: config.tools,
+            instructions: config.instructions,
+            model: config.model,
+          });
+          console.log(`🔄 Agente "${config.name}" atualizado na API`);
+        } else {
+          console.log(`✅ Agente "${config.name}" encontrado na API (sem mudanças necessárias)`);
+        }
+        
+        this.agentCache.set(config.name, {
+          id: existing.id,
           instructions: config.instructions,
+          tools: config.tools || [],
+          model: config.model,
         });
-        this.agentCache.set(config.name, existing.id);
         return existing.id;
       }
     } catch (error) {
@@ -66,7 +134,13 @@ export class OpenAIAdapter implements LLMAdapter {
       tools: config.tools,
     });
 
-    this.agentCache.set(config.name, assistant.id);
+    this.agentCache.set(config.name, {
+      id: assistant.id,
+      instructions: config.instructions,
+      tools: config.tools || [],
+      model: config.model,
+    });
+    console.log(`✅ Novo agente "${config.name}" criado (ID: ${assistant.id})`);
     return assistant.id;
   }
 
@@ -93,26 +167,8 @@ export class OpenAIAdapter implements LLMAdapter {
     role: 'user' | 'assistant' | 'system',
     content: string
   ): Promise<LLMMessage> {
-    // Verifica se há runs ativos antes de adicionar mensagem
-    const activeRuns = await this.listRuns(threadId, 10);
-    const runningRuns = activeRuns.filter(
-      run => run.status === 'queued' || run.status === 'in_progress' || run.status === 'requires_action'
-    );
-
-    // Cancela runs ativos para permitir adicionar nova mensagem
-    if (runningRuns.length > 0) {
-      console.log(`⚠️ Encontrado(s) ${runningRuns.length} run(s) ativo(s) na thread ${threadId}. Cancelando...`);
-      for (const run of runningRuns) {
-        try {
-          await this.cancelRun(threadId, run.id);
-          console.log(`✅ Run ${run.id} cancelado`);
-        } catch (error: any) {
-          console.warn(`⚠️ Erro ao cancelar run ${run.id}:`, error.message);
-        }
-      }
-      // Aguarda um pouco para garantir que o cancelamento foi processado
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
+    // Removida verificação de runs ativos - a API da OpenAI gerencia isso automaticamente
+    // Isso elimina uma requisição HTTP desnecessária na maioria dos casos
 
     // OpenAI não aceita 'system' em mensagens de thread, apenas 'user' e 'assistant'
     const openaiRole = role === 'system' ? 'user' : role;
@@ -145,11 +201,30 @@ export class OpenAIAdapter implements LLMAdapter {
 
   async createRun(threadId: string, assistantId: string, socket?: Socket): Promise<LLMRun> {
     try {
+      const startTime = Date.now();
       console.log(`🔵 [OpenAI] Criando run para thread ${threadId} com assistant ${assistantId}...`);
+      
+      // Log de tempo antes da chamada HTTP
+      const beforeHttpTime = Date.now();
+      const timeSinceStart = beforeHttpTime - startTime;
+      if (timeSinceStart > 10) {
+        console.warn(`⚠️ [OpenAI] Tempo antes da chamada HTTP: ${timeSinceStart}ms`);
+      }
+      
+      // Faz a chamada HTTP para criar o run
+      const httpStartTime = Date.now();
       const run = await this.openai.beta.threads.runs.create(threadId, {
         assistant_id: assistantId,
       });
+      const httpDuration = Date.now() - httpStartTime;
+      const totalDuration = Date.now() - startTime;
+      
       console.log(`✅ [OpenAI] Run criado: ${run.id} (Status: ${run.status})`);
+      console.log(`⏱️ [OpenAI] Tempos: HTTP: ${httpDuration}ms, Total: ${totalDuration}ms`);
+      
+      if (httpDuration > 2000) {
+        console.warn(`⚠️ [OpenAI] Chamada HTTP levou ${httpDuration}ms (acima do esperado)`);
+      }
 
       return {
         id: run.id,
@@ -274,6 +349,14 @@ export class OpenAIAdapter implements LLMAdapter {
       });
     }
 
+    // Polling adaptativo: começa rápido (200ms) e aumenta gradualmente até 1000ms
+    const getPollingDelay = (iteration: number): number => {
+      if (iteration <= 3) return 200; // Primeiras 3 iterações: 200ms
+      if (iteration <= 10) return 300; // Próximas 7: 300ms
+      if (iteration <= 20) return 500; // Próximas 10: 500ms
+      return 1000; // Depois: 1000ms
+    };
+
     while (iterationCount < MAX_ITERATIONS) {
       iterationCount++;
       const run = await this.openai.beta.threads.runs.retrieve(threadId, runId);
@@ -284,7 +367,8 @@ export class OpenAIAdapter implements LLMAdapter {
         totalTokens += run.usage.total_tokens || 0;
       }
 
-      if (socket) {
+      // Só busca mensagens se houver socket e não estiver em status terminal
+      if (socket && run.status !== 'completed' && run.status !== 'failed' && run.status !== 'cancelled') {
         await fetchAndEmitNewAssistantMessages();
       }
 
@@ -456,9 +540,13 @@ export class OpenAIAdapter implements LLMAdapter {
         await this.openai.beta.threads.runs.submitToolOutputs(threadId, runId, {
           tool_outputs: validOutputs,
         });
+        // Após submit tool outputs, volta ao início do loop imediatamente
+        continue;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Polling adaptativo baseado no número de iterações
+      const delay = getPollingDelay(iterationCount);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
     throw new Error(`Run não completou após ${MAX_ITERATIONS} iterações`);

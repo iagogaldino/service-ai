@@ -27,24 +27,54 @@ export interface AppConfig {
   lastUpdated?: string;
 }
 
+// Cache para config.json (evita múltiplas leituras)
+let configCache: AppConfig | null = null;
+let configCacheTime: number = 0;
+const CONFIG_CACHE_TTL = 5000; // Cache por 5 segundos
+
 /**
- * Carrega configuração do arquivo config.json
+ * Carrega configuração do arquivo config.json com cache
  * 
+ * @param forceReload - Se true, força recarregar mesmo com cache válido
  * @returns {AppConfig | null} Configuração carregada ou null se não existir
  */
-export function loadConfigFromJson(): AppConfig | null {
+export function loadConfigFromJson(forceReload: boolean = false): AppConfig | null {
+  const now = Date.now();
+  
+  // Retorna do cache se ainda válido e não forçado a recarregar
+  if (!forceReload && configCache !== null && (now - configCacheTime) < CONFIG_CACHE_TTL) {
+    return configCache;
+  }
+  
   try {
     const configPath = path.join(process.cwd(), 'config.json');
     if (fs.existsSync(configPath)) {
       const fileContent = fs.readFileSync(configPath, 'utf-8');
       const config = JSON.parse(fileContent) as AppConfig;
-      console.log(`✅ Arquivo config.json carregado`);
+      
+      // Atualiza cache
+      configCache = config;
+      configCacheTime = now;
+      
+      // Só loga na primeira carga ou quando forçado
+      if (forceReload || configCacheTime === now) {
+        // Log removido para reduzir poluição no console
+      }
+      
       return config;
     }
   } catch (error) {
     console.warn('⚠️  Erro ao carregar config.json:', error);
   }
   return null;
+}
+
+/**
+ * Limpa o cache de configuração (útil após salvar nova configuração)
+ */
+export function clearConfigCache(): void {
+  configCache = null;
+  configCacheTime = 0;
 }
 
 /**
@@ -60,6 +90,10 @@ export function saveConfigToJson(config: AppConfig): void {
       lastUpdated: new Date().toISOString()
     };
     fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2), 'utf-8');
+    
+    // Limpa cache após salvar
+    clearConfigCache();
+    
     console.log(`✅ Configuração salva em config.json`);
   } catch (error) {
     console.error('❌ Erro ao salvar config.json:', error);

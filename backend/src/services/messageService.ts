@@ -198,9 +198,26 @@ export async function processMessage(
 
     // Cria um run para processar a mensagem com o agente selecionado (usando config processado)
     console.log(`🚀 Criando run para processar mensagem...`);
+    const executionStartTime = Date.now();
     const run = await llmAdapter.createRun(threadId, agentId);
 
     console.log(`✅ Run criado: ${run.id} (Status: ${run.status})`);
+
+    // Emite evento de início de execução com timestamp
+    socket.emit('agent_execution_start', {
+      agentName: config.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      threadId: threadId,
+    });
+    emitToMonitors(socket.id, 'agent_execution_start', {
+      agentName: config.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      threadId: threadId,
+    });
 
     // Log de criação de run
     saveLog({
@@ -212,14 +229,39 @@ export async function processMessage(
       status: run.status,
       llmProvider: getCurrentLLMProvider(),
       metadata: {
-        assistantId: agentId
+        assistantId: agentId,
+        executionStartTime: executionStartTime,
       }
     });
 
     // Aguarda a conclusão do run (o adapter já trata tool calling internamente)
     const { message: responseMessage, tokenUsage } = await llmAdapter.waitForRunCompletion(threadId, run.id, socket);
+    const executionEndTime = Date.now();
+    const executionDuration = executionEndTime - executionStartTime;
 
-    console.log(`✅ Run concluído com sucesso`);
+    console.log(`✅ Run concluído com sucesso em ${executionDuration}ms`);
+
+    // Emite evento de fim de execução com duração
+    socket.emit('agent_execution_end', {
+      agentName: config.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      endTime: executionEndTime,
+      duration: executionDuration,
+      durationSeconds: (executionDuration / 1000).toFixed(2),
+      threadId: threadId,
+    });
+    emitToMonitors(socket.id, 'agent_execution_end', {
+      agentName: config.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      endTime: executionEndTime,
+      duration: executionDuration,
+      durationSeconds: (executionDuration / 1000).toFixed(2),
+      threadId: threadId,
+    });
 
     // Atualiza tokens acumulados na thread
     updateThreadTokens(threadId, tokenUsage);
@@ -413,30 +455,12 @@ export async function processMessageWithAgent(
     socket.emit('agent_selected', agentSelectedData);
     emitToMonitors(socket.id, 'agent_selected', agentSelectedData);
 
-    // Processa templates nas instruções do agente (substitui {{ input_user }} pela mensagem)
-    const processedInstructions = processTemplate(agentConfig.instructions, {
-      input_user: enhancedMessage,
-    });
-    
-    // Cria uma cópia do agentConfig com instruções processadas
-    const processedAgentConfig = {
-      ...agentConfig,
-      instructions: processedInstructions,
-    };
-    
-    // Atualiza o agente com as instruções processadas antes de processar a mensagem
-    if (processedInstructions !== agentConfig.instructions) {
-      console.log(`🔄 Processando templates nas instruções do agente "${agentConfig.name}"...`);
-      console.log(`   Instruções originais: "${agentConfig.instructions.substring(0, 100)}..."`);
-      console.log(`   Instruções processadas: "${processedInstructions.substring(0, 100)}..."`);
-      
-      // Atualiza o agente com as instruções processadas
-      await llmAdapter.getOrCreateAgent(processedAgentConfig);
-    }
-    
+    // O agente já foi criado/atualizado no workflowExecutor com as instruções processadas
+    // Não precisamos chamar getOrCreateAgent novamente aqui
     console.log(`✅ Usando agente específico: "${agentConfig.name}" (ID: ${agentId})`);
 
     // Log de seleção de agente
+    // Nota: agentConfig já vem com instruções processadas do workflowExecutor
     saveLog({
       type: 'agent_selection',
       socketId: socket.id,
@@ -447,7 +471,7 @@ export async function processMessageWithAgent(
       llmProvider: getCurrentLLMProvider(),
       metadata: {
         originalInstructions: agentConfig.instructions,
-        processedInstructions: processedInstructions,
+        processedInstructions: agentConfig.instructions, // Já processadas no workflowExecutor
       }
     });
 
@@ -478,12 +502,14 @@ export async function processMessageWithAgent(
       });
     }
 
-    // Salva mensagem do usuário na conversa
+    // Operações de storage são feitas de forma assíncrona (não bloqueiam)
+    // Salva mensagem do usuário na conversa (assíncrono)
     saveConversationMessage(threadId, socket.id, 'user', message, undefined, undefined, getCurrentLLMProvider());
 
     console.log(`✅ Mensagem adicionada à thread com sucesso (ID: ${userMessage.id})`);
 
-    // Log de mensagem enviada
+    // Log de mensagem enviada (assíncrono, não bloqueia)
+    const messageSentTime = Date.now();
     saveLog({
       type: 'message_sent',
       socketId: socket.id,
@@ -502,9 +528,44 @@ export async function processMessageWithAgent(
     console.log(`   ThreadId: ${threadId}`);
     console.log(`   AgentId: ${agentId}`);
     console.log(`   Provider: ${getCurrentLLMProvider()}`);
+    const executionStartTime = Date.now();
+    const timeBeforeRun = Date.now();
+    const timeSinceMessageSent = timeBeforeRun - messageSentTime;
+    if (timeSinceMessageSent > 500) {
+      console.warn(`⚠️ Tempo entre message_sent e criação de run: ${timeSinceMessageSent}ms (acima do esperado)`);
+    }
+    
+    const runStartTime = Date.now();
     const run = await llmAdapter.createRun(threadId, agentId, socket);
+    const runCreationTime = Date.now() - runStartTime;
+    const totalTimeToRun = Date.now() - messageSentTime;
+    
+    console.log(`⏱️ Tempos: message_sent→run: ${timeSinceMessageSent}ms, criação run: ${runCreationTime}ms, total: ${totalTimeToRun}ms`);
+    
+    if (runCreationTime > 1000) {
+      console.warn(`⚠️ Criação de run levou ${runCreationTime}ms (acima do esperado)`);
+    }
+    if (totalTimeToRun > 1500) {
+      console.warn(`⚠️ Tempo total entre message_sent e run criado: ${totalTimeToRun}ms (acima do esperado)`);
+    }
 
     console.log(`✅ Run criado: ${run.id} (Status: ${run.status})`);
+
+    // Emite evento de início de execução com timestamp
+    socket.emit('agent_execution_start', {
+      agentName: agentConfig.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      threadId: threadId,
+    });
+    emitToMonitors(socket.id, 'agent_execution_start', {
+      agentName: agentConfig.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      threadId: threadId,
+    });
 
     // Log de criação de run
     saveLog({
@@ -516,14 +577,39 @@ export async function processMessageWithAgent(
       status: run.status,
       llmProvider: getCurrentLLMProvider(),
       metadata: {
-        assistantId: agentId
+        assistantId: agentId,
+        executionStartTime: executionStartTime,
       }
     });
 
     // Aguarda a conclusão do run (o adapter já trata tool calling internamente)
     const { message: responseMessage, tokenUsage } = await llmAdapter.waitForRunCompletion(threadId, run.id, socket);
+    const executionEndTime = Date.now();
+    const executionDuration = executionEndTime - executionStartTime;
 
-    console.log(`✅ Run concluído com sucesso`);
+    console.log(`✅ Run concluído com sucesso em ${executionDuration}ms`);
+
+    // Emite evento de fim de execução com duração
+    socket.emit('agent_execution_end', {
+      agentName: agentConfig.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      endTime: executionEndTime,
+      duration: executionDuration,
+      durationSeconds: (executionDuration / 1000).toFixed(2),
+      threadId: threadId,
+    });
+    emitToMonitors(socket.id, 'agent_execution_end', {
+      agentName: agentConfig.name,
+      agentId: agentId,
+      runId: run.id,
+      startTime: executionStartTime,
+      endTime: executionEndTime,
+      duration: executionDuration,
+      durationSeconds: (executionDuration / 1000).toFixed(2),
+      threadId: threadId,
+    });
 
     // Atualiza tokens acumulados na thread
     updateThreadTokens(threadId, tokenUsage);
@@ -556,70 +642,134 @@ export async function processMessageWithAgent(
     console.log(`💰 Tokens desta mensagem: ${tokenUsage.totalTokens} (prompt: ${tokenUsage.promptTokens}, completion: ${tokenUsage.completionTokens})`);
     console.log(`💰 Total acumulado na thread: ${threadTokens.totalTokens} (prompt: ${threadTokens.promptTokens}, completion: ${threadTokens.completionTokens})`);
 
-    // Salva mensagem do assistente na conversa
-    saveConversationMessage(
-      threadId,
-      socket.id,
-      'assistant',
-      responseMessage,
-      agentConfig.name,
-      tokenUsage,
-      currentLLMProvider
-    );
+    // Calcula custos para os logs (antes de retornar para não bloquear)
+    const tokenCost = calculateTokenCost(tokenUsage, agentConfig.model || 'gpt-4-turbo-preview');
+    const accumulatedTokenCost = calculateTokenCost(threadTokens, agentConfig.model || 'gpt-4-turbo-preview');
 
-    // Salva tokens em arquivo JSON
-    saveTokens(
-      threadId,
-      agentConfig.name,
-      message,
-      tokenUsage,
-      threadTokens,
-      agentConfig.model,
-      currentLLMProvider
-    );
+    // Operações de storage são feitas de forma assíncrona após retornar a resposta
+    // Isso não bloqueia a resposta ao usuário
+    // Garante que threadId seja string (não undefined)
+    if (threadId) {
+      const safeThreadId: string = threadId; // Type narrowing para garantir que é string
+      
+      // Salva logs críticos primeiro (com tratamento de erro individual)
+      // Log de resposta é crítico e deve ser salvo mesmo se outras operações falharem
+      Promise.resolve().then(() => {
+        try {
+          saveLog({
+            type: 'response',
+            socketId: socket.id,
+            threadId: safeThreadId,
+            runId: run.id,
+            agentName: agentConfig.name,
+            agentId: agentId,
+            message: message,
+            response: responseMessage,
+            tokenUsage: tokenUsage,
+            accumulatedTokenUsage: threadTokens,
+            tokenCost: tokenCost,
+            accumulatedTokenCost: accumulatedTokenCost,
+            llmProvider: currentLLMProvider,
+            metadata: {
+              responseLength: responseMessage.length,
+              model: agentConfig.model || 'gpt-4-turbo-preview'
+            }
+          });
+        } catch (error: any) {
+          console.error('❌ Erro crítico ao salvar log de response:', error);
+        }
+      }).catch(error => {
+        console.error('❌ Erro crítico ao salvar log de response:', error);
+      });
 
-    // Calcula custos para os logs
-    const tokenCost = calculateTokenCost(tokenUsage, agentConfig.model);
-    const accumulatedTokenCost = calculateTokenCost(threadTokens, agentConfig.model);
-
-    // Log de resposta
-    saveLog({
-      type: 'response',
-      socketId: socket.id,
-      threadId: threadId,
-      runId: run.id,
-      agentName: agentConfig.name,
-      agentId: agentId,
-      message: message,
-      response: responseMessage,
-      tokenUsage: tokenUsage,
-      accumulatedTokenUsage: threadTokens,
-      tokenCost: tokenCost,
-      accumulatedTokenCost: accumulatedTokenCost,
-      llmProvider: currentLLMProvider,
-      metadata: {
-        responseLength: responseMessage.length,
-        model: agentConfig.model
+      // Outras operações de storage em paralelo
+      Promise.all([
+        // Salva mensagem do assistente na conversa (assíncrono)
+        Promise.resolve().then(() => {
+          try {
+            saveConversationMessage(
+              safeThreadId,
+              socket.id,
+              'assistant',
+              responseMessage,
+              agentConfig.name,
+              tokenUsage,
+              currentLLMProvider
+            );
+          } catch (error: any) {
+            console.error('❌ Erro ao salvar conversação:', error.message);
+          }
+        }),
+        // Salva tokens em arquivo JSON (assíncrono)
+        Promise.resolve().then(() => {
+          try {
+            saveTokens(
+              safeThreadId,
+              agentConfig.name,
+              message,
+              tokenUsage,
+              threadTokens,
+              agentConfig.model || 'gpt-4-turbo-preview',
+              currentLLMProvider
+            );
+          } catch (error: any) {
+            console.error('❌ Erro ao salvar tokens:', error.message);
+          }
+        }),
+        // Log de uso de tokens
+        Promise.resolve().then(() => {
+          try {
+            saveLog({
+              type: 'token_usage',
+              socketId: socket.id,
+              threadId: safeThreadId,
+              runId: run.id,
+              agentName: agentConfig.name,
+              tokenUsage: tokenUsage,
+              accumulatedTokenUsage: threadTokens,
+              tokenCost: tokenCost,
+              accumulatedTokenCost: accumulatedTokenCost,
+              llmProvider: currentLLMProvider,
+              metadata: {
+                model: agentConfig.model || 'gpt-4-turbo-preview'
+              }
+            });
+          } catch (error: any) {
+            console.error('❌ Erro ao salvar log de token_usage:', error.message);
+          }
+        })
+      ]).catch(error => {
+        console.error('❌ Erro ao salvar dados de storage (não crítico):', error);
+      });
+    } else {
+      // Se não há threadId, ainda tenta salvar o log de response
+      console.warn('⚠️ ThreadId não disponível, salvando log de response sem threadId');
+      try {
+        saveLog({
+          type: 'response',
+          socketId: socket.id,
+          threadId: 'unknown',
+          runId: run.id,
+          agentName: agentConfig.name,
+          agentId: agentId,
+          message: message,
+          response: responseMessage,
+          tokenUsage: tokenUsage,
+          accumulatedTokenUsage: threadTokens,
+          tokenCost: tokenCost,
+          accumulatedTokenCost: accumulatedTokenCost,
+          llmProvider: currentLLMProvider,
+          metadata: {
+            responseLength: responseMessage.length,
+            model: agentConfig.model || 'gpt-4-turbo-preview'
+          }
+        });
+      } catch (error: any) {
+        console.error('❌ Erro crítico ao salvar log de response (sem threadId):', error);
       }
-    });
+    }
 
-    // Log de uso de tokens
-    saveLog({
-      type: 'token_usage',
-      socketId: socket.id,
-      threadId: threadId,
-      runId: run.id,
-      agentName: agentConfig.name,
-      tokenUsage: tokenUsage,
-      accumulatedTokenUsage: threadTokens,
-      tokenCost: tokenCost,
-      accumulatedTokenCost: accumulatedTokenCost,
-      llmProvider: currentLLMProvider,
-      metadata: {
-        model: agentConfig.model
-      }
-    });
-
+    // Retorna imediatamente sem esperar operações de storage
     return { success: true, response: responseMessage };
   } catch (error: any) {
     console.error('Erro ao processar mensagem com agente específico:', error);

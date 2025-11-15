@@ -32,12 +32,21 @@ export interface EdgeCondition {
  */
 export interface WorkflowNode {
   id: string;
-  type: 'start' | 'agent' | 'end' | 'condition' | 'merge';
+  type: 'start' | 'agent' | 'end' | 'condition' | 'merge' | 'if-else' | 'user-approval';
   agentName?: string; // Se type = 'agent'
   position: { x: number; y: number };
   data?: {
     label?: string;
+    type?: string; // Tipo interno (para compatibilidade com React Flow)
     condition?: string; // Para type = 'condition'
+    config?: {
+      conditions?: Array<{
+        id: string;
+        caseName?: string;
+        condition?: string;
+      }>;
+      elseLabel?: string;
+    };
     [key: string]: any; // Permite campos extras
   };
 }

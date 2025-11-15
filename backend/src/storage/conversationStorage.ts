@@ -3,11 +3,12 @@
  */
 
 import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import path from 'path';
 import { Conversation, ConversationsJsonFile, ConversationMessage, TokenUsage, LLMProvider } from '../types';
 
 /**
- * Salva uma mensagem na conversa
+ * Salva uma mensagem na conversa (versão síncrona - mantida para compatibilidade)
  */
 export function saveConversationMessage(
   threadId: string,
@@ -18,12 +19,30 @@ export function saveConversationMessage(
   tokenUsage?: TokenUsage,
   llmProvider?: LLMProvider
 ): void {
+  // Chama versão assíncrona sem bloquear
+  saveConversationMessageAsync(threadId, socketId, role, content, agentName, tokenUsage, llmProvider).catch(error => {
+    console.error('❌ Erro ao salvar mensagem na conversa:', error);
+  });
+}
+
+/**
+ * Salva uma mensagem na conversa de forma assíncrona (não bloqueante)
+ */
+export async function saveConversationMessageAsync(
+  threadId: string,
+  socketId: string,
+  role: 'user' | 'assistant' | 'system',
+  content: string,
+  agentName?: string,
+  tokenUsage?: TokenUsage,
+  llmProvider?: LLMProvider
+): Promise<void> {
   try {
     const conversationsFilePath = path.join(process.cwd(), 'conversations.json');
     
     let conversationsData: ConversationsJsonFile;
-    if (fs.existsSync(conversationsFilePath)) {
-      const fileContent = fs.readFileSync(conversationsFilePath, 'utf-8').trim();
+    try {
+      const fileContent = (await fsPromises.readFile(conversationsFilePath, 'utf-8')).trim();
       if (fileContent === '') {
         conversationsData = createEmptyConversationsData();
       } else {
@@ -32,8 +51,12 @@ export function saveConversationMessage(
           conversationsData.conversations = [];
         }
       }
-    } else {
-      conversationsData = createEmptyConversationsData();
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        conversationsData = createEmptyConversationsData();
+      } else {
+        throw error;
+      }
     }
 
     // Busca conversa existente ou cria nova
@@ -68,7 +91,7 @@ export function saveConversationMessage(
 
     conversationsData.lastUpdated = new Date().toISOString();
 
-    fs.writeFileSync(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
+    await fsPromises.writeFile(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
   } catch (error) {
     console.error('❌ Erro ao salvar mensagem na conversa:', error);
   }

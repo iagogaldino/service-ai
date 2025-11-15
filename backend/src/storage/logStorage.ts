@@ -3,9 +3,61 @@
  */
 
 import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import path from 'path';
 import { LogEntry, LogsJsonFile, LogType, LLMProvider } from '../types';
 import { loadConfigFromJson } from '../config/env';
+
+// Fila para garantir que apenas uma operação de escrita aconteça por vez
+let writeQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Função auxiliar para recuperar JSON corrompido
+ */
+function recoverJson(content: string): LogsJsonFile | null {
+  // Remove qualquer conteúdo após o último } válido
+  const trimmed = content.trim();
+  
+  // Estratégia 1: Procura pelo último } que fecha o objeto principal
+  let lastBrace = trimmed.lastIndexOf('}');
+  while (lastBrace > 0) {
+    try {
+      const candidate = trimmed.substring(0, lastBrace + 1);
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.entries)) {
+        return parsed as LogsJsonFile;
+      }
+    } catch {
+      // Continua tentando
+    }
+    // Procura o próximo } anterior
+    lastBrace = trimmed.lastIndexOf('}', lastBrace - 1);
+  }
+  
+  // Estratégia 2: Tenta encontrar o início do objeto statistics
+  const statsIndex = trimmed.lastIndexOf('"statistics"');
+  if (statsIndex > 0) {
+    // Encontra o } que fecha statistics
+    let statsEnd = trimmed.indexOf('}', statsIndex);
+    if (statsEnd > 0) {
+      // Encontra o } que fecha o objeto principal
+      const mainEnd = trimmed.indexOf('}', statsEnd + 1);
+      if (mainEnd > 0) {
+        try {
+          const candidate = trimmed.substring(0, mainEnd + 1);
+          const parsed = JSON.parse(candidate);
+          if (parsed && typeof parsed === 'object' && Array.isArray(parsed.entries)) {
+            return parsed as LogsJsonFile;
+          }
+        } catch {
+          // Falhou
+        }
+      }
+    }
+  }
+  
+  return null;
+}
 
 /**
  * Interface para logs do frontend
@@ -44,9 +96,19 @@ function getCurrentLLMProvider(): LLMProvider {
 }
 
 /**
- * Salva uma entrada de log em um arquivo JSON
+ * Salva uma entrada de log em um arquivo JSON (versão síncrona - mantida para compatibilidade)
  */
 export function saveLog(logEntry: Omit<LogEntry, 'id' | 'timestamp'>): void {
+  // Chama versão assíncrona sem bloquear
+  saveLogAsync(logEntry).catch(error => {
+    console.error('❌ Erro ao salvar log no JSON:', error);
+  });
+}
+
+/**
+ * Salva uma entrada de log em um arquivo JSON de forma assíncrona (não bloqueante)
+ */
+export async function saveLogAsync(logEntry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<void> {
   try {
     const logsFilePath = path.join(process.cwd(), 'logs.json');
     
@@ -61,18 +123,52 @@ export function saveLog(logEntry: Omit<LogEntry, 'id' | 'timestamp'>): void {
     
     // Lê o arquivo existente ou cria estrutura vazia
     let logsData: LogsJsonFile;
-    if (fs.existsSync(logsFilePath)) {
-      const fileContent = fs.readFileSync(logsFilePath, 'utf-8');
+    try {
+      const fileContent = await fsPromises.readFile(logsFilePath, 'utf-8');
       if (fileContent.trim() === '') {
         logsData = createEmptyLogsData();
       } else {
-        logsData = JSON.parse(fileContent);
-        if (!logsData.statistics.totalCost) {
-          logsData.statistics.totalCost = 0;
+        try {
+          // Tenta fazer parse do JSON
+          logsData = JSON.parse(fileContent);
+          if (!logsData.statistics || !logsData.statistics.totalCost) {
+            if (!logsData.statistics) {
+              logsData.statistics = {
+                totalConnections: 0,
+                totalMessages: 0,
+                totalToolExecutions: 0,
+                totalErrors: 0,
+                totalTokens: 0,
+                totalCost: 0
+              };
+            } else {
+              logsData.statistics.totalCost = logsData.statistics.totalCost || 0;
+            }
+          }
+        } catch (parseError: any) {
+          // Se o JSON estiver corrompido, tenta recuperar o conteúdo válido
+          console.warn('⚠️ JSON corrompido detectado, tentando recuperar...', parseError.message);
+          
+          const recovered = recoverJson(fileContent);
+          if (recovered) {
+            logsData = recovered;
+            console.log('✅ JSON recuperado com sucesso');
+            // Salva o JSON recuperado imediatamente para evitar corrupção futura
+            await fsPromises.writeFile(logsFilePath, JSON.stringify(logsData, null, 2), 'utf-8');
+          } else {
+            console.error('❌ Não foi possível recuperar JSON, criando estrutura vazia');
+            logsData = createEmptyLogsData();
+          }
         }
       }
-    } else {
-      logsData = createEmptyLogsData();
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        logsData = createEmptyLogsData();
+      } else {
+        // Em caso de outros erros, cria estrutura vazia para não bloquear
+        console.error('❌ Erro ao ler arquivo de logs, criando estrutura vazia:', error.message);
+        logsData = createEmptyLogsData();
+      }
     }
 
     // Adiciona nova entrada
@@ -90,8 +186,79 @@ export function saveLog(logEntry: Omit<LogEntry, 'id' | 'timestamp'>): void {
       logsData.totalEntries = logsData.entries.length;
     }
 
-    // Salva o arquivo
-    fs.writeFileSync(logsFilePath, JSON.stringify(logsData, null, 2), 'utf-8');
+    // Adiciona à fila para garantir que apenas uma escrita aconteça por vez
+    // Não aguarda a conclusão para não bloquear (fire and forget com tratamento de erro)
+    writeQueue = writeQueue.then(async () => {
+      try {
+        // Lê novamente o arquivo antes de escrever para evitar sobrescrever mudanças concorrentes
+        let currentData: LogsJsonFile;
+        try {
+          const currentContent = await fsPromises.readFile(logsFilePath, 'utf-8');
+          if (currentContent.trim() === '') {
+            currentData = createEmptyLogsData();
+          } else {
+            try {
+              currentData = JSON.parse(currentContent);
+              if (!currentData.statistics || !currentData.statistics.totalCost) {
+                if (!currentData.statistics) {
+                  currentData.statistics = {
+                    totalConnections: 0,
+                    totalMessages: 0,
+                    totalToolExecutions: 0,
+                    totalErrors: 0,
+                    totalTokens: 0,
+                    totalCost: 0
+                  };
+                } else {
+                  currentData.statistics.totalCost = currentData.statistics.totalCost || 0;
+                }
+              }
+            } catch (parseError: any) {
+              // Se corrompido, tenta recuperar usando a mesma função
+              const recovered = recoverJson(currentContent);
+              if (recovered) {
+                currentData = recovered;
+              } else {
+                currentData = createEmptyLogsData();
+              }
+            }
+          }
+        } catch (error: any) {
+          if (error.code === 'ENOENT') {
+            currentData = createEmptyLogsData();
+          } else {
+            currentData = createEmptyLogsData();
+          }
+        }
+
+        // Verifica se a entrada já existe (evita duplicatas)
+        const entryExists = currentData.entries.some(e => e.id === fullLogEntry.id);
+        if (!entryExists) {
+          currentData.entries.push(fullLogEntry);
+          currentData.totalEntries = currentData.entries.length;
+          currentData.lastUpdated = new Date().toISOString();
+          updateStatistics(currentData, fullLogEntry);
+
+          // Mantém apenas as últimas 10000 entradas
+          if (currentData.entries.length > MAX_ENTRIES) {
+            currentData.entries = currentData.entries.slice(-MAX_ENTRIES);
+            currentData.totalEntries = currentData.entries.length;
+          }
+        }
+
+        // Escreve o arquivo de forma atômica usando writeFile
+        await fsPromises.writeFile(logsFilePath, JSON.stringify(currentData, null, 2), 'utf-8');
+      } catch (writeError: any) {
+        console.error('❌ Erro ao escrever log no arquivo:', writeError);
+        // Não relança o erro para não quebrar a fila
+      }
+    }).catch((error: any) => {
+      // Tratamento de erro na fila para evitar que trave
+      console.error('❌ Erro na fila de escrita de logs:', error);
+    });
+
+    // NÃO aguarda a escrita - fire and forget para não bloquear
+    // A fila garante ordem, mas não bloqueia a execução
   } catch (error) {
     console.error('❌ Erro ao salvar log no JSON:', error);
   }

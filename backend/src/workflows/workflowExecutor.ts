@@ -62,17 +62,21 @@ export async function executeWorkflow(
       executionCount++;
       path.push(currentNode.id);
 
-      // 3.1. Emite evento de nó iniciado
+      // 3.1. Determina o tipo real do nó (pode estar em data.type para compatibilidade com React Flow)
+      const actualNodeType = currentNode.data?.type || currentNode.type;
+      
+      // 3.2. Emite evento de nó iniciado
       if (socket) {
+        console.log(`📤 [Backend] Emitindo workflow_node_started para nó: ${currentNode.id} (tipo: ${actualNodeType})`);
         socket.emit('workflow_node_started', {
           nodeId: currentNode.id,
-          nodeType: currentNode.type,
+          nodeType: actualNodeType,
           nodeName: currentNode.data?.label || currentNode.id,
         });
       }
 
-      // 3.2. Executa nó atual
-      console.log(`🔄 Executando nó: ${currentNode.id} (tipo: ${currentNode.type})`);
+      // 3.3. Executa nó atual
+      console.log(`🔄 Executando nó: ${currentNode.id} (tipo: ${currentNode.type}, tipo real: ${actualNodeType})`);
       const result = await executeNode(currentNode, context, agentManager, socket);
       console.log(`✅ Nó executado: ${currentNode.id}, resultado:`, JSON.stringify(result, null, 2));
       
@@ -85,14 +89,17 @@ export async function executeWorkflow(
         timestamp: new Date().toISOString(),
       });
 
-      // 3.4. Emite evento de nó completado
+      // 3.4. Emite evento de nó completado (usa tipo real do nó)
       if (socket) {
+        const actualNodeType = currentNode.data?.type || currentNode.type;
+        console.log(`📤 [Backend] Emitindo workflow_node_completed para nó: ${currentNode.id} (tipo: ${actualNodeType})`);
         socket.emit('workflow_node_completed', {
           nodeId: currentNode.id,
-          nodeType: currentNode.type,
+          nodeType: actualNodeType,
           nodeName: currentNode.data?.label || currentNode.id,
           result: result,
         });
+        console.log(`✅ [Backend] Evento workflow_node_completed emitido com sucesso para nó: ${currentNode.id}`);
       }
 
       // 3.5. Encontra próximo nó
@@ -101,13 +108,15 @@ export async function executeWorkflow(
       if (!nextEdge) {
         // Sem próximo nó, finaliza
         if (socket) {
+          const actualNodeType = currentNode.data?.type || currentNode.type;
           socket.emit('workflow_node_completed', {
             nodeId: currentNode.id,
-            nodeType: currentNode.type,
+            nodeType: actualNodeType,
             nodeName: currentNode.data?.label || currentNode.id,
             result: result,
             isEnd: true,
           });
+          console.log(`📤 Evento workflow_node_completed emitido (fim do workflow) para nó: ${currentNode.id} (tipo: ${actualNodeType})`);
         }
         break;
       }
@@ -206,6 +215,50 @@ async function executeNode(
   agentManager: AgentManager,
   socket?: Socket
 ): Promise<any> {
+  // Determina o tipo real do nó (pode estar em data.type para compatibilidade com React Flow)
+  // Verifica data.type ANTES de node.type para garantir que nós if-else e user-approval sejam reconhecidos
+  const actualType = node.data?.type || node.type;
+  
+  // Se o tipo real for if-else ou user-approval, usa ele diretamente
+  if (actualType === 'if-else' || actualType === 'user-approval') {
+    switch (actualType) {
+      case 'if-else':
+        // Nós if-else apenas avaliam condições e retornam resultado
+        // A seleção da edge correta é feita na função findNextEdge
+        const ifElseConfig = node.data?.config;
+        const conditions = ifElseConfig?.conditions || [];
+        
+        // Avalia cada condição e retorna o resultado
+        let evaluatedCondition: string | null = null;
+        for (const condition of conditions) {
+          if (condition.condition) {
+            // Processa template na condição
+            const processedCondition = processTemplate(condition.condition, {
+              input_user: context.message || '',
+              agent_response: context.lastResult?.response || '',
+            });
+            
+            console.log(`🔍 Avaliando condição if-else: "${processedCondition}"`);
+          }
+        }
+        
+        return {
+          type: 'if-else',
+          evaluated: true,
+          conditionMet: evaluatedCondition !== null,
+          evaluatedCondition: evaluatedCondition,
+        };
+      
+      case 'user-approval':
+        // Nós user-approval aguardam aprovação (não implementado ainda)
+        return {
+          type: 'user-approval',
+          evaluated: true,
+        };
+    }
+  }
+  
+  // Para outros tipos, usa o switch normal
   switch (node.type) {
     case 'agent':
       if (!node.agentName) {
@@ -346,7 +399,60 @@ function findNextEdge(
 ): WorkflowEdge | null {
   const edges = workflow.edges.filter(e => e.source === currentNode.id);
   
-  // Retorna primeira edge sem condição ou com condição atendida
+  // Verifica se o nó atual é do tipo if-else (incluindo verificação em data.type)
+  const actualType = currentNode.data?.type || currentNode.type;
+  if (actualType === 'if-else') {
+    const ifElseConfig = currentNode.data?.config;
+    const conditions = ifElseConfig?.conditions || [];
+    
+    // Para nós if-else, avalia as condições na ordem e retorna a primeira que for verdadeira
+    for (const condition of conditions) {
+      if (condition.condition && condition.id) {
+        // Processa template na condição
+        const processedCondition = processTemplate(condition.condition, {
+          input_user: context.message || '',
+          agent_response: context.lastResult?.response || '',
+        });
+        
+        // Avalia a condição (implementação simplificada por enquanto)
+        // TODO: Implementar avaliação real usando CEL ou outra biblioteca
+        const conditionMet = evaluateIfElseCondition(processedCondition, context);
+        
+        if (conditionMet) {
+          // Encontra a edge correspondente a esta condição
+          // O ID da edge deve ser no formato: source-condition-{conditionId}
+          const conditionEdgeId = `source-condition-${condition.id}`;
+          const conditionEdge = edges.find(e => 
+            e.id.includes(conditionEdgeId) || 
+            e.id.includes(`source-${condition.id}`) ||
+            e.id === `reactflow__edge-${currentNode.id}source-condition-${condition.id}`
+          );
+          
+          if (conditionEdge) {
+            console.log(`✅ Condição if-else atendida: "${condition.caseName || condition.id}", seguindo para edge: ${conditionEdge.id}`);
+            return conditionEdge;
+          }
+        }
+      }
+    }
+    
+    // Se nenhuma condição foi atendida, retorna a edge "else"
+    const elseEdge = edges.find(e => 
+      e.id.includes('source-else') ||
+      e.id === `reactflow__edge-${currentNode.id}source-else`
+    );
+    
+    if (elseEdge) {
+      console.log(`✅ Nenhuma condição atendida, seguindo para edge else: ${elseEdge.id}`);
+      return elseEdge;
+    }
+    
+    // Fallback: retorna primeira edge se não encontrou else
+    console.warn(`⚠️ Nenhuma edge else encontrada para nó if-else ${currentNode.id}, usando primeira edge`);
+    return edges.length > 0 ? edges[0] : null;
+  }
+  
+  // Para outros tipos de nós, retorna primeira edge sem condição ou com condição atendida
   for (const edge of edges) {
     if (!edge.condition || evaluateEdgeCondition(edge.condition, context)) {
       return edge;
@@ -395,6 +501,49 @@ function evaluateEdgeCondition(
     default:
       return true;
   }
+}
+
+/**
+ * Avalia condição de if-else
+ * Por enquanto, implementação simplificada que detecta condições básicas
+ */
+function evaluateIfElseCondition(
+  condition: string,
+  context: ExecutionContext
+): boolean {
+  if (!condition) {
+    return false;
+  }
+
+  // Converte condição para minúsculas para comparação
+  const lowerCondition = condition.toLowerCase();
+  const inputUser = (context.message || '').toLowerCase();
+  const agentResponse = (context.lastResult?.response || '').toLowerCase();
+
+  // Substitui variáveis na condição
+  let processedCondition = condition;
+  processedCondition = processedCondition.replace(/\{\{\s*input_user\s*\}\}/gi, context.message || '');
+  processedCondition = processedCondition.replace(/\{\{\s*agent_response\s*\}\}/gi, context.lastResult?.response || '');
+
+  // Detecção básica de condições comuns
+  // Exemplo: "mais de 10" -> verifica se input_user tem mais de 10 caracteres
+  if (lowerCondition.includes('mais de') || lowerCondition.includes('maior que')) {
+    const match = processedCondition.match(/(\d+)/);
+    if (match) {
+      const number = parseInt(match[1], 10);
+      const length = (context.message || '').length;
+      if (lowerCondition.includes('caracter') || lowerCondition.includes('caractere')) {
+        return length > number;
+      }
+      // Por padrão, verifica comprimento do texto
+      return length > number;
+    }
+  }
+
+  // Condição sempre verdadeira por padrão (para desenvolvimento)
+  // TODO: Implementar avaliação real usando CEL (Common Expression Language) ou outra biblioteca
+  console.warn(`⚠️ Avaliação de condição if-else não totalmente implementada: "${condition}"`);
+  return false; // Por padrão, retorna false para seguir para o else
 }
 
 /**
