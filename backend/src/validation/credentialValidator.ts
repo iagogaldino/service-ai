@@ -32,6 +32,10 @@ export function validateLLMCredentials(
       return { valid: false, error: 'StackSpot Client Secret não configurado' };
     }
     return { valid: true };
+  } else if (provider === 'ollama') {
+    // Ollama não precisa de credenciais, apenas verifica se está configurado
+    // A validação real será feita tentando conectar ao servidor Ollama
+    return { valid: true };
   }
 
   return { valid: false, error: `Provider "${provider}" não suportado` };

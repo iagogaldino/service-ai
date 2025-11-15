@@ -35693,5 +35693,159 @@
     "meta": {
       "count": 1
     }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.619Z",
+    "level": "info",
+    "message": "Carregando configuração de agentes",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\src\\agents\\agents.json"
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.619Z",
+    "level": "info",
+    "message": "Agentes carregados do arquivo",
+    "meta": {
+      "count": 5
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Threads carregadas do storage",
+    "meta": {
+      "count": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:12.620Z",
+    "level": "info",
+    "message": "Execuções carregadas do storage",
+    "meta": {
+      "count": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.522Z",
+    "level": "info",
+    "message": "Carregando configuração de agentes",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\src\\agents\\agents.json"
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.523Z",
+    "level": "info",
+    "message": "Agentes carregados do arquivo",
+    "meta": {
+      "count": 5
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.523Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.523Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.523Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.529Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.529Z",
+    "level": "info",
+    "message": "Execuções carregadas do storage",
+    "meta": {
+      "count": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.529Z",
+    "level": "info",
+    "message": "Storage carregado do disco",
+    "meta": {
+      "file": "C:\\Users\\iago_\\Desktop\\Projects\\ServiceIA\\backend\\node_modules\\stackspotdelsuc-sdk\\data\\stackspot-storage.json",
+      "threads": 1
+    }
+  },
+  {
+    "timestamp": "2025-11-15T15:01:39.529Z",
+    "level": "info",
+    "message": "Threads carregadas do storage",
+    "meta": {
+      "count": 1
+    }
   }
 ]

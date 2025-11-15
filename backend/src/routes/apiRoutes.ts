@@ -380,11 +380,19 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
         };
       }
       
+      // Prepara resposta com informações de Ollama
+      let ollamaConfig: any = {
+        configured: true, // Ollama não precisa de credenciais
+        baseUrl: config?.ollamaBaseUrl || 'http://localhost:11434',
+        defaultModel: config?.ollamaDefaultModel || 'llama2'
+      };
+      
       // Retorna formato completo esperado pelo frontend
       res.json({
         llmProvider: config?.llmProvider || 'stackspot',
         openai: openaiConfig,
         stackspot: stackspotConfig,
+        ollama: ollamaConfig,
         port: config?.port || 3000,
         lastUpdated: config?.lastUpdated || null
       });
@@ -399,11 +407,11 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
    */
   app.post('/api/config', async (req: Request, res: Response) => {
     try {
-      const { llmProvider, openaiApiKey, stackspotClientId, stackspotClientSecret, stackspotRealm, port } = req.body;
+      const { llmProvider, openaiApiKey, stackspotClientId, stackspotClientSecret, stackspotRealm, ollamaBaseUrl, ollamaDefaultModel, port } = req.body;
       
       // Valida provider
-      if (!llmProvider || (llmProvider !== 'openai' && llmProvider !== 'stackspot')) {
-        return res.status(400).json({ error: 'Provider deve ser "openai" ou "stackspot"' });
+      if (!llmProvider || (llmProvider !== 'openai' && llmProvider !== 'stackspot' && llmProvider !== 'ollama')) {
+        return res.status(400).json({ error: 'Provider deve ser "openai", "stackspot" ou "ollama"' });
       }
       
       // Valida credenciais apenas do provider que está sendo configurado
@@ -440,7 +448,7 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
       // Atualiza configuração preservando todas as credenciais existentes
       const newConfig: AppConfig = {
         ...existingConfig,
-        llmProvider: llmProvider as 'openai' | 'stackspot',
+        llmProvider: llmProvider as 'openai' | 'stackspot' | 'ollama',
         port: port || existingConfig.port || 3000
       };
       
@@ -449,8 +457,7 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
         if (openaiApiKey) {
           newConfig.openaiApiKey = openaiApiKey.trim();
         }
-        // Mantém credenciais do StackSpot se existirem
-        // (não remove mais)
+        // Mantém credenciais dos outros providers se existirem
       } else if (llmProvider === 'stackspot') {
         if (stackspotClientId) {
           newConfig.stackspotClientId = stackspotClientId.trim();
@@ -461,8 +468,15 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
         if (stackspotRealm) {
           newConfig.stackspotRealm = stackspotRealm.trim() || 'stackspot-freemium';
         }
-        // Mantém credenciais do OpenAI se existirem
-        // (não remove mais)
+        // Mantém credenciais dos outros providers se existirem
+      } else if (llmProvider === 'ollama') {
+        if (ollamaBaseUrl) {
+          newConfig.ollamaBaseUrl = ollamaBaseUrl.trim();
+        }
+        if (ollamaDefaultModel) {
+          newConfig.ollamaDefaultModel = ollamaDefaultModel.trim();
+        }
+        // Mantém credenciais dos outros providers se existirem
       }
       
       // Valida credenciais antes de salvar e reinicializar
@@ -522,7 +536,7 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
               setThreadId(socket.id, thread.id);
               
               // Emite mensagem de sucesso
-              const providerName = llmProvider === 'openai' ? 'OpenAI' : 'StackSpot';
+              const providerName = llmProvider === 'openai' ? 'OpenAI' : llmProvider === 'stackspot' ? 'StackSpot' : 'Ollama';
               socket.emit('config_saved', {
                 type: 'config_saved',
                 message: `✅ ${providerName} configurado com sucesso!`,
@@ -544,6 +558,8 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
         credentialPreview = newConfig.openaiApiKey.substring(0, 7) + '...' + newConfig.openaiApiKey.substring(newConfig.openaiApiKey.length - 4);
       } else if (llmProvider === 'stackspot' && newConfig.stackspotClientId) {
         credentialPreview = newConfig.stackspotClientId.substring(0, 8) + '...' + newConfig.stackspotClientId.substring(newConfig.stackspotClientId.length - 4);
+      } else if (llmProvider === 'ollama') {
+        credentialPreview = `${newConfig.ollamaBaseUrl || 'http://localhost:11434'} (${newConfig.ollamaDefaultModel || 'llama2'})`;
       }
       
       res.json({
