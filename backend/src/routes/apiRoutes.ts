@@ -30,6 +30,14 @@ import { LLMAdapter } from '../llm/adapters/LLMAdapter';
 import { AgentManager } from '../agents/agentManager';
 import { initializeAgents } from '../agents/config';
 import { setThreadId } from '../services/threadService';
+import {
+  getAllModels,
+  getModelsByProvider,
+  updateProviderModels,
+  updateAllProviderModels,
+  shouldUpdateProvider,
+  loadModelsDatabase,
+} from '../services/modelService';
 
 /**
  * Dependências necessárias para as rotas
@@ -444,6 +452,7 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
       if (llmProvider === 'stackspot' && !stackspotClientId && !existingConfig.stackspotClientId) {
         return res.status(400).json({ error: 'StackSpot Client ID e Client Secret são obrigatórios. Forneça as credenciais para configurar o StackSpot.' });
       }
+      // Ollama não precisa de credenciais, sempre pode ser selecionado
       
       // Atualiza configuração preservando todas as credenciais existentes
       const newConfig: AppConfig = {
@@ -571,6 +580,109 @@ export function setupApiRoutes(app: Router, deps: ApiRoutesDependencies): void {
     } catch (error: any) {
       console.error('Erro ao salvar configuração:', error);
       res.status(500).json({ error: error.message || 'Erro ao salvar configuração' });
+    }
+  });
+
+  // ==================== Rotas de Modelos ====================
+  
+  /**
+   * GET /api/models
+   * Lista todos os modelos disponíveis
+   */
+  app.get('/api/models', async (_req: Request, res: Response) => {
+    try {
+      const models = getAllModels();
+      const db = loadModelsDatabase();
+      
+      res.json({
+        success: true,
+        models,
+        providers: db.providers,
+        lastUpdated: db.lastUpdated,
+      });
+    } catch (error: any) {
+      console.error('Erro ao buscar modelos:', error);
+      res.status(500).json({ error: error.message || 'Erro ao buscar modelos' });
+    }
+  });
+
+  /**
+   * GET /api/models/:provider
+   * Lista modelos de um provider específico
+   */
+  app.get('/api/models/:provider', async (req: Request, res: Response) => {
+    try {
+      const provider = req.params.provider as 'openai' | 'stackspot' | 'ollama';
+      
+      if (!['openai', 'stackspot', 'ollama'].includes(provider)) {
+        return res.status(400).json({ error: 'Provider inválido. Use: openai, stackspot ou ollama' });
+      }
+
+      const models = getModelsByProvider(provider);
+      const db = loadModelsDatabase();
+      const providerInfo = db.providers[provider];
+      
+      res.json({
+        success: true,
+        provider,
+        models,
+        lastFetched: providerInfo?.lastFetched || null,
+        count: models.length,
+        shouldUpdate: shouldUpdateProvider(provider),
+      });
+    } catch (error: any) {
+      console.error('Erro ao buscar modelos do provider:', error);
+      res.status(500).json({ error: error.message || 'Erro ao buscar modelos' });
+    }
+  });
+
+  /**
+   * POST /api/models/update/:provider
+   * Atualiza modelos de um provider específico
+   */
+  app.post('/api/models/update/:provider', async (req: Request, res: Response) => {
+    try {
+      const provider = req.params.provider as 'openai' | 'stackspot' | 'ollama';
+      
+      if (!['openai', 'stackspot', 'ollama'].includes(provider)) {
+        return res.status(400).json({ error: 'Provider inválido. Use: openai, stackspot ou ollama' });
+      }
+
+      const count = await updateProviderModels(provider);
+      const models = getModelsByProvider(provider);
+      
+      res.json({
+        success: true,
+        message: `${count} modelo(s) do ${provider} atualizado(s) com sucesso`,
+        provider,
+        count,
+        models,
+      });
+    } catch (error: any) {
+      console.error('Erro ao atualizar modelos:', error);
+      res.status(500).json({ error: error.message || 'Erro ao atualizar modelos' });
+    }
+  });
+
+  /**
+   * POST /api/models/update-all
+   * Atualiza modelos de todos os providers
+   */
+  app.post('/api/models/update-all', async (_req: Request, res: Response) => {
+    try {
+      const results = await updateAllProviderModels();
+      const db = loadModelsDatabase();
+      
+      res.json({
+        success: true,
+        message: 'Modelos atualizados com sucesso',
+        results,
+        providers: db.providers,
+        totalModels: getAllModels().length,
+      });
+    } catch (error: any) {
+      console.error('Erro ao atualizar todos os modelos:', error);
+      res.status(500).json({ error: error.message || 'Erro ao atualizar modelos' });
     }
   });
 }

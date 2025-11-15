@@ -68,6 +68,73 @@ export class ApiError extends Error {
 }
 
 /**
+ * Configuração de LLM
+ */
+export interface LLMConfig {
+  llmProvider: 'openai' | 'stackspot' | 'ollama';
+  openai: {
+    configured: boolean;
+    apiKeyPreview: string | null;
+  };
+  stackspot: {
+    configured: boolean;
+    clientIdPreview: string | null;
+    realm: string;
+  };
+  ollama: {
+    configured: boolean;
+    baseUrl: string;
+    defaultModel: string;
+  };
+  port: number;
+  lastUpdated: string | null;
+}
+
+/**
+ * Obtém a configuração atual de LLM
+ */
+export async function getLLMConfig(): Promise<LLMConfig> {
+  return fetchApi<LLMConfig>('/api/config');
+}
+
+/**
+ * Atualiza a configuração de LLM
+ */
+export interface UpdateLLMConfigRequest {
+  llmProvider: 'openai' | 'stackspot' | 'ollama';
+  openaiApiKey?: string;
+  stackspotClientId?: string;
+  stackspotClientSecret?: string;
+  stackspotRealm?: string;
+  ollamaBaseUrl?: string;
+  ollamaDefaultModel?: string;
+  port?: number;
+}
+
+export interface UpdateLLMConfigResponse {
+  success: boolean;
+  message: string;
+  llmProvider: 'openai' | 'stackspot' | 'ollama';
+  credentialPreview?: string;
+  error?: string;
+}
+
+/**
+ * Salva a configuração de LLM
+ */
+export async function updateLLMConfig(
+  config: UpdateLLMConfigRequest
+): Promise<UpdateLLMConfigResponse> {
+  return fetchApi<UpdateLLMConfigResponse>(
+    '/api/config',
+    {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }
+  );
+}
+
+/**
  * Função auxiliar para fazer requisições HTTP
  */
 async function fetchApi<T>(
@@ -233,6 +300,88 @@ export async function deleteAgent(
     `/api/agents/${encodeURIComponent(agentName)}`,
     {
       method: 'DELETE',
+    }
+  );
+}
+
+/**
+ * Modelos de LLM
+ */
+export interface LLMModel {
+  id: string;
+  name: string;
+  provider: 'openai' | 'stackspot' | 'ollama';
+  description?: string;
+  contextLength?: number;
+  maxTokens?: number;
+  supportsStreaming?: boolean;
+  supportsTools?: boolean;
+}
+
+export interface ModelsResponse {
+  success: boolean;
+  models: LLMModel[];
+  providers: {
+    openai?: { lastFetched: string; count: number };
+    stackspot?: { lastFetched: string; count: number };
+    ollama?: { lastFetched: string; count: number };
+  };
+  lastUpdated: string;
+}
+
+export interface ProviderModelsResponse {
+  success: boolean;
+  provider: 'openai' | 'stackspot' | 'ollama';
+  models: LLMModel[];
+  lastFetched: string | null;
+  count: number;
+  shouldUpdate: boolean;
+}
+
+/**
+ * Obtém todos os modelos disponíveis
+ */
+export async function getAllModels(): Promise<ModelsResponse> {
+  return fetchApi<ModelsResponse>('/api/models');
+}
+
+/**
+ * Obtém modelos de um provider específico
+ */
+export async function getModelsByProvider(
+  provider: 'openai' | 'stackspot' | 'ollama'
+): Promise<ProviderModelsResponse> {
+  return fetchApi<ProviderModelsResponse>(`/api/models/${provider}`);
+}
+
+/**
+ * Atualiza modelos de um provider específico
+ */
+export async function updateProviderModels(
+  provider: 'openai' | 'stackspot' | 'ollama'
+): Promise<ProviderModelsResponse> {
+  return fetchApi<ProviderModelsResponse>(
+    `/api/models/update/${provider}`,
+    {
+      method: 'POST',
+    }
+  );
+}
+
+/**
+ * Atualiza modelos de todos os providers
+ */
+export async function updateAllModels(): Promise<{
+  success: boolean;
+  message: string;
+  results: { [key: string]: number };
+  providers: any;
+  totalModels: number;
+}> {
+  return fetchApi(
+    '/api/models/update-all',
+    {
+      method: 'POST',
     }
   );
 }

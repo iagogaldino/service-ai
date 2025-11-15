@@ -124,7 +124,7 @@ async function handleConnection(socket: Socket): Promise<void> {
 async function handleConnectionWithoutAdapter(socket: Socket): Promise<void> {
   const config = loadConfigFromJson();
   const provider = config?.llmProvider || 'stackspot';
-  const providerName = provider === 'openai' ? 'OpenAI' : 'StackSpot';
+  const providerName = provider === 'openai' ? 'OpenAI' : provider === 'stackspot' ? 'StackSpot' : 'Ollama';
   
   socket.emit('config_required', {
     type: 'config_required',

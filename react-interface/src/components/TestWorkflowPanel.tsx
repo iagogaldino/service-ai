@@ -34,7 +34,8 @@ const TestWorkflowPanel: React.FC<TestWorkflowPanelProps> = ({
   edges, 
   isClosing = false,
   onClose,
-  onWorkflowEvent
+  onWorkflowEvent,
+  onExecutionTime
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -101,6 +102,48 @@ const TestWorkflowPanel: React.FC<TestWorkflowPanelProps> = ({
       setIsProcessing(false);
     });
 
+    // Listeners para medição de tempo de execução
+    newSocket.on('agent_execution_start', (data: { agentName: string; agentId: string; runId: string; startTime: number }) => {
+      console.log(`⏱️ Execução iniciada para agente "${data.agentName}" em ${new Date(data.startTime).toLocaleTimeString()}`);
+    });
+
+    newSocket.on('agent_execution_end', (data: { 
+      agentName: string; 
+      agentId: string; 
+      runId: string; 
+      startTime: number; 
+      endTime: number; 
+      duration: number; 
+      durationSeconds: string;
+    }) => {
+      console.log(`⏱️ Execução concluída para agente "${data.agentName}" em ${data.durationSeconds}s (${data.duration}ms)`);
+      
+      // Adiciona mensagem informativa sobre o tempo de execução
+      const executionMessage: Message = {
+        id: `execution-${data.runId}`,
+        role: 'assistant',
+        content: `⏱️ Agente "${data.agentName}" executado em ${data.durationSeconds}s`,
+        timestamp: new Date(data.endTime),
+      };
+      setMessages((prev) => [...prev, executionMessage]);
+      
+      // Encontra o nó correspondente ao agente e notifica o tempo de execução
+      if (onExecutionTime) {
+        // Tenta encontrar pelo nome do agente (mais comum em workflows)
+        const agentNode = nodes.find(node => 
+          node.data.type === 'agent' && 
+          ((node.data.config as any)?.name === data.agentName || 
+           (node.data.config as any)?.stackspotAgentId === data.agentId ||
+           node.data.label === data.agentName)
+        );
+        if (agentNode) {
+          onExecutionTime(agentNode.id, data.duration);
+        } else {
+          console.warn(`Nó não encontrado para agente "${data.agentName}" (ID: ${data.agentId})`);
+        }
+      }
+    });
+
     // Listeners para eventos de workflow
     newSocket.on('workflow_started', () => {
       // Limpa estados anteriores quando um novo workflow inicia
@@ -114,6 +157,7 @@ const TestWorkflowPanel: React.FC<TestWorkflowPanelProps> = ({
     });
 
     newSocket.on('workflow_node_started', (data: { nodeId: string; nodeType: string; nodeName: string }) => {
+      console.log('📥 [Frontend] Evento workflow_node_started recebido:', data);
       if (onWorkflowEvent) {
         onWorkflowEvent({
           type: 'node_started',
@@ -123,6 +167,7 @@ const TestWorkflowPanel: React.FC<TestWorkflowPanelProps> = ({
     });
 
     newSocket.on('workflow_node_completed', (data: { nodeId: string; nodeType: string; nodeName: string; isEnd?: boolean }) => {
+      console.log('📥 [Frontend] Evento workflow_node_completed recebido:', data);
       if (onWorkflowEvent) {
         onWorkflowEvent({
           type: 'node_completed',
@@ -148,7 +193,7 @@ const TestWorkflowPanel: React.FC<TestWorkflowPanelProps> = ({
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Erro: ${error.message || 'Erro desconhecido'}`,
+        content: error.message || 'Erro desconhecido',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -421,11 +466,12 @@ const TestWorkflowPanel: React.FC<TestWorkflowPanelProps> = ({
                       padding: '12px 16px',
                       borderRadius: '12px',
                       backgroundColor:
-                        message.role === 'user' ? '#3b82f6' : '#2a2a2a',
+                        message.role === 'user' ? '#3b82f6' : message.content.toLowerCase().includes('erro') || message.content.toLowerCase().includes('error') ? '#7f1d1d' : '#2a2a2a',
                       color: '#ffffff',
                       fontSize: '14px',
                       lineHeight: '1.5',
                       wordWrap: 'break-word',
+                      whiteSpace: 'pre-wrap',
                     }}
                   >
                     {message.content}

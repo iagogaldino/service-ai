@@ -1,0 +1,93 @@
+{
+  "models": [
+    {
+      "id": "gpt-4-turbo-preview",
+      "name": "gpt-4-turbo-preview",
+      "provider": "openai",
+      "description": "GPT-4 Turbo Preview - Modelo mais avançado da OpenAI",
+      "contextLength": 128000,
+      "maxTokens": 4096,
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "gpt-4",
+      "name": "gpt-4",
+      "provider": "openai",
+      "description": "GPT-4 - Modelo padrão GPT-4",
+      "contextLength": 8192,
+      "maxTokens": 4096,
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "gpt-4-32k",
+      "name": "gpt-4-32k",
+      "provider": "openai",
+      "description": "GPT-4 32K - Contexto estendido",
+      "contextLength": 32768,
+      "maxTokens": 4096,
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "gpt-3.5-turbo",
+      "name": "gpt-3.5-turbo",
+      "provider": "openai",
+      "description": "GPT-3.5 Turbo - Modelo rápido e eficiente",
+      "contextLength": 16385,
+      "maxTokens": 4096,
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "gpt-3.5-turbo-16k",
+      "name": "gpt-3.5-turbo-16k",
+      "provider": "openai",
+      "description": "GPT-3.5 Turbo 16K - Contexto estendido",
+      "contextLength": 16385,
+      "maxTokens": 4096,
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "default",
+      "name": "default",
+      "provider": "stackspot",
+      "description": "Modelo padrão do StackSpot",
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "gpt-oss:20b",
+      "name": "gpt-oss:20b",
+      "provider": "ollama",
+      "description": "Modelo Ollama: gpt-oss:20b",
+      "supportsStreaming": true,
+      "supportsTools": true
+    },
+    {
+      "id": "llama3:latest",
+      "name": "llama3:latest",
+      "provider": "ollama",
+      "description": "Modelo Ollama: llama3:latest",
+      "supportsStreaming": true,
+      "supportsTools": true
+    }
+  ],
+  "lastUpdated": "2025-11-15T15:39:17.239Z",
+  "providers": {
+    "ollama": {
+      "lastFetched": "2025-11-15T15:39:17.239Z",
+      "count": 2
+    },
+    "openai": {
+      "lastFetched": "2025-11-15T15:36:52.460Z",
+      "count": 5
+    },
+    "stackspot": {
+      "lastFetched": "2025-11-15T15:36:52.517Z",
+      "count": 1
+    }
+  }
+}

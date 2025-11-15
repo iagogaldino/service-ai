@@ -12,7 +12,7 @@ import fs from 'fs';
  */
 export interface AppConfig {
   // Provider escolhido
-  llmProvider?: 'openai' | 'stackspot';
+  llmProvider?: 'openai' | 'stackspot' | 'ollama';
   
   // Configuração OpenAI
   openaiApiKey?: string;
@@ -21,6 +21,10 @@ export interface AppConfig {
   stackspotClientId?: string;
   stackspotClientSecret?: string;
   stackspotRealm?: string;
+  
+  // Configuração Ollama
+  ollamaBaseUrl?: string; // URL base do Ollama (padrão: http://localhost:11434)
+  ollamaDefaultModel?: string; // Modelo padrão (padrão: llama2)
   
   // Outras configurações
   port?: number;

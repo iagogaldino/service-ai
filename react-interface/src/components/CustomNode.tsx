@@ -159,6 +159,16 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
             }}>
               {userApprovalConfig?.name || data.label}
             </div>
+            {data.executionTime !== undefined && (
+              <div style={{
+                fontSize: '10px',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontWeight: 500,
+                marginTop: '2px',
+              }}>
+                ⏱️ {(data.executionTime / 1000).toFixed(2)}s
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -187,15 +197,25 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
             }}>
               {data.label}
             </div>
-            {data.type === 'agent' && (
-              <div style={{
-                fontSize: '12px',
-                color: '#9ca3af',
-                fontWeight: 400,
-              }}>
-                Agent
-              </div>
-            )}
+          {data.type === 'agent' && (
+            <div style={{
+              fontSize: '12px',
+              color: '#9ca3af',
+              fontWeight: 400,
+            }}>
+              Agent
+            </div>
+          )}
+          {data.executionTime !== undefined && (
+            <div style={{
+              fontSize: '11px',
+              color: '#3b82f6',
+              fontWeight: 500,
+              marginTop: '4px',
+            }}>
+              ⏱️ {(data.executionTime / 1000).toFixed(2)}s
+            </div>
+          )}
           </div>
         </div>
       )}

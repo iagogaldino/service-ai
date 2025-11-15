@@ -17,7 +17,7 @@ export type LogType =
   | 'monitoring'
   | 'agent_prompt';
 
-export type LLMProvider = 'openai' | 'stackspot';
+export type LLMProvider = 'openai' | 'stackspot' | 'ollama';
 
 /**
  * Interface para informações de uso de tokens

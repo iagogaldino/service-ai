@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Book, Trash2, Plus, Pencil, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Book, Trash2, Plus, Pencil, ChevronDown, ChevronUp, ExternalLink, RefreshCw } from 'lucide-react';
 import { AgentConfig, CustomNode, ShouldUseRule } from '../types';
 import VariableAutocomplete from './VariableAutocomplete';
+import { getModelsByProvider, updateProviderModels, getLLMConfig, LLMModel } from '../services/apiService';
 // Removido: useGroups - não há mais grupos
 
 interface AgentConfigPanelProps {
@@ -50,6 +51,56 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
     continueOnError: false,
     writeToConversationHistory: true,
   });
+  const [availableModels, setAvailableModels] = useState<LLMModel[]>([]);
+  const [currentProvider, setCurrentProvider] = useState<'openai' | 'stackspot' | 'ollama'>('openai');
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isUpdatingModels, setIsUpdatingModels] = useState(false);
+
+  // Carrega modelos do provider atual
+  useEffect(() => {
+    loadModels();
+  }, []);
+
+  const loadModels = async () => {
+    try {
+      setIsLoadingModels(true);
+      // Busca o provider atual
+      const llmConfig = await getLLMConfig();
+      setCurrentProvider(llmConfig.llmProvider);
+      
+      // Busca modelos do provider
+      const response = await getModelsByProvider(llmConfig.llmProvider);
+      setAvailableModels(response.models);
+      
+      // Se não há modelos ou precisa atualizar, atualiza automaticamente
+      if (response.models.length === 0 || response.shouldUpdate) {
+        await updateModels(llmConfig.llmProvider);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar modelos:', error);
+      // Fallback para modelos padrão
+      setAvailableModels([
+        { id: 'gpt-4-turbo-preview', name: 'gpt-4-turbo-preview', provider: 'openai' },
+        { id: 'gpt-4', name: 'gpt-4', provider: 'openai' },
+        { id: 'gpt-3.5-turbo', name: 'gpt-3.5-turbo', provider: 'openai' },
+      ]);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const updateModels = async (provider: 'openai' | 'stackspot' | 'ollama') => {
+    try {
+      setIsUpdatingModels(true);
+      const response = await updateProviderModels(provider);
+      setAvailableModels(response.models);
+      console.log(`✅ ${response.count} modelo(s) atualizado(s)`);
+    } catch (error) {
+      console.error('Erro ao atualizar modelos:', error);
+    } finally {
+      setIsUpdatingModels(false);
+    }
+  };
 
   const handleChange = (field: keyof AgentConfig, value: any) => {
     const newConfig = { ...config, [field]: value };
@@ -325,18 +376,48 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#ffffff',
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '8px',
             }}>
-              Model
-          </label>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#ffffff',
+              }}>
+                Model ({currentProvider})
+              </label>
+              <button
+                onClick={() => updateModels(currentProvider)}
+                disabled={isUpdatingModels || isLoadingModels}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '4px',
+                  color: '#9ca3af',
+                  fontSize: '12px',
+                  cursor: isUpdatingModels || isLoadingModels ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  opacity: isUpdatingModels || isLoadingModels ? 0.5 : 1,
+                }}
+                title="Atualizar modelos"
+              >
+                <RefreshCw size={12} style={{
+                  animation: isUpdatingModels ? 'spin 1s linear infinite' : 'none',
+                }} />
+                {isUpdatingModels ? 'Atualizando...' : 'Atualizar'}
+              </button>
+            </div>
           <select
             value={config.model}
             onChange={(e) => handleChange('model', e.target.value)}
+            disabled={isLoadingModels}
             style={{
               width: '100%',
               padding: '10px 12px',
@@ -345,12 +426,21 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               borderRadius: '6px',
               color: '#ffffff',
               fontSize: '14px',
-              cursor: 'pointer',
+              cursor: isLoadingModels ? 'not-allowed' : 'pointer',
+              opacity: isLoadingModels ? 0.5 : 1,
             }}
           >
-            <option value="gpt-4-turbo-preview">gpt-4-turbo-preview</option>
-            <option value="gpt-4">gpt-4</option>
-            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            {isLoadingModels ? (
+              <option>Carregando modelos...</option>
+            ) : availableModels.length === 0 ? (
+              <option>Nenhum modelo disponível</option>
+            ) : (
+              availableModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name} {model.description ? `- ${model.description}` : ''}
+                </option>
+              ))
+            )}
           </select>
           </div>
 

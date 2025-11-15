@@ -47,6 +47,7 @@ function App() {
   const [completedNodeIds, setCompletedNodeIds] = useState<Set<string>>(new Set());
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
   const [completedEdgeIds, setCompletedEdgeIds] = useState<Set<string>>(new Set());
+  const [nodeExecutionTimes, setNodeExecutionTimes] = useState<Map<string, number>>(new Map());
 
   // Handler para quando projeto é selecionado
   const handleProjectSelected = async (projectId: string) => {
@@ -408,6 +409,25 @@ function App() {
     }
   }, [historyIndex, history.length]);
 
+  // Limpar mensagens de deploy automaticamente após 5 segundos
+  useEffect(() => {
+    if (deploySuccess) {
+      const timer = setTimeout(() => {
+        setDeploySuccess(null);
+      }, 5000); // 5 segundos
+      return () => clearTimeout(timer);
+    }
+  }, [deploySuccess]);
+
+  useEffect(() => {
+    if (deployError) {
+      const timer = setTimeout(() => {
+        setDeployError(null);
+      }, 8000); // 8 segundos para erros (mais tempo para ler)
+      return () => clearTimeout(timer);
+    }
+  }, [deployError]);
+
   // Função de deploy
   const handleDeploy = useCallback(async () => {
     try {
@@ -463,7 +483,8 @@ function App() {
         const errorMessages = validationErrors.map(
           ({ agent, errors }) => `${agent}: ${errors.join(', ')}`
         ).join('\n');
-        setDeployError(`Erros de validação:\n${errorMessages}`);
+        setDeployError(`⚠️ Não é possível fazer deploy. Configure os agentes primeiro:\n\n${errorMessages}\n\nClique no agente para configurá-lo.`);
+        setIsDeploying(false);
         return;
       }
       
@@ -760,7 +781,7 @@ function App() {
                 const errorMessages = validationErrors.map(
                   ({ agent, errors }) => `${agent}: ${errors.join(', ')}`
                 ).join('\n');
-                setDeployError(`Erros de validação:\n${errorMessages}`);
+                setDeployError(`⚠️ Não é possível testar o workflow. Configure os agentes primeiro:\n\n${errorMessages}\n\nClique no agente para configurá-lo.`);
                 setIsDeploying(false);
                 return;
               }
@@ -786,10 +807,16 @@ function App() {
               const errors: Array<{ agent: string; error: string }> = [];
               
               for (const node of agentNodes) {
-                const config = node.data.config!;
+                const config = node.data.config;
+                
+                // Verifica se config é AgentConfig (tem a propriedade 'instructions')
+                if (!config || !('instructions' in config)) {
+                  console.warn(`Nó ${node.id} não tem configuração de agente válida, pulando...`);
+                  continue;
+                }
                 
                 try {
-                  const backendAgent = transformAgentForBackend(config);
+                  const backendAgent = transformAgentForBackend(config as AgentConfig);
                   const existing = findExistingAgent(backendAgent.name, agentsFile!);
                   
                   if (existing) {
@@ -1032,6 +1059,7 @@ function App() {
                 completedNodeIds={completedNodeIds}
                 activeEdgeId={activeEdgeId}
                 completedEdgeIds={completedEdgeIds}
+                nodeExecutionTimes={nodeExecutionTimes}
               />
             )}
             <BottomBar
@@ -1080,24 +1108,43 @@ function App() {
                   setCompletedNodeIds(new Set());
                   setActiveEdgeId(null);
                   setCompletedEdgeIds(new Set());
+                  setNodeExecutionTimes(new Map());
                 }, 300);
               }}
+              onExecutionTime={(nodeId, duration) => {
+                setNodeExecutionTimes(prev => {
+                  const newMap = new Map(prev);
+                  newMap.set(nodeId, duration);
+                  return newMap;
+                });
+              }}
               onWorkflowEvent={(event) => {
+                console.log('🎯 [App] Evento de workflow recebido:', event);
                 if (event.type === 'node_started' && event.nodeId) {
                   if (event.nodeId === '__clear__') {
                     // Limpa todos os estados quando um novo workflow inicia
+                    console.log('🧹 [App] Limpando estados de workflow');
                     setActiveNodeId(null);
                     setCompletedNodeIds(new Set());
                     setActiveEdgeId(null);
                     setCompletedEdgeIds(new Set());
+                    setNodeExecutionTimes(new Map());
                   } else {
+                    console.log(`▶️ [App] Nó iniciado: ${event.nodeId}`);
                     setActiveNodeId(event.nodeId);
                   }
                 } else if (event.type === 'node_completed' && event.nodeId) {
-                  setCompletedNodeIds(prev => new Set(prev).add(event.nodeId!));
+                  console.log(`✅ [App] Nó completado: ${event.nodeId}`);
+                  setCompletedNodeIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(event.nodeId!);
+                    console.log(`📊 [App] IDs completados:`, Array.from(newSet));
+                    return newSet;
+                  });
                   setActiveNodeId(null);
                 } else if (event.type === 'edge_evaluated' && event.edgeId) {
                   if (event.conditionMet) {
+                    console.log(`🔗 [App] Edge avaliada (condição atendida): ${event.edgeId}`);
                     setActiveEdgeId(event.edgeId);
                     // Marca edge como completada após um delay
                     setTimeout(() => {
@@ -1175,15 +1222,38 @@ function App() {
           position: 'fixed',
           top: '60px',
           right: '20px',
-          padding: '12px 20px',
+          padding: '16px 20px',
           backgroundColor: '#ef4444',
           color: '#ffffff',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
           zIndex: 10000,
-          maxWidth: '400px',
+          maxWidth: '450px',
           whiteSpace: 'pre-wrap',
+          fontSize: '14px',
+          lineHeight: '1.5',
         }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+            <strong style={{ fontSize: '15px' }}>Erro de Validação</strong>
+            <button
+              onClick={() => setDeployError(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontSize: '20px',
+                padding: '0',
+                marginLeft: '12px',
+                lineHeight: '1',
+                opacity: 0.8,
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
+            >
+              ×
+            </button>
+          </div>
           {deployError}
         </div>
       )}

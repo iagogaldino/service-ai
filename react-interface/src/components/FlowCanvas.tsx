@@ -35,6 +35,7 @@ interface FlowCanvasProps {
   completedNodeIds?: Set<string>;
   activeEdgeId?: string | null;
   completedEdgeIds?: Set<string>;
+  nodeExecutionTimes?: Map<string, number>;
 }
 
 const FlowCanvas: React.FC<FlowCanvasProps> = ({ 
@@ -48,6 +49,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   initialNodes,
   initialEdges,
   activeNodeId,
+  nodeExecutionTimes,
   completedNodeIds = new Set(),
   activeEdgeId,
   completedEdgeIds = new Set(),
@@ -148,10 +150,18 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
           };
         }
         
+        // Adiciona tempo de execução se disponível
+        if (nodeExecutionTimes && nodeExecutionTimes.has(node.id)) {
+          updatedNode.data = {
+            ...updatedNode.data,
+            executionTime: nodeExecutionTimes.get(node.id),
+          };
+        }
+        
         return updatedNode;
       })
     );
-  }, [activeNodeId, completedNodeIds, setNodes]);
+  }, [activeNodeId, completedNodeIds, nodeExecutionTimes, setNodes]);
 
   // Aplica estilos visuais às edges baseado no estado de execução
   useEffect(() => {

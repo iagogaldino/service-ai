@@ -46,16 +46,32 @@ export async function saveConversationMessageAsync(
       if (fileContent === '') {
         conversationsData = createEmptyConversationsData();
       } else {
-        conversationsData = JSON.parse(fileContent);
-        if (!conversationsData.conversations) {
-          conversationsData.conversations = [];
+        try {
+          conversationsData = JSON.parse(fileContent);
+          if (!conversationsData.conversations) {
+            conversationsData.conversations = [];
+          }
+        } catch (parseError: any) {
+          // JSON malformado - faz backup e recria arquivo
+          console.error('❌ Erro ao fazer parse do conversations.json (JSON malformado):', parseError.message);
+          const backupPath = `${conversationsFilePath}.backup.${Date.now()}`;
+          try {
+            await fsPromises.copyFile(conversationsFilePath, backupPath);
+            console.log(`💾 Backup do arquivo corrompido salvo em: ${backupPath}`);
+          } catch (backupError) {
+            console.warn('⚠️ Não foi possível criar backup do arquivo corrompido:', backupError);
+          }
+          conversationsData = createEmptyConversationsData();
         }
       }
     } catch (error: any) {
       if (error.code === 'ENOENT') {
+        // Arquivo não existe, cria novo
         conversationsData = createEmptyConversationsData();
       } else {
-        throw error;
+        // Outro erro de leitura
+        console.error('❌ Erro ao ler conversations.json:', error.message);
+        conversationsData = createEmptyConversationsData();
       }
     }
 
@@ -91,9 +107,16 @@ export async function saveConversationMessageAsync(
 
     conversationsData.lastUpdated = new Date().toISOString();
 
-    await fsPromises.writeFile(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('❌ Erro ao salvar mensagem na conversa:', error);
+    // Escreve o arquivo de forma segura
+    try {
+      await fsPromises.writeFile(conversationsFilePath, JSON.stringify(conversationsData, null, 2), 'utf-8');
+    } catch (writeError: any) {
+      console.error('❌ Erro ao escrever conversations.json:', writeError.message);
+      throw writeError;
+    }
+  } catch (error: any) {
+    console.error('❌ Erro ao salvar mensagem na conversa:', error.message || error);
+    // Não propaga o erro para não quebrar o fluxo principal
   }
 }
 

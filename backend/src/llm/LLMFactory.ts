@@ -5,8 +5,9 @@
 import { LLMAdapter } from './adapters/LLMAdapter';
 import { OpenAIAdapter } from './adapters/OpenAIAdapter';
 import { StackSpotAdapter, StackSpotConfig } from './adapters/StackSpotAdapter';
+import { OllamaAdapter, OllamaConfig } from './adapters/OllamaAdapter';
 
-export type LLMProvider = 'openai' | 'stackspot';
+export type LLMProvider = 'openai' | 'stackspot' | 'ollama';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -14,6 +15,7 @@ export interface LLMConfig {
     apiKey: string;
   };
   stackspot?: StackSpotConfig;
+  ollama?: OllamaConfig;
 }
 
 /**
@@ -32,6 +34,9 @@ export function createLLMAdapter(config: LLMConfig): LLMAdapter {
         throw new Error('StackSpot clientId e clientSecret são obrigatórios quando provider é "stackspot"');
       }
       return new StackSpotAdapter(config.stackspot);
+
+    case 'ollama':
+      return new OllamaAdapter(config.ollama);
 
     default:
       throw new Error(`Provider "${config.provider}" não suportado`);

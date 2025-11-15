@@ -43,6 +43,9 @@ export interface CustomNodeData {
   label: string;
   type: ComponentType;
   config?: AgentConfig | IfElseConfig | UserApprovalConfig;
+  isActive?: boolean;
+  isCompleted?: boolean;
+  executionTime?: number;
 }
 
 /**

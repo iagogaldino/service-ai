@@ -94,6 +94,17 @@ if (llmAdapter) {
   });
 }
 
+// Inicializa modelos de LLM em background (não bloqueia o servidor)
+import('./services/modelService').then(({ updateAllProviderModels }) => {
+  updateAllProviderModels().then((results) => {
+    const total = Object.values(results).reduce((sum, count) => sum + count, 0);
+    console.log(`✅ Modelos inicializados: ${total} modelo(s) carregado(s)`);
+  }).catch((err: any) => {
+    console.warn('⚠️ Erro ao inicializar modelos (não crítico):', err.message);
+    // Não bloqueia o servidor se falhar
+  });
+});
+
 // Funções para gerenciar AgentManager (necessárias para as rotas)
 function getAgentManager(): AgentManager | undefined {
   return agentManager;

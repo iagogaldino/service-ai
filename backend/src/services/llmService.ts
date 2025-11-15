@@ -35,6 +35,12 @@ export function initializeLLMAdapter(): void {
             realm: config.stackspotRealm || 'stackspot-freemium',
           }
         : undefined,
+      ollama: config?.ollamaBaseUrl || config?.ollamaDefaultModel
+        ? {
+            baseUrl: config.ollamaBaseUrl,
+            defaultModel: config.ollamaDefaultModel,
+          }
+        : undefined,
     };
 
     llmAdapter = createLLMAdapter(llmConfig);
