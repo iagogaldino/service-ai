@@ -59,24 +59,32 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Atualiza o config quando o node muda (quando seleciona outro agente)
+  // IMPORTANTE: Só atualiza quando o node ID muda, não quando o config muda
+  const previousNodeIdRef = React.useRef<string | undefined>(undefined);
+  
   useEffect(() => {
-    if (node && node.data.config) {
-      setConfig(node.data.config);
-    } else if (node) {
-      setConfig({
-        name: node.data.label || 'Agent',
-        description: '',
-        instructions: '',
-        includeChatHistory: true,
-        model: 'gpt-4-turbo-preview',
-        tools: [],
-        outputFormat: 'text',
-        shouldUse: {
-          type: 'default',
-        },
-      });
+    // Só atualizar se o node ID realmente mudou
+    if (node?.id !== previousNodeIdRef.current) {
+      previousNodeIdRef.current = node?.id;
+      
+      if (node && node.data.config) {
+        setConfig(node.data.config);
+      } else if (node) {
+        setConfig({
+          name: node.data.label || 'Agent',
+          description: '',
+          instructions: '',
+          includeChatHistory: true,
+          model: 'gpt-4-turbo-preview',
+          tools: [],
+          outputFormat: 'text',
+          shouldUse: {
+            type: 'default',
+          },
+        });
+      }
     }
-  }, [node?.id, node?.data.config]);
+  }, [node?.id]); // Só depende do ID do node, não do config
 
   // Carrega modelos do provider atual
   useEffect(() => {
@@ -127,7 +135,11 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   const handleChange = (field: keyof AgentConfig, value: any) => {
     const newConfig = { ...config, [field]: value };
     setConfig(newConfig);
-    onUpdate(node.id, newConfig);
+    // Atualizar de forma assíncrona para não interferir com eventos do navegador (ex: Backspace)
+    // Isso permite que o evento seja processado completamente antes da atualização
+    setTimeout(() => {
+      onUpdate(node.id, newConfig);
+    }, 0);
   };
   
   // Removido: useEffect para grupos - não há mais grupos

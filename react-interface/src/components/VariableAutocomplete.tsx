@@ -25,23 +25,47 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<VariableDefinition[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [cursorPosition, setCursorPosition] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const valueKeyRef = useRef(0); // Key para forçar re-render quando value mudar externamente
+
+  // Sincroniza o textarea quando o prop value mudar externamente
+  // IMPORTANTE: Só sincronizar se o textarea NÃO tiver foco (usuário não está digitando)
+  useEffect(() => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
+      const currentValue = textarea.value || '';
+      const newValue = value || '';
+      const hasFocus = document.activeElement === textarea;
+      
+      // Só atualizar se:
+      // 1. O valor realmente mudou
+      // 2. O textarea NÃO tem foco (usuário não está digitando)
+      // 3. O valor atual do textarea é diferente do novo valor
+      if (currentValue !== newValue && !hasFocus) {
+        const cursorPos = textarea.selectionStart || 0;
+        textarea.value = newValue;
+        valueKeyRef.current += 1;
+        // Restaurar posição do cursor
+        setTimeout(() => {
+          if (textareaRef.current) {
+            const newCursorPos = Math.min(cursorPos, newValue.length);
+            textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          }
+        }, 0);
+      }
+    }
+  }, [value]);
 
   // Atualiza sugestões quando o texto ou posição do cursor muda
   const updateSuggestions = useCallback(() => {
     if (!textareaRef.current) return;
 
-    // Garante que value é uma string válida
-    const safeValue = value || '';
-    
+    const textareaValue = textareaRef.current.value || '';
     const position = textareaRef.current.selectionStart || 0;
-    setCursorPosition(position);
 
-    // Verifica se está digitando dentro de {{ ... }}
-    if (isInsideVariable(safeValue, position)) {
-      const searchText = extractSearchText(safeValue, position);
+    if (isInsideVariable(textareaValue, position)) {
+      const searchText = extractSearchText(textareaValue, position);
       const filtered = filterVariables(searchText);
       
       if (filtered.length > 0) {
@@ -54,25 +78,26 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
     } else {
       setShowSuggestions(false);
     }
-  }, [value]);
-
-  useEffect(() => {
-    updateSuggestions();
-  }, [updateSuggestions]);
+  }, []);
 
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Adiciona listeners para detectar mudanças na seleção
-    textarea.addEventListener('keyup', updateSuggestions);
-    textarea.addEventListener('click', updateSuggestions);
-    textarea.addEventListener('select', updateSuggestions);
+    const handleKeyUp = () => {
+      setTimeout(() => updateSuggestions(), 10);
+    };
+    const handleClick = () => updateSuggestions();
+    const handleSelect = () => updateSuggestions();
+    
+    textarea.addEventListener('keyup', handleKeyUp);
+    textarea.addEventListener('click', handleClick);
+    textarea.addEventListener('select', handleSelect);
 
     return () => {
-      textarea.removeEventListener('keyup', updateSuggestions);
-      textarea.removeEventListener('click', updateSuggestions);
-      textarea.removeEventListener('select', updateSuggestions);
+      textarea.removeEventListener('keyup', handleKeyUp);
+      textarea.removeEventListener('click', handleClick);
+      textarea.removeEventListener('select', handleSelect);
     };
   }, [updateSuggestions]);
 
@@ -92,12 +117,10 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
       suggestionsRef.current.style.visibility = 'visible';
     };
 
-    // Usa requestAnimationFrame para garantir que o DOM está atualizado
     requestAnimationFrame(() => {
       updatePosition();
     });
     
-    // Atualiza posição ao fazer scroll ou redimensionar
     window.addEventListener('scroll', updatePosition, true);
     window.addEventListener('resize', updatePosition);
 
@@ -105,25 +128,147 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [showSuggestions, value]);
+  }, [showSuggestions]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e.target.value);
+    // Obter valor diretamente do evento - não interferir com o comportamento padrão
+    const newValue = e.target.value;
+    // Notificar o componente pai de forma assíncrona para não bloquear
+    requestAnimationFrame(() => {
+      onChange(newValue);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    const beforeValue = textarea?.value || '';
+    const beforeSelectionStart = textarea?.selectionStart || 0;
+    
+    // Permitir Ctrl+Z (undo) e Ctrl+Y (redo) funcionarem normalmente
+    // Também permitir Ctrl+A (selecionar tudo), Ctrl+C (copiar), Ctrl+V (colar), Ctrl+X (cortar)
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'z' || key === 'y' || key === 'a' || key === 'c' || key === 'v' || key === 'x') {
+        // Não fazer nada - deixar o navegador gerenciar esses atalhos
+        if (onKeyDown) {
+          onKeyDown(e);
+        }
+        return;
+      }
+    }
+    
+    // CRÍTICO: Para Backspace e Delete, NUNCA fazer nada além de permitir comportamento padrão
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      // Fechar sugestões se estiverem abertas
+      if (showSuggestions) {
+        setShowSuggestions(false);
+      }
+      
+      // NÃO prevenir comportamento padrão - deixar o navegador apagar normalmente
+      // NÃO chamar onChange aqui - deixar o onChange natural do textarea fazer isso
+      
+      if (onKeyDown) {
+        onKeyDown(e);
+      }
+      
+      // Verificar após um pequeno delay se o valor mudou
+      setTimeout(() => {
+        if (textareaRef.current) {
+          const afterValue = textareaRef.current.value;
+          const afterSelectionStart = textareaRef.current.selectionStart;
+          const beforeSelectionEnd = textarea?.selectionEnd || beforeSelectionStart;
+          const hasSelection = beforeSelectionStart !== beforeSelectionEnd;
+          
+          // Se o valor não mudou mas deveria ter mudado, forçar a atualização manualmente
+          if (beforeValue === afterValue) {
+            let newValue: string;
+            let newCursorPos: number;
+            
+            if (hasSelection) {
+              // Há texto selecionado - apagar a seleção inteira
+              newValue = beforeValue.substring(0, beforeSelectionStart) + beforeValue.substring(beforeSelectionEnd);
+              newCursorPos = beforeSelectionStart;
+            } else if (beforeSelectionStart > 0 && beforeSelectionStart <= beforeValue.length) {
+              // Não há seleção - apagar um caractere antes do cursor
+              newValue = beforeValue.substring(0, beforeSelectionStart - 1) + beforeValue.substring(beforeSelectionStart);
+              newCursorPos = beforeSelectionStart - 1;
+            } else {
+              // Não deveria mudar
+              return;
+            }
+            
+            if (textareaRef.current) {
+              // Usar document.execCommand para manter o histórico de undo/redo
+              // Primeiro, selecionar o texto que precisa ser removido
+              if (hasSelection) {
+                textareaRef.current.setSelectionRange(beforeSelectionStart, beforeSelectionEnd);
+                // Tentar usar deleteCommand para manter o histórico
+                const deleted = document.execCommand('delete', false);
+                if (!deleted) {
+                  // Fallback: atualizar manualmente se execCommand não funcionar
+                  textareaRef.current.value = newValue;
+                  textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                } else {
+                  // Se execCommand funcionou, apenas ajustar a posição do cursor
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                    }
+                  }, 0);
+                }
+              } else {
+                // Para um único caractere, tentar usar deleteCommand
+                textareaRef.current.setSelectionRange(beforeSelectionStart - 1, beforeSelectionStart);
+                const deleted = document.execCommand('delete', false);
+                if (!deleted) {
+                  // Fallback: atualizar manualmente
+                  textareaRef.current.value = newValue;
+                  textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                } else {
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                    }
+                  }, 0);
+                }
+              }
+              
+              // Atualizar o valor via onChange após um pequeno delay para garantir que o undo funcione
+              setTimeout(() => {
+                if (textareaRef.current) {
+                  onChange(textareaRef.current.value);
+                }
+              }, 0);
+            }
+          }
+        }
+      }, 10);
+      
+      return; // Retornar imediatamente sem fazer mais nada
+    }
+    
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      if (onKeyDown) {
+        onKeyDown(e);
+      }
+      return;
+    }
+    
+    // Só interceptar navegação nas sugestões se elas estiverem abertas
     if (showSuggestions && suggestions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % suggestions.length);
+        return;
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+        return;
       } else if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
         insertVariable(suggestions[selectedIndex]);
-      } else if (e.key === 'Escape') {
-        setShowSuggestions(false);
+        return;
       }
     }
     
@@ -135,26 +280,24 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
   const insertVariable = (variable: VariableDefinition) => {
     if (!textareaRef.current) return;
 
-    // Garante que value é uma string válida
-    const safeValue = value || '';
-
     const textarea = textareaRef.current;
+    const currentValue = textarea.value || '';
     const position = textarea.selectionStart || 0;
-    const textBeforeCursor = safeValue.substring(0, position);
-    const textAfterCursor = safeValue.substring(position);
+    const textBeforeCursor = currentValue.substring(0, position);
+    const textAfterCursor = currentValue.substring(position);
     
-    // Encontra onde começa o {{
     const lastOpenBrace = textBeforeCursor.lastIndexOf('{{');
     if (lastOpenBrace === -1) return;
     
-    // Substitui o texto entre {{ e o cursor pela variável completa
-    const beforeVariable = safeValue.substring(0, lastOpenBrace);
+    const beforeVariable = currentValue.substring(0, lastOpenBrace);
     const variableText = `{{ ${variable.name} }}`;
     const newValue = beforeVariable + variableText + textAfterCursor;
     
+    // Atualizar textarea diretamente
+    textarea.value = newValue;
     onChange(newValue);
     
-    // Posiciona o cursor após a variável
+    // Posicionar cursor
     setTimeout(() => {
       if (textareaRef.current) {
         const newPosition = beforeVariable.length + variableText.length;
@@ -172,18 +315,15 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
 
   // Função para destacar variáveis no texto
   const highlightVariables = (text: string) => {
-    // Garante que text é uma string válida
     const safeText = text || '';
     if (!safeText) return [{ text: '', isVariable: false }];
     
-    // Regex para encontrar variáveis {{ nome_variavel }}
     const variableRegex = /\{\{\s*(\w+)\s*\}\}/g;
     const parts: Array<{ text: string; isVariable: boolean }> = [];
     let lastIndex = 0;
     let match;
 
     while ((match = variableRegex.exec(safeText)) !== null) {
-      // Adiciona texto antes da variável
       if (match.index > lastIndex) {
         parts.push({
           text: safeText.substring(lastIndex, match.index),
@@ -191,13 +331,9 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
         });
       }
       
-      // Extrai o nome da variável (sem os espaços e chaves)
       const variableName = match[1];
-      
-      // Verifica se a variável existe na lista de variáveis disponíveis
       const isValidVariable = AVAILABLE_VARIABLE_NAMES.has(variableName);
       
-      // Adiciona a variável (destacada apenas se for válida)
       parts.push({
         text: match[0],
         isVariable: isValidVariable,
@@ -206,7 +342,6 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
       lastIndex = match.index + match[0].length;
     }
     
-    // Adiciona texto restante
     if (lastIndex < safeText.length) {
       parts.push({
         text: safeText.substring(lastIndex),
@@ -217,15 +352,54 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
     return parts.length > 0 ? parts : [{ text: safeText, isVariable: false }];
   };
 
-  const highlightedParts = highlightVariables(value || '');
+  // Obter valor atual do textarea para o highlight - ler diretamente do DOM
+  const getCurrentValue = () => {
+    return textareaRef.current?.value || value || '';
+  };
+  
+  const highlightedParts = highlightVariables(getCurrentValue());
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+    <div 
+      ref={containerRef} 
+      style={{ 
+        position: 'relative', 
+        width: '100%',
+        pointerEvents: 'auto',
+      }}
+    >
       <textarea
+        key={`textarea-${valueKeyRef.current}`}
         ref={textareaRef}
-        value={value || ''}
+        defaultValue={value || ''}
         onChange={handleChange}
+        onInput={(e) => {
+          // onInput é mais confiável que onChange para textarea não controlado
+          handleChange(e as any);
+        }}
         onKeyDown={handleKeyDown}
+        onKeyUp={(e) => {
+          // Para Backspace/Delete, forçar atualização do valor
+          if (e.key === 'Backspace' || e.key === 'Delete') {
+            setTimeout(() => {
+              if (textareaRef.current) {
+                onChange(textareaRef.current.value);
+              }
+            }, 0);
+          }
+          // Atualizar sugestões de forma assíncrona
+          setTimeout(() => updateSuggestions(), 10);
+        }}
+        onSelect={updateSuggestions}
+        onPaste={(e) => {
+          // Deixar o paste acontecer naturalmente, depois atualizar
+          setTimeout(() => {
+            if (textareaRef.current) {
+              onChange(textareaRef.current.value);
+              updateSuggestions();
+            }
+          }, 0);
+        }}
         placeholder={placeholder}
         style={{
           width: '100%',
@@ -234,13 +408,14 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
           backgroundColor: 'transparent',
           border: '1px solid #2a2a2a',
           borderRadius: '6px',
-          color: 'transparent', // Texto transparente para mostrar o overlay
+          color: 'transparent',
           fontSize: '14px',
           fontFamily: 'inherit',
           resize: 'vertical',
           position: 'relative',
-          zIndex: 2,
+          zIndex: 10,
           caretColor: '#ffffff',
+          outline: 'none',
           ...style,
         }}
       />
@@ -259,10 +434,15 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
           fontSize: '14px',
           fontFamily: 'inherit',
           lineHeight: '1.5',
-          zIndex: 1,
+          zIndex: 0,
           overflow: 'hidden',
           border: '1px solid transparent',
           borderRadius: '6px',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          MozUserSelect: 'none',
+          msUserSelect: 'none',
+          touchAction: 'none',
         }}
       >
         {highlightedParts.map((part, index) => (
@@ -296,7 +476,7 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
             maxHeight: '300px',
             overflowY: 'auto',
             overflowX: 'hidden',
-            visibility: 'hidden', // Inicialmente invisível até calcular posição
+            visibility: 'hidden',
           }}
         >
           {suggestions.map((variable, index) => (
@@ -336,4 +516,3 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
 };
 
 export default VariableAutocomplete;
-
