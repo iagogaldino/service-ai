@@ -103,7 +103,7 @@ export async function executeWorkflow(
       }
 
       // 3.5. Encontra próximo nó
-      const nextEdge = findNextEdge(workflow, currentNode, context);
+      const nextEdge = await findNextEdge(workflow, currentNode, context, agentManager, socket);
       
       if (!nextEdge) {
         // Sem próximo nó, finaliza
@@ -392,11 +392,13 @@ async function executeNode(
 /**
  * Encontra próximo edge válido
  */
-function findNextEdge(
+async function findNextEdge(
   workflow: Workflow,
   currentNode: WorkflowNode,
-  context: ExecutionContext
-): WorkflowEdge | null {
+  context: ExecutionContext,
+  agentManager: AgentManager,
+  socket?: Socket
+): Promise<WorkflowEdge | null> {
   const edges = workflow.edges.filter(e => e.source === currentNode.id);
   
   // Verifica se o nó atual é do tipo if-else (incluindo verificação em data.type)
@@ -414,9 +416,8 @@ function findNextEdge(
           agent_response: context.lastResult?.response || '',
         });
         
-        // Avalia a condição (implementação simplificada por enquanto)
-        // TODO: Implementar avaliação real usando CEL ou outra biblioteca
-        const conditionMet = evaluateIfElseCondition(processedCondition, context);
+        // Avalia a condição usando agente LLM especializado
+        const conditionMet = await evaluateIfElseCondition(processedCondition, context, agentManager, socket);
         
         if (conditionMet) {
           // Encontra a edge correspondente a esta condição
@@ -504,10 +505,111 @@ function evaluateEdgeCondition(
 }
 
 /**
- * Avalia condição de if-else
- * Por enquanto, implementação simplificada que detecta condições básicas
+ * Avalia condição de if-else usando um agente LLM especializado
+ * O agente analisa a condição e o contexto para determinar se é verdadeira
  */
-function evaluateIfElseCondition(
+async function evaluateIfElseCondition(
+  condition: string,
+  context: ExecutionContext,
+  agentManager: AgentManager,
+  socket?: Socket
+): Promise<boolean> {
+  if (!condition) {
+    return false;
+  }
+
+  try {
+    const llmAdapter = getLLMAdapter();
+    if (!llmAdapter) {
+      console.warn('⚠️ LLM adapter não disponível, usando avaliação simplificada');
+      return evaluateIfElseConditionSimple(condition, context);
+    }
+
+    // Cria agente especializado para avaliação de condições
+    const conditionAgentConfig: AgentConfig = {
+      name: 'Condition Evaluator',
+      description: 'Agente especializado em avaliar condições lógicas e booleanas',
+      instructions: `Você é um agente especializado em avaliar condições lógicas.
+
+Sua função é analisar uma condição e um contexto, e determinar se a condição é VERDADEIRA ou FALSA.
+
+IMPORTANTE:
+- Você deve responder APENAS com "true" ou "false" (sem aspas, sem explicações)
+- Não adicione nenhum texto adicional, apenas "true" ou "false"
+- Avalie a condição de forma lógica e precisa
+- Considere o contexto fornecido (mensagem do usuário, resposta do agente anterior, etc.)
+
+Exemplos:
+- Condição: "input_user contém 'sim'" + Contexto: mensagem="sim, quero" → Resposta: true
+- Condição: "agent_response tem mais de 100 caracteres" + Contexto: response="texto curto" → Resposta: false
+- Condição: "input_user é um número maior que 10" + Contexto: mensagem="15" → Resposta: true
+
+Avalie a condição fornecida e responda apenas "true" ou "false".`,
+      model: '', // Usa modelo padrão do adapter (string vazia = padrão)
+      tools: [],
+      priority: 0,
+      shouldUse: () => true, // Sempre disponível para avaliação de condições
+    };
+
+    // Prepara o prompt com a condição e o contexto
+    const contextInfo = {
+      input_user: context.message || '',
+      agent_response: context.lastResult?.response || '',
+      last_node: context.lastNode || '',
+      variables: JSON.stringify(context.variables || {}),
+    };
+
+    const evaluationPrompt = `Avalie a seguinte condição:
+
+CONDIÇÃO: "${condition}"
+
+CONTEXTO:
+- Mensagem do usuário (input_user): "${contextInfo.input_user}"
+- Resposta do agente anterior (agent_response): "${contextInfo.agent_response}"
+- Último nó executado: "${contextInfo.last_node}"
+- Variáveis do workflow: ${contextInfo.variables}
+
+Responda APENAS com "true" se a condição for VERDADEIRA, ou "false" se for FALSA.
+Não adicione nenhum texto adicional, apenas "true" ou "false".`;
+
+    // Cria thread temporária para avaliação
+    const thread = await llmAdapter.createThread();
+    
+    // Adiciona mensagem do usuário
+    await llmAdapter.addMessage(thread.id, 'user', evaluationPrompt);
+    
+    // Cria e executa o agente
+    const agentId = await llmAdapter.getOrCreateAgent(conditionAgentConfig);
+    const run = await llmAdapter.createRun(thread.id, agentId, socket);
+    
+    // Aguarda resposta
+    const { message: response } = await llmAdapter.waitForRunCompletion(thread.id, run.id, socket);
+    
+    // Processa resposta - deve ser "true" ou "false"
+    const normalizedResponse = response.trim().toLowerCase();
+    const isTrue = normalizedResponse === 'true' || 
+                   normalizedResponse === 'verdadeiro' ||
+                   normalizedResponse.startsWith('true') ||
+                   normalizedResponse.includes('verdadeiro');
+    
+    console.log(`🔍 Condição avaliada: "${condition}" → ${isTrue ? 'TRUE' : 'FALSE'}`);
+    console.log(`   Resposta do agente: "${response}"`);
+    
+    return isTrue;
+    
+  } catch (error: any) {
+    console.error('❌ Erro ao avaliar condição com agente LLM:', error);
+    console.warn('⚠️ Fallback para avaliação simplificada');
+    // Fallback para avaliação simplificada em caso de erro
+    return evaluateIfElseConditionSimple(condition, context);
+  }
+}
+
+/**
+ * Avaliação simplificada de condição (fallback)
+ * Usada quando o LLM não está disponível ou há erro
+ */
+function evaluateIfElseConditionSimple(
   condition: string,
   context: ExecutionContext
 ): boolean {
@@ -540,10 +642,29 @@ function evaluateIfElseCondition(
     }
   }
 
-  // Condição sempre verdadeira por padrão (para desenvolvimento)
-  // TODO: Implementar avaliação real usando CEL (Common Expression Language) ou outra biblioteca
-  console.warn(`⚠️ Avaliação de condição if-else não totalmente implementada: "${condition}"`);
-  return false; // Por padrão, retorna false para seguir para o else
+  // Verifica se contém palavras-chave
+  if (lowerCondition.includes('contém') || lowerCondition.includes('contains')) {
+    const match = processedCondition.match(/contém\s+['"]([^'"]+)['"]/i) || 
+                  processedCondition.match(/contains\s+['"]([^'"]+)['"]/i);
+    if (match) {
+      const keyword = match[1].toLowerCase();
+      return inputUser.includes(keyword) || agentResponse.includes(keyword);
+    }
+  }
+
+  // Verifica comparações numéricas simples
+  if (lowerCondition.includes('igual a') || lowerCondition.includes('==')) {
+    const match = processedCondition.match(/(\d+)/);
+    if (match) {
+      const number = parseInt(match[1], 10);
+      const inputNumber = parseInt(context.message || '0', 10);
+      return inputNumber === number;
+    }
+  }
+
+  // Por padrão, retorna false
+  console.warn(`⚠️ Condição não reconhecida na avaliação simplificada: "${condition}"`);
+  return false;
 }
 
 /**

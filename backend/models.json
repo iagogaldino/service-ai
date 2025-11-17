@@ -75,18 +75,18 @@
       "supportsTools": true
     }
   ],
-  "lastUpdated": "2025-11-15T15:39:17.239Z",
+  "lastUpdated": "2025-11-17T12:33:39.169Z",
   "providers": {
     "ollama": {
-      "lastFetched": "2025-11-15T15:39:17.239Z",
+      "lastFetched": "2025-11-17T12:33:39.169Z",
       "count": 2
     },
     "openai": {
-      "lastFetched": "2025-11-15T15:36:52.460Z",
+      "lastFetched": "2025-11-17T12:33:39.109Z",
       "count": 5
     },
     "stackspot": {
-      "lastFetched": "2025-11-15T15:36:52.517Z",
+      "lastFetched": "2025-11-17T12:33:39.111Z",
       "count": 1
     }
   }
