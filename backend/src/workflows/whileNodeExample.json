@@ -1,0 +1,20 @@
+{
+  "id": "while-001",
+  "type": "while",
+  "position": { "x": 400, "y": 300 },
+  "data": {
+    "label": "While Loop",
+    "type": "while",
+    "config": {
+      "while": {
+        "condition": "context.iteration < 10",
+        "maxIterations": 100,
+        "steps": [
+          "agent-step-1",
+          "agent-step-2"
+        ]
+      }
+    }
+  }
+}
+

@@ -26,7 +26,7 @@ const iconMap: Record<ComponentType, React.ReactNode> = {
   guardrails: <Shield size={14} fill="white" />,
   mcp: <Grid3x3 size={14} fill="white" />,
   'if-else': <GitBranch size={14} fill="white" />,
-  while: <RotateCw size={14} fill="white" />,
+  while: <RotateCw size={16} strokeWidth={1.5} color="#9ca3af" />,
   'user-approval': <Hand size={14} fill="white" />,
   transform: <ArrowRightLeft size={14} fill="white" />,
   'set-state': <RefreshCw size={14} fill="white" />,
@@ -56,21 +56,29 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
   const ifElseConfig = data.type === 'if-else' ? (data.config as IfElseConfig | undefined) : undefined;
   const userApprovalConfig = data.type === 'user-approval' ? (data.config as UserApprovalConfig | undefined) : undefined;
 
+  // Estilo especial para nó WHILE (estilo OpenAI Build Agents)
+  const isWhileNode = data.type === 'while';
+  
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
-        backgroundColor: '#1a1a1a',
-        border: `1px solid ${selected ? color : '#3a3a3a'}`,
-        borderRadius: '10px',
-        padding: data.type === 'user-approval' ? '0 14px 12px 14px' : '12px 14px',
-        minWidth: '160px',
+        backgroundColor: isWhileNode ? 'transparent' : '#1a1a1a',
+        border: isWhileNode 
+          ? `2px dashed ${selected ? '#9ca3af' : '#6b7280'}` 
+          : `1px solid ${selected ? color : '#3a3a3a'}`,
+        borderRadius: isWhileNode ? '12px' : '10px',
+        padding: data.type === 'user-approval' ? '0 14px 12px 14px' : isWhileNode ? '16px' : '12px 14px',
+        minWidth: isWhileNode ? '120px' : '160px',
+        minHeight: isWhileNode ? '80px' : 'auto',
         transition: 'all 0.2s',
-        boxShadow: selected ? `0 0 0 1px ${color}` : 'none',
+        boxShadow: selected && !isWhileNode ? `0 0 0 1px ${color}` : 'none',
         position: 'relative',
         zIndex: 1,
-        display: 'block',
+        display: 'flex',
+        flexDirection: isWhileNode ? 'column' : 'row',
+        alignItems: isWhileNode ? 'flex-start' : 'center',
         visibility: 'visible',
         opacity: 1,
         overflow: 'hidden',
@@ -114,11 +122,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
           type="target"
           position={Position.Left}
           style={{
-            background: '#555',
-            width: '12px',
-            height: '12px',
+            background: isWhileNode ? '#3b82f6' : '#555',
+            width: isWhileNode ? '10px' : '12px',
+            height: isWhileNode ? '10px' : '12px',
             border: '2px solid #1a1a1a',
-            opacity: isHovered ? 1 : 0,
+            opacity: isHovered || isWhileNode ? 1 : 0,
             transition: 'opacity 0.2s',
           }}
         />
@@ -170,6 +178,50 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
               </div>
             )}
           </div>
+        </div>
+      ) : isWhileNode ? (
+        // Layout especial para nó WHILE (estilo OpenAI Build Agents)
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '4px',
+          width: '100%',
+          position: 'relative', 
+          zIndex: 1 
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+          }}>
+            <div style={{
+              color: '#9ca3af',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '2px',
+            }}>
+              {icon}
+            </div>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#9ca3af',
+              lineHeight: '1.4',
+            }}>
+              {data.label || 'While'}
+            </div>
+          </div>
+          {data.executionTime !== undefined && (
+            <div style={{
+              fontSize: '11px',
+              color: '#3b82f6',
+              fontWeight: 500,
+              marginTop: '4px',
+            }}>
+              ⏱️ {(data.executionTime / 1000).toFixed(2)}s
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
@@ -383,11 +435,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ data, selected, id })
           type="source"
           position={Position.Right}
           style={{
-            background: '#555',
-            width: '12px',
-            height: '12px',
-            border: '2px solid #1a1a1a',
-            opacity: isHovered ? 1 : 0,
+            background: isWhileNode ? '#3b82f6' : '#555',
+            width: isWhileNode ? '10px' : '12px',
+            height: isWhileNode ? '10px' : '12px',
+            border: isWhileNode ? '2px solid #1a1a1a' : '2px solid #1a1a1a',
+            opacity: isHovered || isWhileNode ? 1 : 0,
             transition: 'opacity 0.2s',
           }}
         />

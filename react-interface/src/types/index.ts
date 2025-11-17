@@ -39,10 +39,19 @@ export interface UserApprovalConfig {
   message?: string;
 }
 
+export interface WhileConfig {
+  while: {
+    condition: string; // Expressão CEL-like (ex: "context.iteration < 10", "inputs.foo == 5")
+    maxIterations?: number; // Máximo de iterações (padrão: 100)
+    steps?: string[]; // IDs dos nós que serão repetidos dentro do loop
+    childNodes?: string[]; // IDs dos nós filhos que estão dentro do container
+  };
+}
+
 export interface CustomNodeData {
   label: string;
   type: ComponentType;
-  config?: AgentConfig | IfElseConfig | UserApprovalConfig;
+  config?: AgentConfig | IfElseConfig | UserApprovalConfig | WhileConfig;
   isActive?: boolean;
   isCompleted?: boolean;
   executionTime?: number;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Copy, Trash2, Plus, ExternalLink } from 'lucide-react';
 import { CustomNode, IfElseConfig, IfElseCondition } from '../types';
 import VariableAutocomplete from './VariableAutocomplete';
+import ConfirmDialog from './ConfirmDialog';
 
 interface IfElseConfigPanelProps {
   node: CustomNode | null;
@@ -26,6 +27,19 @@ const IfElseConfigPanel: React.FC<IfElseConfigPanelProps> = ({
       elseLabel: 'Else',
     }
   );
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Atualiza o config quando o node muda (quando seleciona outro nó)
+  useEffect(() => {
+    if (node && node.data.config) {
+      setConfig(node.data.config as IfElseConfig);
+    } else if (node) {
+      setConfig({
+        conditions: [],
+        elseLabel: 'Else',
+      });
+    }
+  }, [node?.id, node?.data.config]);
 
   const handleChange = (field: keyof IfElseConfig, value: any) => {
     const newConfig = { ...config, [field]: value };
@@ -55,10 +69,13 @@ const IfElseConfigPanel: React.FC<IfElseConfigPanelProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm('Tem certeza que deseja deletar este nó If/else?')) {
-      onDelete(node.id);
-      onClose();
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    onDelete(node.id);
+    onClose();
+    setShowDeleteConfirm(false);
   };
 
   const handleCopy = () => {
@@ -343,6 +360,18 @@ const IfElseConfigPanel: React.FC<IfElseConfigPanelProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* Modal de confirmação de exclusão */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Deletar Nó If/Else"
+        message="Tem certeza que deseja deletar este nó If/Else? Esta ação não pode ser desfeita."
+        confirmText="Deletar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 };

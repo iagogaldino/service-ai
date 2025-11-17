@@ -40,6 +40,16 @@ export function filterVariables(searchText: string): VariableDefinition[] {
  * Extrai o texto após {{ para busca
  */
 export function extractSearchText(text: string, cursorPosition: number): string {
+  // Garante que text é uma string válida
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  
+  // Garante que cursorPosition é um número válido
+  if (typeof cursorPosition !== 'number' || cursorPosition < 0) {
+    return '';
+  }
+  
   // Procura por {{ antes da posição do cursor
   const textBeforeCursor = text.substring(0, cursorPosition);
   const lastOpenBrace = textBeforeCursor.lastIndexOf('{{');
@@ -58,6 +68,16 @@ export function extractSearchText(text: string, cursorPosition: number): string 
  * Verifica se o cursor está dentro de um {{ ... }}
  */
 export function isInsideVariable(text: string, cursorPosition: number): boolean {
+  // Garante que text é uma string válida
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+  
+  // Garante que cursorPosition é um número válido
+  if (typeof cursorPosition !== 'number' || cursorPosition < 0) {
+    return false;
+  }
+  
   const textBeforeCursor = text.substring(0, cursorPosition);
   const lastOpenBrace = textBeforeCursor.lastIndexOf('{{');
   

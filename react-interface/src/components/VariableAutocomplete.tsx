@@ -33,12 +33,15 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
   const updateSuggestions = useCallback(() => {
     if (!textareaRef.current) return;
 
-    const position = textareaRef.current.selectionStart;
+    // Garante que value é uma string válida
+    const safeValue = value || '';
+    
+    const position = textareaRef.current.selectionStart || 0;
     setCursorPosition(position);
 
     // Verifica se está digitando dentro de {{ ... }}
-    if (isInsideVariable(value, position)) {
-      const searchText = extractSearchText(value, position);
+    if (isInsideVariable(safeValue, position)) {
+      const searchText = extractSearchText(safeValue, position);
       const filtered = filterVariables(searchText);
       
       if (filtered.length > 0) {
@@ -132,17 +135,20 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
   const insertVariable = (variable: VariableDefinition) => {
     if (!textareaRef.current) return;
 
+    // Garante que value é uma string válida
+    const safeValue = value || '';
+
     const textarea = textareaRef.current;
-    const position = textarea.selectionStart;
-    const textBeforeCursor = value.substring(0, position);
-    const textAfterCursor = value.substring(position);
+    const position = textarea.selectionStart || 0;
+    const textBeforeCursor = safeValue.substring(0, position);
+    const textAfterCursor = safeValue.substring(position);
     
     // Encontra onde começa o {{
     const lastOpenBrace = textBeforeCursor.lastIndexOf('{{');
     if (lastOpenBrace === -1) return;
     
     // Substitui o texto entre {{ e o cursor pela variável completa
-    const beforeVariable = value.substring(0, lastOpenBrace);
+    const beforeVariable = safeValue.substring(0, lastOpenBrace);
     const variableText = `{{ ${variable.name} }}`;
     const newValue = beforeVariable + variableText + textAfterCursor;
     
@@ -166,7 +172,9 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
 
   // Função para destacar variáveis no texto
   const highlightVariables = (text: string) => {
-    if (!text) return [{ text: '', isVariable: false }];
+    // Garante que text é uma string válida
+    const safeText = text || '';
+    if (!safeText) return [{ text: '', isVariable: false }];
     
     // Regex para encontrar variáveis {{ nome_variavel }}
     const variableRegex = /\{\{\s*(\w+)\s*\}\}/g;
@@ -174,11 +182,11 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
     let lastIndex = 0;
     let match;
 
-    while ((match = variableRegex.exec(text)) !== null) {
+    while ((match = variableRegex.exec(safeText)) !== null) {
       // Adiciona texto antes da variável
       if (match.index > lastIndex) {
         parts.push({
-          text: text.substring(lastIndex, match.index),
+          text: safeText.substring(lastIndex, match.index),
           isVariable: false,
         });
       }
@@ -199,23 +207,23 @@ const VariableAutocomplete: React.FC<VariableAutocompleteProps> = ({
     }
     
     // Adiciona texto restante
-    if (lastIndex < text.length) {
+    if (lastIndex < safeText.length) {
       parts.push({
-        text: text.substring(lastIndex),
+        text: safeText.substring(lastIndex),
         isVariable: false,
       });
     }
     
-    return parts.length > 0 ? parts : [{ text, isVariable: false }];
+    return parts.length > 0 ? parts : [{ text: safeText, isVariable: false }];
   };
 
-  const highlightedParts = highlightVariables(value);
+  const highlightedParts = highlightVariables(value || '');
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <textarea
         ref={textareaRef}
-        value={value}
+        value={value || ''}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}

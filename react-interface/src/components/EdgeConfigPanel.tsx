@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Trash2, Play, MousePointer2, Check, ChevronDown } from 'lucide-react';
 import { Edge, Node } from 'reactflow';
 import { CustomNodeData } from '../types';
+import ConfirmDialog from './ConfirmDialog';
 
 interface EdgeConfigPanelProps {
   edge: Edge | null;
@@ -18,15 +19,20 @@ const EdgeConfigPanel: React.FC<EdgeConfigPanelProps> = ({
   onClose,
   onDelete 
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   if (!edge) {
     return null;
   }
 
   const handleDelete = () => {
-    if (window.confirm('Tem certeza que deseja deletar esta conexão?')) {
-      onDelete(edge.id);
-      onClose();
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    onDelete(edge.id);
+    onClose();
+    setShowDeleteConfirm(false);
   };
 
   const getNodeIcon = (type: string) => {
@@ -328,6 +334,18 @@ const EdgeConfigPanel: React.FC<EdgeConfigPanelProps> = ({
         </div>
         </div>
       </div>
+      
+      {/* Modal de confirmação de exclusão */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Deletar Conexão"
+        message="Tem certeza que deseja deletar esta conexão? Esta ação não pode ser desfeita."
+        confirmText="Deletar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 };

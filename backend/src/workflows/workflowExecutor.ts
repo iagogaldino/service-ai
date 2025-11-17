@@ -77,7 +77,7 @@ export async function executeWorkflow(
 
       // 3.3. Executa nó atual
       console.log(`🔄 Executando nó: ${currentNode.id} (tipo: ${currentNode.type}, tipo real: ${actualNodeType})`);
-      const result = await executeNode(currentNode, context, agentManager, socket);
+      const result = await executeNode(currentNode, context, agentManager, socket, workflow);
       console.log(`✅ Nó executado: ${currentNode.id}, resultado:`, JSON.stringify(result, null, 2));
       
       // 3.3. Atualiza contexto
@@ -213,14 +213,15 @@ async function executeNode(
   node: WorkflowNode,
   context: ExecutionContext,
   agentManager: AgentManager,
-  socket?: Socket
+  socket?: Socket,
+  workflow?: Workflow // Adicionado para suportar execução de steps no WHILE
 ): Promise<any> {
   // Determina o tipo real do nó (pode estar em data.type para compatibilidade com React Flow)
   // Verifica data.type ANTES de node.type para garantir que nós if-else e user-approval sejam reconhecidos
   const actualType = node.data?.type || node.type;
   
-  // Se o tipo real for if-else ou user-approval, usa ele diretamente
-  if (actualType === 'if-else' || actualType === 'user-approval') {
+  // Se o tipo real for if-else, user-approval ou while, usa ele diretamente
+  if (actualType === 'if-else' || actualType === 'user-approval' || actualType === 'while') {
     switch (actualType) {
       case 'if-else':
         // Nós if-else apenas avaliam condições e retornam resultado
@@ -255,6 +256,10 @@ async function executeNode(
           type: 'user-approval',
           evaluated: true,
         };
+      
+      case 'while':
+        // Executa loop while
+        return await executeWhileNode(node, context, agentManager, socket, workflow);
     }
   }
   
@@ -665,6 +670,251 @@ function evaluateIfElseConditionSimple(
   // Por padrão, retorna false
   console.warn(`⚠️ Condição não reconhecida na avaliação simplificada: "${condition}"`);
   return false;
+}
+
+/**
+ * Executa nó WHILE (loop condicional)
+ * Estilo OpenAI Build Agents
+ */
+async function executeWhileNode(
+  node: WorkflowNode,
+  context: ExecutionContext,
+  agentManager: AgentManager,
+  socket?: Socket,
+  workflow?: Workflow
+): Promise<any> {
+  const whileConfig = node.data?.config?.while;
+  
+  if (!whileConfig || !whileConfig.condition) {
+    throw new Error(`Nó WHILE ${node.id} não tem condição configurada`);
+  }
+
+  const maxIterations = whileConfig.maxIterations || 100;
+  const steps = whileConfig.steps || [];
+  const condition = whileConfig.condition;
+
+  console.log(`🔄 [WHILE] Iniciando loop no nó ${node.id}`);
+  console.log(`   Condição: "${condition}"`);
+  console.log(`   Max iterações: ${maxIterations}`);
+  console.log(`   Steps: ${steps.length > 0 ? steps.join(', ') : 'nenhum'}`);
+
+  const loopResults: any[] = [];
+  let iteration = 0;
+  let conditionMet = true;
+
+  // Inicializa variável de iteração no contexto se não existir
+  if (!context.variables) {
+    context.variables = {};
+  }
+  context.variables.iteration = 0;
+  context.variables.loop_count = 0;
+
+  // Loop principal
+  while (conditionMet && iteration < maxIterations) {
+    iteration++;
+    context.variables.iteration = iteration;
+    context.variables.loop_count = iteration;
+
+    console.log(`🔄 [WHILE] Iteração ${iteration}/${maxIterations}`);
+
+    // Processa a condição substituindo variáveis do contexto
+    // Suporta padrão Build Agents: context.*, inputs.*, step.*
+    const processedCondition = processWhileCondition(condition, context, iteration);
+
+    // Avalia condição usando agente LLM
+    try {
+      conditionMet = await evaluateIfElseCondition(processedCondition, context, agentManager, socket);
+      console.log(`   Condição avaliada: ${conditionMet ? 'TRUE' : 'FALSE'}`);
+    } catch (error: any) {
+      console.error(`❌ Erro ao avaliar condição do WHILE:`, error);
+      conditionMet = false; // Em caso de erro, para o loop
+      break;
+    }
+
+    // Se condição ainda é verdadeira, executa os steps
+    if (conditionMet) {
+      console.log(`   Executando ${steps.length} step(s) na iteração ${iteration}`);
+
+      // Executa cada step dentro do loop
+      const stepResults: any[] = [];
+      for (const stepId of steps) {
+        if (!workflow) {
+          console.warn(`   ⚠️ Workflow não disponível, não é possível executar step: ${stepId}`);
+          stepResults.push({
+            stepId,
+            iteration,
+            executed: false,
+            error: 'Workflow não disponível',
+          });
+          continue;
+        }
+
+        // Encontra o nó do step no workflow
+        const stepNode = workflow.nodes.find(n => n.id === stepId);
+        if (!stepNode) {
+          console.warn(`   ⚠️ Step não encontrado no workflow: ${stepId}`);
+          stepResults.push({
+            stepId,
+            iteration,
+            executed: false,
+            error: 'Step não encontrado',
+          });
+          continue;
+        }
+
+        console.log(`   → Executando step: ${stepId} (${stepNode.type})`);
+        
+        try {
+          // Executa o nó do step
+          const stepResult = await executeNode(stepNode, context, agentManager, socket, workflow);
+          
+          // Atualiza contexto com resultado do step
+          context.lastResult = stepResult;
+          context.lastNode = stepId;
+          context.history.push({
+            nodeId: stepId,
+            result: stepResult,
+            timestamp: new Date().toISOString(),
+          });
+
+          stepResults.push({
+            stepId,
+            iteration,
+            executed: true,
+            result: stepResult,
+          });
+
+          // Emite evento de step completado
+          if (socket) {
+            socket.emit('workflow_node_completed', {
+              nodeId: stepId,
+              nodeType: stepNode.data?.type || stepNode.type,
+              nodeName: stepNode.data?.label || stepId,
+              result: stepResult,
+              isWhileStep: true,
+              whileIteration: iteration,
+            });
+          }
+        } catch (error: any) {
+          console.error(`   ❌ Erro ao executar step ${stepId}:`, error);
+          stepResults.push({
+            stepId,
+            iteration,
+            executed: false,
+            error: error.message || 'Erro desconhecido',
+          });
+        }
+      }
+
+      loopResults.push({
+        iteration,
+        condition: processedCondition,
+        conditionMet: true,
+        stepResults,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Atualiza contexto com resultados da iteração
+      context.variables.last_iteration_result = stepResults;
+      context.variables.last_loop_result = stepResults[stepResults.length - 1];
+
+      // Pequeno delay para evitar execução muito rápida
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } else {
+      console.log(`   Condição falsa, saindo do loop`);
+    }
+  }
+
+  // Verifica se saiu por limite de iterações
+  if (iteration >= maxIterations && conditionMet) {
+    console.warn(`⚠️ [WHILE] Loop atingiu limite de ${maxIterations} iterações`);
+  }
+
+  const result = {
+    type: 'while',
+    condition: condition,
+    iterations: iteration,
+    maxIterations: maxIterations,
+    completed: !conditionMet, // true se saiu porque condição ficou falsa
+    stoppedByLimit: iteration >= maxIterations && conditionMet,
+    results: loopResults,
+    finalContext: {
+      iteration: context.variables.iteration,
+      loop_count: context.variables.loop_count,
+    },
+  };
+
+  console.log(`✅ [WHILE] Loop concluído: ${iteration} iteração(ões) executada(s)`);
+  
+  return result;
+}
+
+/**
+ * Processa condição do WHILE substituindo variáveis do padrão Build Agents
+ * Suporta: context.*, inputs.*, step.*
+ */
+function processWhileCondition(
+  condition: string,
+  context: ExecutionContext,
+  iteration: number
+): string {
+  let processed = condition;
+
+  // Substitui context.*
+  // Ex: context.count -> context.variables.count ou context.message
+  processed = processed.replace(/context\.(\w+)/g, (match, varName) => {
+    if (varName === 'message') {
+      return `"${context.message || ''}"`;
+    }
+    if (varName === 'iteration' || varName === 'loop_count') {
+      return String(iteration);
+    }
+    if (context.variables && context.variables[varName] !== undefined) {
+      const value = context.variables[varName];
+      return typeof value === 'string' ? `"${value}"` : String(value);
+    }
+    return 'undefined';
+  });
+
+  // Substitui inputs.*
+  // Ex: inputs.foo -> context.variables.foo ou context.message
+  processed = processed.replace(/inputs\.(\w+)/g, (match, varName) => {
+    if (context.variables && context.variables[varName] !== undefined) {
+      const value = context.variables[varName];
+      return typeof value === 'string' ? `"${value}"` : String(value);
+    }
+    // Fallback para message se não encontrar na variável
+    if (varName === 'message' || varName === 'text') {
+      return `"${context.message || ''}"`;
+    }
+    return 'undefined';
+  });
+
+  // Substitui step.*
+  // Ex: step.result -> último resultado do step
+  processed = processed.replace(/step\.(\w+)/g, (match, prop) => {
+    if (prop === 'result' && context.lastResult) {
+      const result = context.lastResult;
+      if (typeof result === 'string') {
+        return `"${result}"`;
+      }
+      return JSON.stringify(result);
+    }
+    if (prop === 'response' && context.lastResult?.response) {
+      return `"${context.lastResult.response}"`;
+    }
+    return 'undefined';
+  });
+
+  // Substitui variáveis de template padrão
+  processed = processTemplate(processed, {
+    input_user: context.message || '',
+    agent_response: context.lastResult?.response || '',
+    iteration: String(iteration),
+    loop_count: String(iteration),
+  });
+
+  return processed;
 }
 
 /**

@@ -10,6 +10,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@reactflow/node-resizer": "^2.2.14",
     "@types/uuid": "^9.0.8",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",

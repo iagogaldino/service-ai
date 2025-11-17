@@ -1,30 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Trash2, Plus } from 'lucide-react';
-import { CustomNode, UserApprovalConfig } from '../types';
+import { Copy, Trash2, Bookmark } from 'lucide-react';
+import { CustomNode, WhileConfig } from '../types';
 import VariableAutocomplete from './VariableAutocomplete';
 import ConfirmDialog from './ConfirmDialog';
 
-interface UserApprovalConfigPanelProps {
+interface WhileConfigPanelProps {
   node: CustomNode | null;
-  onUpdate: (nodeId: string, config: UserApprovalConfig) => void;
+  onUpdate: (nodeId: string, config: WhileConfig) => void;
   onClose: () => void;
   onDelete: (nodeId: string) => void;
 }
 
-const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({ 
+const WhileConfigPanel: React.FC<WhileConfigPanelProps> = ({ 
   node, 
   onUpdate, 
   onClose,
   onDelete 
 }) => {
-  if (!node || node.data.type !== 'user-approval') {
+  if (!node || node.data.type !== 'while') {
     return null;
   }
 
-  const [config, setConfig] = useState<UserApprovalConfig>(
-    (node.data.config as UserApprovalConfig) || {
-      name: 'User approval',
-      message: '',
+  const [config, setConfig] = useState<WhileConfig>(
+    (node.data.config as WhileConfig) || {
+      while: {
+        condition: '',
+        maxIterations: 100,
+        steps: [],
+      },
     }
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -32,17 +35,26 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
   // Atualiza o config quando o node muda (quando seleciona outro nó)
   useEffect(() => {
     if (node && node.data.config) {
-      setConfig(node.data.config as UserApprovalConfig);
+      setConfig(node.data.config as WhileConfig);
     } else if (node) {
       setConfig({
-        name: 'User approval',
-        message: '',
+        while: {
+          condition: '',
+          maxIterations: 100,
+          steps: [],
+        },
       });
     }
   }, [node?.id, node?.data.config]);
 
-  const handleChange = (field: keyof UserApprovalConfig, value: any) => {
-    const newConfig = { ...config, [field]: value };
+  const handleChange = (field: keyof WhileConfig['while'], value: any) => {
+    const newConfig: WhileConfig = {
+      ...config,
+      while: {
+        ...config.while,
+        [field]: value,
+      },
+    };
     setConfig(newConfig);
     onUpdate(node.id, newConfig);
   };
@@ -59,12 +71,7 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
 
   const handleCopy = () => {
     // TODO: Implementar funcionalidade de copiar
-    console.log('Copiar nó user approval');
-  };
-
-  const handleAddContext = () => {
-    // TODO: Implementar funcionalidade de adicionar contexto
-    console.log('Adicionar contexto');
+    console.log('Copiar nó While');
   };
 
   return (
@@ -119,13 +126,13 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
                 color: '#ffffff',
                 marginBottom: '4px',
               }}>
-                User approval
+                While
               </h2>
               <p style={{
                 fontSize: '14px',
                 color: '#9ca3af',
               }}>
-                Pause for a human to approve or reject a step
+                Loop while a condition is true
               </p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -179,7 +186,7 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
           overflowY: 'auto',
           minHeight: 0,
         }}>
-          {/* Campo Name */}
+          {/* Expression */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{
               fontSize: '14px',
@@ -188,13 +195,57 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
               marginBottom: '8px',
               display: 'block',
             }}>
-              Name
+              Expression
+            </label>
+            <VariableAutocomplete
+              value={config.while.condition || ''}
+              onChange={(value) => handleChange('condition', value)}
+              placeholder="e.g. input.foo == 5"
+              minHeight="80px"
+            />
+            <p style={{
+              fontSize: '12px',
+              color: '#9ca3af',
+              marginTop: '8px',
+              margin: 0,
+              lineHeight: '1.5',
+            }}>
+              Use Common Expression Language to create a custom expression.{' '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  // TODO: Abrir link de documentação
+                  console.log('Learn more about CEL');
+                }}
+                style={{
+                  color: '#3b82f6',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                }}
+              >
+                Learn more.
+              </a>
+            </p>
+          </div>
+
+          {/* Max Iterations */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#ffffff',
+              marginBottom: '8px',
+              display: 'block',
+            }}>
+              Max Iterations
             </label>
             <input
-              type="text"
-              value={config.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="User approval"
+              type="number"
+              value={config.while.maxIterations || 100}
+              onChange={(e) => handleChange('maxIterations', parseInt(e.target.value) || 100)}
+              min="1"
+              max="1000"
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -205,58 +256,32 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
                 fontSize: '14px',
               }}
             />
+            <p style={{
+              fontSize: '12px',
+              color: '#9ca3af',
+              marginTop: '8px',
+              margin: 0,
+            }}>
+              Maximum number of loop iterations to prevent infinite loops (default: 100)
+            </p>
           </div>
 
-          {/* Campo Message */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#ffffff',
-              marginBottom: '8px',
-              display: 'block',
+          {/* Steps Info */}
+          <div style={{
+            marginBottom: '24px',
+            padding: '12px',
+            backgroundColor: '#0a0a0a',
+            border: '1px solid #2a2a2a',
+            borderRadius: '6px',
+          }}>
+            <p style={{
+              fontSize: '12px',
+              color: '#9ca3af',
+              margin: 0,
+              lineHeight: '1.5',
             }}>
-              Message
-            </label>
-            <div style={{ position: 'relative' }}>
-              <VariableAutocomplete
-                value={config.message || ''}
-                onChange={(value) => handleChange('message', value)}
-                placeholder="Describe the message to show the user. Eg. ok to proceed?"
-                minHeight="120px"
-              />
-              <button
-                onClick={handleAddContext}
-                style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  right: '8px',
-                  padding: '6px 12px',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  transition: 'color 0.2s, background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#ffffff';
-                  e.currentTarget.style.backgroundColor = '#2a2a2a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#9ca3af';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <Plus size={14} />
-                Add context {'{=}'}
-              </button>
-            </div>
+              <strong style={{ color: '#ffffff' }}>Steps:</strong> Configure the steps to be repeated inside the loop by connecting nodes to this While node. The steps will be executed in order on each iteration while the condition is true.
+            </p>
           </div>
         </div>
       </div>
@@ -264,8 +289,8 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
       {/* Modal de confirmação de exclusão */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
-        title="Deletar Nó User Approval"
-        message={`Tem certeza que deseja deletar o nó "${config.name}"? Esta ação não pode ser desfeita.`}
+        title="Deletar Nó While"
+        message="Tem certeza que deseja deletar este nó While? Esta ação não pode ser desfeita."
         confirmText="Deletar"
         cancelText="Cancelar"
         type="danger"
@@ -276,5 +301,5 @@ const UserApprovalConfigPanel: React.FC<UserApprovalConfigPanelProps> = ({
   );
 };
 
-export default UserApprovalConfigPanel;
+export default WhileConfigPanel;
 

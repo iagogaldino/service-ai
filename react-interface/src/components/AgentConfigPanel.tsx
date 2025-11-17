@@ -3,6 +3,7 @@ import { Book, Trash2, Plus, Pencil, ChevronDown, ChevronUp, ExternalLink, Refre
 import { AgentConfig, CustomNode, ShouldUseRule } from '../types';
 import VariableAutocomplete from './VariableAutocomplete';
 import { getModelsByProvider, updateProviderModels, getLLMConfig, LLMModel } from '../services/apiService';
+import ConfirmDialog from './ConfirmDialog';
 // Removido: useGroups - não há mais grupos
 
 interface AgentConfigPanelProps {
@@ -55,6 +56,27 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   const [currentProvider, setCurrentProvider] = useState<'openai' | 'stackspot' | 'ollama'>('openai');
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isUpdatingModels, setIsUpdatingModels] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Atualiza o config quando o node muda (quando seleciona outro agente)
+  useEffect(() => {
+    if (node && node.data.config) {
+      setConfig(node.data.config);
+    } else if (node) {
+      setConfig({
+        name: node.data.label || 'Agent',
+        description: '',
+        instructions: '',
+        includeChatHistory: true,
+        model: 'gpt-4-turbo-preview',
+        tools: [],
+        outputFormat: 'text',
+        shouldUse: {
+          type: 'default',
+        },
+      });
+    }
+  }, [node?.id, node?.data.config]);
 
   // Carrega modelos do provider atual
   useEffect(() => {
@@ -111,10 +133,13 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   // Removido: useEffect para grupos - não há mais grupos
 
   const handleDelete = () => {
-    if (window.confirm('Tem certeza que deseja deletar este agente?')) {
-      onDelete(node.id);
-      onClose();
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    onDelete(node.id);
+    onClose();
+    setShowDeleteConfirm(false);
   };
 
   return (
@@ -1043,6 +1068,18 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* Modal de confirmação de exclusão */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Deletar Agente"
+        message={`Tem certeza que deseja deletar o agente "${config.name}"? Esta ação não pode ser desfeita.`}
+        confirmText="Deletar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 };

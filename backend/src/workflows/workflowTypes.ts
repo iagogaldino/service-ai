@@ -32,7 +32,7 @@ export interface EdgeCondition {
  */
 export interface WorkflowNode {
   id: string;
-  type: 'start' | 'agent' | 'end' | 'condition' | 'merge' | 'if-else' | 'user-approval';
+  type: 'start' | 'agent' | 'end' | 'condition' | 'merge' | 'if-else' | 'user-approval' | 'while';
   agentName?: string; // Se type = 'agent'
   position: { x: number; y: number };
   data?: {
@@ -46,6 +46,12 @@ export interface WorkflowNode {
         condition?: string;
       }>;
       elseLabel?: string;
+      // Configuração para nó WHILE
+      while?: {
+        condition: string; // Expressão CEL-like (ex: "context.count < 10", "inputs.foo == 5")
+        maxIterations?: number; // Máximo de iterações (padrão: 100)
+        steps?: string[]; // IDs dos nós que serão repetidos dentro do loop
+      };
     };
     [key: string]: any; // Permite campos extras
   };

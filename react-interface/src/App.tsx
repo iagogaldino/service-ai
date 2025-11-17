@@ -7,11 +7,13 @@ import AgentConfigPanel from './components/AgentConfigPanel';
 import EdgeConfigPanel from './components/EdgeConfigPanel';
 import IfElseConfigPanel from './components/IfElseConfigPanel';
 import UserApprovalConfigPanel from './components/UserApprovalConfigPanel';
+import WhileConfigPanel from './components/WhileConfigPanel';
 import WorkflowSelector from './components/WorkflowSelector';
 import TestWorkflowPanel from './components/TestWorkflowPanel';
 import ProjectModal from './components/ProjectModal';
 import ProjectSelector from './components/ProjectSelector';
 import SettingsMenu from './components/SettingsMenu';
+import ConfirmDialog from './components/ConfirmDialog';
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData, ComponentDefinition, AgentConfig, IfElseConfig, UserApprovalConfig } from './types';
 import { loadAgentsFromBackend, transformAgentForBackend, findExistingAgent, validateAgentConfig } from './utils/agentTransformer';
@@ -41,6 +43,8 @@ function App() {
   const [showProjectSelector, setShowProjectSelector] = useState(true);
   const [isCheckingProject, setIsCheckingProject] = useState(true);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
   
   // Estados para rastreamento visual do workflow
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
@@ -275,13 +279,13 @@ function App() {
         return;
       }
       
-      // Se houver um nó selecionado (agent, if-else ou user-approval), fecha o painel
-      if (selectedNode && (selectedNode.data.type === 'agent' || selectedNode.data.type === 'if-else' || selectedNode.data.type === 'user-approval')) {
+      // Se houver um nó selecionado (agent, if-else, user-approval ou while), fecha o painel
+      if (selectedNode && (selectedNode.data.type === 'agent' || selectedNode.data.type === 'if-else' || selectedNode.data.type === 'user-approval' || selectedNode.data.type === 'while')) {
         setSelectedNode(null);
       }
     };
 
-    if (selectedNode && (selectedNode.data.type === 'agent' || selectedNode.data.type === 'if-else' || selectedNode.data.type === 'user-approval')) {
+    if (selectedNode && (selectedNode.data.type === 'agent' || selectedNode.data.type === 'if-else' || selectedNode.data.type === 'user-approval' || selectedNode.data.type === 'while')) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
@@ -356,12 +360,38 @@ function App() {
     }
   }, [selectedNode]);
 
+  // Listener de teclado para deletar com a tecla Delete
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Verifica se a tecla Delete ou Backspace foi pressionada
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNode) {
+        // Previne o comportamento padrão (navegação do navegador)
+        e.preventDefault();
+        
+        // Verifica se não está digitando em um input ou textarea
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+        
+        // Abre o modal de confirmação
+        setNodeToDelete(selectedNode.id);
+        setShowDeleteConfirm(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedNode]);
+
   const handleDeleteNode = useCallback(async (nodeId: string) => {
-    const nodeToDelete = allNodes.find(node => node.id === nodeId);
+    const nodeToDeleteObj = allNodes.find(node => node.id === nodeId);
     
     // Se for um agente, deleta no backend também
-    if (nodeToDelete && nodeToDelete.data.type === 'agent' && nodeToDelete.data.config) {
-      const config = nodeToDelete.data.config;
+    if (nodeToDeleteObj && nodeToDeleteObj.data.type === 'agent' && nodeToDeleteObj.data.config) {
+      const config = nodeToDeleteObj.data.config;
       
       try {
         console.log(`🗑️ Deletando agente no backend: ${config.name}`);
@@ -386,7 +416,9 @@ function App() {
     setAllNodes((nds) => nds.filter((node) => node.id !== nodeId));
     // Remove edges conectadas a este nó
     setAllEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
-    if (selectedNode && selectedNode.id === nodeId) {
+    
+    // Limpa a seleção se o nó deletado estava selecionado
+    if (selectedNode?.id === nodeId) {
       setSelectedNode(null);
     }
   }, [selectedNode, allNodes]);
@@ -1181,6 +1213,14 @@ function App() {
             onDelete={handleDeleteNode}
           />
         )}
+        {selectedNode && selectedNode.data.type === 'while' && (
+          <WhileConfigPanel
+            node={selectedNode}
+            onUpdate={handleUpdateNode}
+            onClose={() => setSelectedNode(null)}
+            onDelete={handleDeleteNode}
+          />
+        )}
         {selectedEdge && (
           <EdgeConfigPanel
             edge={selectedEdge}
@@ -1256,6 +1296,45 @@ function App() {
           </div>
           {deployError}
         </div>
+      )}
+
+      {/* Modal de confirmação de exclusão por tecla Delete */}
+      {nodeToDelete && (
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          title="Deletar Nó"
+          message={
+            (() => {
+              const node = allNodes.find(n => n.id === nodeToDelete);
+              if (node?.data.type === 'agent' && node.data.config) {
+                const config = node.data.config as AgentConfig;
+                return `Tem certeza que deseja deletar o agente "${config.name}"? Esta ação não pode ser desfeita.`;
+              } else if (node?.data.type === 'while') {
+                return 'Tem certeza que deseja deletar este nó While? Esta ação não pode ser desfeita.';
+              } else if (node?.data.type === 'if-else') {
+                return 'Tem certeza que deseja deletar este nó If/Else? Esta ação não pode ser desfeita.';
+              } else if (node?.data.type === 'user-approval') {
+                const config = node.data.config as UserApprovalConfig;
+                return `Tem certeza que deseja deletar o nó "${config.name}"? Esta ação não pode ser desfeita.`;
+              }
+              return 'Tem certeza que deseja deletar este nó? Esta ação não pode ser desfeita.';
+            })()
+          }
+          confirmText="Deletar"
+          cancelText="Cancelar"
+          type="danger"
+          onConfirm={() => {
+            if (nodeToDelete) {
+              handleDeleteNode(nodeToDelete);
+              setShowDeleteConfirm(false);
+              setNodeToDelete(null);
+            }
+          }}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            setNodeToDelete(null);
+          }}
+        />
       )}
 
     </div>
